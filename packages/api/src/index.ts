@@ -26,6 +26,10 @@
  * @agent bundle-size-tracking
  * @modified 2026-01-25
  * @description Added bundle size tracking routes for monitoring bundle sizes
+ *
+ * @agent android-builds
+ * @modified 2026-01-26
+ * @description Added Android build system routes for managing app builds
  */
 
 /**
@@ -57,6 +61,7 @@ import { metricsRouter } from './routes/metrics'
 import { healthRouter } from './routes/health'
 import { uploadsRouter } from './routes/uploads'
 import { bundlesRouter } from './routes/bundles'
+import { iosBuildRoutes, androidBuildsRouter } from './routes/builds'
 import {
   rateLimitUpdates,
   rateLimitDevices,
@@ -114,6 +119,8 @@ app.route('/v1/apps', metricsRouter)
 app.route('/v1/apps', healthRouter)
 app.route('/v1/uploads', uploadsRouter)
 app.route('/v1/apps', bundlesRouter)
+app.route('/v1/apps', iosBuildRoutes)
+app.route('/v1/apps', androidBuildsRouter)
 
 // Admin routes (OTP-based auth, no rate limiting on auth routes themselves)
 app.use('/v1/admin-auth/*', rateLimitAuth)

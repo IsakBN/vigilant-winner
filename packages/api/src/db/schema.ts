@@ -529,6 +529,81 @@ export const otpAttempts = sqliteTable('otp_attempts', {
 }))
 
 // ============================================
+// iOS Builds Tables
+// ============================================
+
+/**
+ * iOS builds table
+ * Stores iOS app build records and signing metadata
+ *
+ * @agent ios-builds
+ * @created 2026-01-26
+ */
+export const iosBuilds = sqliteTable('ios_builds', {
+  id: text('id').primaryKey(),
+  appId: text('app_id').notNull().references(() => apps.id),
+  version: text('version').notNull(),
+  buildNumber: integer('build_number').notNull(),
+  status: text('status', {
+    enum: ['pending', 'building', 'signing', 'uploading', 'complete', 'failed'],
+  }).notNull().default('pending'),
+  configuration: text('configuration', { enum: ['debug', 'release'] }).notNull().default('release'),
+  bundleId: text('bundle_id').notNull(),
+  teamId: text('team_id'),
+  provisioningProfile: text('provisioning_profile'),
+  artifactUrl: text('artifact_url'),
+  artifactSize: integer('artifact_size'),
+  logs: text('logs'),
+  error: text('error'),
+  startedAt: integer('started_at', { mode: 'timestamp' }),
+  completedAt: integer('completed_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  appIdx: index('ios_builds_app_idx').on(table.appId),
+  statusIdx: index('ios_builds_status_idx').on(table.status),
+  createdIdx: index('ios_builds_created_idx').on(table.createdAt),
+  appVersionBuildIdx: index('ios_builds_app_version_build_idx').on(table.appId, table.version, table.buildNumber),
+}))
+
+// ============================================
+// Android Builds Tables
+// ============================================
+
+/**
+ * Android builds table
+ * Stores Android app build records and signing metadata
+ *
+ * @agent android-builds
+ * @created 2026-01-26
+ */
+export const androidBuilds = sqliteTable('android_builds', {
+  id: text('id').primaryKey(),
+  appId: text('app_id').notNull().references(() => apps.id),
+  version: text('version').notNull(),
+  versionCode: integer('version_code').notNull(),
+  status: text('status', {
+    enum: ['pending', 'building', 'signing', 'uploading', 'complete', 'failed'],
+  }).notNull().default('pending'),
+  buildType: text('build_type', { enum: ['debug', 'release'] }).notNull().default('release'),
+  flavor: text('flavor'),
+  packageName: text('package_name').notNull(),
+  keystoreAlias: text('keystore_alias'),
+  artifactUrl: text('artifact_url'),
+  artifactSize: integer('artifact_size'),
+  artifactType: text('artifact_type', { enum: ['apk', 'aab'] }).notNull().default('apk'),
+  logs: text('logs'),
+  error: text('error'),
+  startedAt: integer('started_at', { mode: 'timestamp' }),
+  completedAt: integer('completed_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  appIdx: index('android_builds_app_idx').on(table.appId),
+  statusIdx: index('android_builds_status_idx').on(table.status),
+  createdIdx: index('android_builds_created_idx').on(table.createdAt),
+  appVersionCodeIdx: index('android_builds_app_version_code_idx').on(table.appId, table.version, table.versionCode),
+}))
+
+// ============================================
 // Health Reports Tables
 // ============================================
 
