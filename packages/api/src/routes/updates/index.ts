@@ -8,7 +8,7 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { updateCheckRequestSchema, ERROR_CODES } from '@bundlenudge/shared'
-import { verifyDeviceToken, decodeJwtPayload } from '../../lib/device-token'
+import { verifyDeviceToken } from '../../lib/device-token'
 import type { Env } from '../../types/env'
 
 interface ReleaseRow {
@@ -30,7 +30,7 @@ interface AppRow {
   webhook_secret: string
 }
 
-export const updatesRoutes = new Hono<{ Bindings: Env }>()
+export const updatesRouter = new Hono<{ Bindings: Env }>()
 
 /**
  * POST /v1/updates/check
@@ -38,7 +38,7 @@ export const updatesRoutes = new Hono<{ Bindings: Env }>()
  * Check for available updates for a device.
  * Returns the latest active release if device qualifies.
  */
-updatesRoutes.post(
+updatesRouter.post(
   '/check',
   zValidator('json', updateCheckRequestSchema),
   async (c) => {

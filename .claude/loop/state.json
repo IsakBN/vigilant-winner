@@ -1,7 +1,7 @@
 {
-  "phase": "failed",
+  "phase": "ready",
   "currentPackage": "api",
-  "currentFeature": "update-check",
+  "currentFeature": "stripe-billing",
   "completedPackages": [],
   "completedFeatures": [
     "setup:setup",
@@ -15,7 +15,10 @@
     "api:apps-crud",
     "api:releases-crud",
     "api:release-management",
-    "api:device-registration"
+    "api:device-registration",
+    "api:update-check",
+    "api:telemetry",
+    "api:targeting-engine"
   ],
   "failedAttempts": [
     {
@@ -34,7 +37,7 @@
       "time": "2026-01-25T16:53:41Z"
     }
   ],
-  "lastCheckpoint": "2026-01-25T16:40:35Z",
+  "lastCheckpoint": "2026-01-25T16:53:41Z",
   "startedAt": null,
   "totalTokensUsed": 0,
   "buildOrder": [

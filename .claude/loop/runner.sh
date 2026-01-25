@@ -72,7 +72,10 @@ save_failure() {
   local feature="$1"
   local attempt="$2"
   local log_file="$3"
-  local failure_file="$FAILURES_DIR/${feature//://}-$(date +%Y%m%d-%H%M%S).md"
+  local failure_file="$FAILURES_DIR/${feature//:/-}-$(date +%Y%m%d-%H%M%S).md"
+
+  # Ensure failures directory exists
+  mkdir -p "$FAILURES_DIR"
 
   cat > "$failure_file" << FAILURE_EOF
 # Failure Report: $feature
@@ -383,7 +386,7 @@ run_tests() {
 
   # Run tests
   log "Running tests for $package..."
-  if ! pnpm test --filter="@bundlenudge/$package" 2>&1; then
+  if ! pnpm --filter="@bundlenudge/$package" test 2>&1; then
     error "Tests failed"
     return 1
   fi
@@ -391,7 +394,7 @@ run_tests() {
 
   # Run typecheck
   log "Running typecheck for $package..."
-  if ! pnpm typecheck --filter="@bundlenudge/$package" 2>&1; then
+  if ! pnpm --filter="@bundlenudge/$package" typecheck 2>&1; then
     error "Typecheck failed"
     return 1
   fi
@@ -399,7 +402,7 @@ run_tests() {
 
   # Run lint (optional - don't fail build)
   log "Running lint for $package..."
-  if pnpm lint --filter="@bundlenudge/$package" 2>&1; then
+  if pnpm --filter="@bundlenudge/$package" lint 2>&1; then
     success "Lint passed"
   else
     warn "Lint warnings (non-blocking)"
