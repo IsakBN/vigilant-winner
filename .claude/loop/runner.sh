@@ -8,7 +8,11 @@
 #   ./runner.sh              # Start fresh
 #   ./runner.sh --continue   # Resume from last state
 
-set -e
+# Don't use set -e - we handle errors ourselves
+# set -e
+
+# Trap errors and log them
+trap 'echo "[ERROR] Script failed at line $LINENO" >> "$SUMMARY_LOG"' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -188,16 +192,24 @@ build_feature() {
     check_stop
 
     log "Attempt $attempt/$MAX_RETRIES"
+    summary "▶ ATTEMPT $attempt: $package/$feature_name"
+
+    # Write prompt to temp file (avoids issues with large prompts via pipe)
+    local prompt_file=$(mktemp)
+    echo "$prompt" > "$prompt_file"
 
     # Run Claude with fresh context (no --continue, explicit new session)
     # -p: Non-interactive mode (prints output, doesn't wait for input)
     # --dangerously-skip-permissions: Auto-approve tool use
     # --model: Use sonnet for speed/cost balance
     # Each invocation is a NEW session with NO prior context
-    if echo "$prompt" | $CLAUDE_BIN -p \
+    log "Running Claude CLI..."
+    if cat "$prompt_file" | $CLAUDE_BIN -p \
       --dangerously-skip-permissions \
       --model sonnet \
       2>&1 | tee "$log_file"; then
+
+      rm -f "$prompt_file"
 
       # Run tests
       if run_tests "$package"; then
@@ -214,9 +226,12 @@ build_feature() {
         return 0
       else
         warn "Tests failed, retrying..."
+        summary "⚠️ Tests failed for $package/$feature_name, retrying..."
       fi
     else
       warn "Build failed, retrying..."
+      summary "⚠️ Claude build failed for $package/$feature_name, retrying..."
+      rm -f "$prompt_file"
     fi
 
     # Record failed attempt
