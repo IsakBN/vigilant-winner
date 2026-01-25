@@ -36,6 +36,7 @@ MAX_RETRIES=3
 CHECKPOINT_EVERY=5  # features (reduced from default for better recovery)
 STOP_FILE="$SCRIPT_DIR/STOP"
 FAILURES_DIR="$SCRIPT_DIR/failures"
+SESSION_FILE="$SCRIPT_DIR/.session-id"
 
 # Ensure directories exist
 mkdir -p "$LOG_DIR"
@@ -134,14 +135,15 @@ update_state() {
 
 # Get next feature to build
 get_next_feature() {
-  local completed=$(jq -r '.completedFeatures | join(",")' "$STATE_FILE")
-  jq -r --arg completed "$completed" '
-    .buildOrder[] |
-    .package as $pkg |
-    .features[] |
-    select(($pkg + ":" + .) as $full | ($completed | split(",") | index($full) | not)) |
-    "\(.package):\(.)"
-  ' "$STATE_FILE" | head -1
+  # Get all completed features as an array
+  local completed_json=$(jq -c '.completedFeatures' "$STATE_FILE")
+
+  # Iterate through build order and find first uncompleted feature
+  jq -r --argjson completed "$completed_json" '
+    [.buildOrder[] | .package as $pkg | .features[] | "\($pkg):\(.)"] |
+    map(select(. as $f | $completed | index($f) | not)) |
+    .[0] // empty
+  ' "$STATE_FILE"
 }
 
 # Create checkpoint
@@ -198,15 +200,24 @@ build_feature() {
     local prompt_file=$(mktemp)
     echo "$prompt" > "$prompt_file"
 
-    # Run Claude with fresh context (no --continue, explicit new session)
+    # Build Claude command
     # -p: Non-interactive mode (prints output, doesn't wait for input)
     # --dangerously-skip-permissions: Auto-approve tool use
     # --model: Use sonnet for speed/cost balance
-    # Each invocation is a NEW session with NO prior context
-    log "Running Claude CLI..."
+    # --session-id: Use consistent session for context continuity
+
+    # Generate or reuse session ID for this run (maintains memory across features)
+    if [ ! -f "$SESSION_FILE" ]; then
+      # Generate new UUID for session
+      uuidgen > "$SESSION_FILE" 2>/dev/null || cat /proc/sys/kernel/random/uuid > "$SESSION_FILE" 2>/dev/null || echo "$(date +%s)-$$" > "$SESSION_FILE"
+    fi
+    local session_id=$(cat "$SESSION_FILE")
+
+    log "Running Claude CLI (session: $session_id)..."
     if cat "$prompt_file" | $CLAUDE_BIN -p \
       --dangerously-skip-permissions \
       --model sonnet \
+      --session-id "$session_id" \
       2>&1 | tee "$log_file"; then
 
       rm -f "$prompt_file"
@@ -324,15 +335,40 @@ $feature_prompt
 2. Follow ALL patterns from KNOWLEDGE.md
 3. Respect ALL decisions from DECISIONS.md
 4. Follow ALL code quality rules from CLAUDE.md (max 250 lines/file, etc.)
-5. Write tests for the feature (colocated *.test.ts files)
+5. **MANDATORY: Write tests** - Every feature MUST have colocated *.test.ts file
 6. Tests MUST pass before you're done
 
-## Output
-- Create/edit files as needed
-- Run tests to verify: pnpm test --filter=@bundlenudge/$package
-- If tests fail, fix the code until they pass
+## TESTING REQUIREMENTS (MANDATORY)
+You MUST create test files for every feature:
+- Create \`<feature>.test.ts\` alongside your implementation
+- Test file must be in same directory as implementation
+- Use Vitest (import { describe, it, expect } from 'vitest')
+- Test all main functions and edge cases
+- Run tests: \`pnpm test --filter=@bundlenudge/$package\`
 
-Begin implementation.
+Example test structure:
+\`\`\`typescript
+import { describe, it, expect, vi } from 'vitest'
+import { yourFunction } from './your-file'
+
+describe('yourFunction', () => {
+  it('should handle normal case', () => {
+    // test
+  })
+
+  it('should handle edge case', () => {
+    // test
+  })
+})
+\`\`\`
+
+## Output
+1. Create implementation files
+2. Create test files (*.test.ts) - THIS IS REQUIRED
+3. Run tests: pnpm test --filter=@bundlenudge/$package
+4. If tests fail, fix until they pass
+
+Begin implementation. REMEMBER: Create *.test.ts files!
 EOF
 }
 

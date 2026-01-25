@@ -1,7 +1,7 @@
 {
-  "phase": "ready",
-  "currentPackage": null,
-  "currentFeature": null,
+  "phase": "failed",
+  "currentPackage": "api",
+  "currentFeature": "update-check",
   "completedPackages": [],
   "completedFeatures": [
     "setup:setup",
@@ -17,7 +17,23 @@
     "api:release-management",
     "api:device-registration"
   ],
-  "failedAttempts": [],
+  "failedAttempts": [
+    {
+      "feature": "api:update-check",
+      "attempt": 1,
+      "time": "2026-01-25T16:53:36Z"
+    },
+    {
+      "feature": "api:update-check",
+      "attempt": 2,
+      "time": "2026-01-25T16:53:39Z"
+    },
+    {
+      "feature": "api:update-check",
+      "attempt": 3,
+      "time": "2026-01-25T16:53:41Z"
+    }
+  ],
   "lastCheckpoint": "2026-01-25T16:40:35Z",
   "startedAt": null,
   "totalTokensUsed": 0,

@@ -6,13 +6,14 @@
 
 ---
 
-## Loop Progress: 8/50 features (16%)
+## Loop Progress: 12/50 features (24%)
 
 ```
-[████░░░░░░░░░░░░░░░░░░░░░░░░░░] 16%
+[███████░░░░░░░░░░░░░░░░░░░░░░░] 24%
 ```
 
 ### Completed Features
+- ✅ setup:setup
 - ✅ shared:types
 - ✅ shared:schemas
 - ✅ shared:constants
@@ -21,9 +22,12 @@
 - ✅ api:auth-middleware
 - ✅ api:github-oauth
 - ✅ api:apps-crud
+- ✅ api:releases-crud
+- ✅ api:release-management
+- ✅ api:device-registration
 
 ### Next Up
-- 🔄 api:releases-crud
+- 🔄 api:update-check
 
 ---
 
