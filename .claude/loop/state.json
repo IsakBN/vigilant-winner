@@ -3,7 +3,7 @@
   "currentPackage": null,
   "currentFeature": null,
   "completedPackages": [],
-  "completedFeatures": ["shared:types", "shared:schemas", "shared:constants", "api:database-schema", "api:better-auth-setup", "api:auth-middleware", "api:github-oauth"],
+  "completedFeatures": ["shared:types", "shared:schemas", "shared:constants", "api:database-schema", "api:better-auth-setup", "api:auth-middleware", "api:github-oauth", "api:apps-crud"],
   "failedAttempts": [],
   "lastCheckpoint": null,
   "startedAt": null,

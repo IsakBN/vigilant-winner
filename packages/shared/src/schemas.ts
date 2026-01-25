@@ -7,6 +7,24 @@
 import { z } from 'zod'
 
 // =============================================================================
+// Apps
+// =============================================================================
+
+export const createAppSchema = z.object({
+  name: z.string().min(1).max(100),
+  platform: z.enum(['ios', 'android']),
+  bundleId: z.string().min(1).max(255).optional(),
+})
+
+export const updateAppSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  bundleId: z.string().min(1).max(255).optional().nullable(),
+})
+
+export type CreateAppSchema = z.infer<typeof createAppSchema>
+export type UpdateAppSchema = z.infer<typeof updateAppSchema>
+
+// =============================================================================
 // Device & Targeting
 // =============================================================================
 
