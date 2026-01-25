@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { Hono } from 'hono'
-import { authMiddleware, requireAdmin } from './auth'
+import { authMiddleware, requireAdmin, type AuthUser } from './auth'
 import type { Env } from '../types/env'
 
 // Mock the auth module
@@ -12,6 +12,10 @@ vi.mock('../lib/auth', () => ({
   }),
   isAdmin: (email: string | null | undefined) => email?.endsWith('@bundlenudge.com') ?? false,
 }))
+
+interface AuthVariables {
+  user: AuthUser
+}
 
 const mockEnv = {} as Env
 
@@ -44,7 +48,7 @@ describe('requireAdmin', () => {
   })
 
   it('returns 403 when user is not admin', async () => {
-    const app = new Hono<{ Bindings: Env }>()
+    const app = new Hono<{ Bindings: Env; Variables: AuthVariables }>()
     app.use('*', async (c, next) => {
       c.set('user', {
         id: 'user-1',
@@ -65,7 +69,7 @@ describe('requireAdmin', () => {
   })
 
   it('allows admin users through', async () => {
-    const app = new Hono<{ Bindings: Env }>()
+    const app = new Hono<{ Bindings: Env; Variables: AuthVariables }>()
     app.use('*', async (c, next) => {
       c.set('user', {
         id: 'admin-1',

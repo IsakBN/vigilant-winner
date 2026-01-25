@@ -23,6 +23,11 @@ export interface BundleNudgeCallbacks {
   onError?: (error: Error) => void
 }
 
+interface DeviceRegisterResponse {
+  accessToken: string
+  expiresAt: number
+}
+
 export class BundleNudge {
   private static instance: BundleNudge | null = null
 
@@ -262,7 +267,7 @@ export class BundleNudge {
       throw new Error(`Device registration failed: ${response.status}`)
     }
 
-    const data = await response.json()
+    const data: DeviceRegisterResponse = await response.json()
     await this.storage.setAccessToken(data.accessToken)
   }
 

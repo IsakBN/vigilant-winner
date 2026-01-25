@@ -19,6 +19,20 @@ export interface UpdaterDependencies {
   onProgress?: (progress: DownloadProgress) => void
 }
 
+interface UpdateCheckResponse {
+  updateAvailable: boolean
+  requiresAppStoreUpdate?: boolean
+  appStoreMessage?: string
+  release?: {
+    version: string
+    bundleUrl: string
+    bundleSize: number
+    bundleHash: string
+    releaseId: string
+    releaseNotes?: string
+  }
+}
+
 export class Updater {
   private storage: Storage
   private config: BundleNudgeConfig
@@ -62,7 +76,7 @@ export class Updater {
       throw new Error(`Update check failed: ${response.status}`)
     }
 
-    const data = await response.json()
+    const data: UpdateCheckResponse = await response.json()
 
     if (data.updateAvailable && data.release) {
       return {

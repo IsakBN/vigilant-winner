@@ -3,9 +3,19 @@
   "currentPackage": null,
   "currentFeature": null,
   "completedPackages": [],
-  "completedFeatures": ["shared:types", "shared:schemas", "shared:constants", "api:database-schema", "api:better-auth-setup", "api:auth-middleware", "api:github-oauth", "api:apps-crud"],
+  "completedFeatures": [
+    "shared:types",
+    "shared:schemas",
+    "shared:constants",
+    "api:database-schema",
+    "api:better-auth-setup",
+    "api:auth-middleware",
+    "api:github-oauth",
+    "api:apps-crud",
+    "api:releases-crud"
+  ],
   "failedAttempts": [],
-  "lastCheckpoint": null,
+  "lastCheckpoint": "2026-01-25T16:37:11Z",
   "startedAt": null,
   "totalTokensUsed": 0,
   "buildOrder": [
@@ -13,14 +23,20 @@
       "package": "setup",
       "phase": 0,
       "description": "Project setup and validation",
-      "features": ["setup"],
+      "features": [
+        "setup"
+      ],
       "critical": true
     },
     {
       "package": "shared",
       "phase": 1,
       "description": "Foundation types and schemas",
-      "features": ["types", "schemas", "constants"]
+      "features": [
+        "types",
+        "schemas",
+        "constants"
+      ]
     },
     {
       "package": "api",
