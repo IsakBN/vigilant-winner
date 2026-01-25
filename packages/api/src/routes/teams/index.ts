@@ -9,6 +9,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import type { Env } from '../../types/env'
 import { invitationsRouter } from './invitations'
+import { auditRouter } from './audit'
 
 // =============================================================================
 // Schemas
@@ -419,10 +420,11 @@ teamsRouter.delete('/:teamId/members/:memberId', async (c) => {
 })
 
 // =============================================================================
-// Mount Invitations Router
+// Mount Sub-Routers
 // =============================================================================
 
 teamsRouter.route('/', invitationsRouter)
+teamsRouter.route('/', auditRouter)
 
 // =============================================================================
 // Helpers
