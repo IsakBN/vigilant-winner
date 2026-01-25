@@ -13,6 +13,8 @@ import { devicesRouter } from './routes/devices'
 import { releasesRouter } from './routes/releases'
 import { telemetryRouter } from './routes/telemetry'
 import { appsRouter } from './routes/apps'
+import { subscriptionsRouter } from './routes/subscriptions'
+import { teamsRouter } from './routes/teams'
 
 import type { Env } from './types/env'
 
@@ -32,6 +34,8 @@ app.route('/v1/devices', devicesRouter)
 app.route('/v1/releases', releasesRouter)
 app.route('/v1/telemetry', telemetryRouter)
 app.route('/v1/apps', appsRouter)
+app.route('/v1/subscriptions', subscriptionsRouter)
+app.route('/v1/teams', teamsRouter)
 
 // 404 handler
 app.notFound((c) => c.json({ error: 'not_found', message: 'Route not found' }, 404))

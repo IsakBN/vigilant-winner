@@ -1,7 +1,7 @@
 {
   "phase": "ready",
   "currentPackage": "api",
-  "currentFeature": "stripe-billing",
+  "currentFeature": "teams-invitations",
   "completedPackages": [],
   "completedFeatures": [
     "setup:setup",
@@ -18,7 +18,9 @@
     "api:device-registration",
     "api:update-check",
     "api:telemetry",
-    "api:targeting-engine"
+    "api:targeting-engine",
+    "api:stripe-billing",
+    "api:teams-crud"
   ],
   "failedAttempts": [
     {

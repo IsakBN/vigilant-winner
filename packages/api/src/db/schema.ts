@@ -118,3 +118,119 @@ export const releaseStats = sqliteTable('release_stats', {
   totalCrashes: integer('total_crashes').default(0),
   lastUpdatedAt: integer('last_updated_at', { mode: 'timestamp' }).notNull(),
 })
+
+/**
+ * Subscription plans table
+ * Available subscription tiers
+ */
+export const subscriptionPlans = sqliteTable('subscription_plans', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull().unique(),
+  displayName: text('display_name').notNull(),
+  priceCents: integer('price_cents').notNull(),
+  stripePriceId: text('stripe_price_id'),
+  mauLimit: integer('mau_limit').notNull(),
+  storageGb: integer('storage_gb').notNull(),
+  bundleRetention: integer('bundle_retention').notNull(),
+  features: text('features', { mode: 'json' }),
+  isActive: integer('is_active', { mode: 'boolean' }).default(true),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+})
+
+/**
+ * Subscriptions table
+ * User subscription records
+ */
+export const subscriptions = sqliteTable('subscriptions', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  planId: text('plan_id').notNull().references(() => subscriptionPlans.id),
+  status: text('status', {
+    enum: ['active', 'trialing', 'past_due', 'cancelled', 'expired'],
+  }).default('active'),
+  stripeCustomerId: text('stripe_customer_id'),
+  stripeSubscriptionId: text('stripe_subscription_id'),
+  currentPeriodStart: integer('current_period_start', { mode: 'timestamp' }),
+  currentPeriodEnd: integer('current_period_end', { mode: 'timestamp' }),
+  cancelAtPeriodEnd: integer('cancel_at_period_end', { mode: 'boolean' }).default(false),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  userIdx: index('subscriptions_user_idx').on(table.userId),
+  stripeCustomerIdx: index('subscriptions_stripe_customer_idx').on(table.stripeCustomerId),
+  stripeSubIdx: index('subscriptions_stripe_sub_idx').on(table.stripeSubscriptionId),
+}))
+
+/**
+ * Organizations (Teams) table
+ * Teams/workspaces for collaborative access
+ */
+export const organizations = sqliteTable('organizations', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').unique(),
+  ownerId: text('owner_id').notNull(),
+  planId: text('plan_id').references(() => subscriptionPlans.id),
+  domain: text('domain'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  ownerIdx: index('organizations_owner_idx').on(table.ownerId),
+  slugIdx: index('organizations_slug_idx').on(table.slug),
+}))
+
+/**
+ * Organization members table
+ * User membership in organizations
+ */
+export const organizationMembers = sqliteTable('organization_members', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').notNull().references(() => organizations.id),
+  userId: text('user_id').notNull(),
+  role: text('role', { enum: ['owner', 'admin', 'member'] }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  orgIdx: index('org_members_org_idx').on(table.organizationId),
+  userIdx: index('org_members_user_idx').on(table.userId),
+  orgUserIdx: index('org_members_org_user_idx').on(table.organizationId, table.userId),
+}))
+
+/**
+ * Team invitations table
+ * Pending invitations to join a team
+ */
+export const teamInvitations = sqliteTable('team_invitations', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').notNull().references(() => organizations.id),
+  email: text('email').notNull(),
+  role: text('role', { enum: ['admin', 'member'] }).notNull(),
+  token: text('token').notNull().unique(),
+  invitedBy: text('invited_by').notNull(),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  acceptedAt: integer('accepted_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  orgIdx: index('team_invitations_org_idx').on(table.organizationId),
+  tokenIdx: index('team_invitations_token_idx').on(table.token),
+  emailIdx: index('team_invitations_email_idx').on(table.email),
+}))
+
+/**
+ * Team audit log table
+ * Tracks team-related events for compliance
+ */
+export const teamAuditLog = sqliteTable('team_audit_log', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').notNull().references(() => organizations.id),
+  userId: text('user_id').notNull(),
+  event: text('event').notNull(),
+  metadata: text('metadata', { mode: 'json' }),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  orgIdx: index('team_audit_org_idx').on(table.organizationId),
+  userIdx: index('team_audit_user_idx').on(table.userId),
+  eventIdx: index('team_audit_event_idx').on(table.event),
+  createdIdx: index('team_audit_created_idx').on(table.createdAt),
+}))

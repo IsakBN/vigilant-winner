@@ -6,10 +6,10 @@
 
 ---
 
-## Loop Progress: 15/50 features (30%)
+## Loop Progress: 17/50 features (34%)
 
 ```
-[█████████░░░░░░░░░░░░░░░░░░░░░] 30%
+[██████████░░░░░░░░░░░░░░░░░░░░] 34%
 ```
 
 ### Completed Features
@@ -28,9 +28,11 @@
 - ✅ api:update-check
 - ✅ api:telemetry
 - ✅ api:targeting-engine
+- ✅ api:stripe-billing
+- ✅ api:teams-crud
 
 ### Next Up
-- 🔄 api:stripe-billing (Phase 4 - SaaS features)
+- 🔄 api:teams-invitations (Phase 4 - SaaS features)
 
 ---
 
