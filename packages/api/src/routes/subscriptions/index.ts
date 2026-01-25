@@ -49,7 +49,7 @@ subscriptionsRouter.get('/plans', async (c) => {
   `).all()
 
   return c.json({
-    plans: plans.results.map(formatPlan),
+    plans: (plans.results as unknown as PlanRecord[]).map(formatPlan),
   })
 })
 
@@ -82,12 +82,12 @@ subscriptionsRouter.get('/me', async (c) => {
 
     return c.json({
       subscription: null,
-      plan: freePlan ? formatPlan(freePlan) : getDefaultFreePlan(),
+      plan: freePlan ? formatPlan(freePlan as unknown as PlanRecord) : getDefaultFreePlan(),
     })
   }
 
   return c.json({
-    subscription: formatSubscription(subscription),
+    subscription: formatSubscription(subscription as unknown as SubscriptionRecord),
     plan: {
       id: subscription.plan_id,
       name: subscription.plan_name,

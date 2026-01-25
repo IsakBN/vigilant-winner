@@ -73,7 +73,7 @@ teamsRouter.get('/', async (c) => {
     LIMIT ? OFFSET ?
   `).bind(userId, limit, offset).all()
 
-  const data = results.results.map(formatTeam)
+  const data = (results.results as unknown as TeamRecord[]).map(formatTeam)
 
   return c.json({
     data,
@@ -111,7 +111,7 @@ teamsRouter.get('/:teamId', async (c) => {
     return c.json({ error: 'not_found', message: 'Team not found' }, 404)
   }
 
-  return c.json({ team: formatTeam(team) })
+  return c.json({ team: formatTeam(team as unknown as TeamRecord) })
 })
 
 /**
@@ -176,7 +176,7 @@ teamsRouter.post('/', zValidator('json', createTeamSchema), async (c) => {
     'SELECT * FROM organizations WHERE id = ?'
   ).bind(teamId).first()
 
-  return c.json({ team: formatTeam(team) }, 201)
+  return c.json({ team: formatTeam(team as unknown as TeamRecord | null) }, 201)
 })
 
 /**
@@ -242,7 +242,7 @@ teamsRouter.patch('/:teamId', zValidator('json', updateTeamSchema), async (c) =>
     'SELECT * FROM organizations WHERE id = ?'
   ).bind(teamId).first()
 
-  return c.json({ team: formatTeam(team) })
+  return c.json({ team: formatTeam(team as unknown as TeamRecord | null) })
 })
 
 /**
@@ -326,7 +326,7 @@ teamsRouter.get('/:teamId/members', async (c) => {
     LIMIT ? OFFSET ?
   `).bind(teamId, limit, offset).all()
 
-  const data = results.results.map(formatMember)
+  const data = (results.results as unknown as MemberRecord[]).map(formatMember)
 
   return c.json({
     data,
