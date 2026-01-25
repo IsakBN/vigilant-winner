@@ -6,10 +6,10 @@
 
 ---
 
-## 🎯 Current Status: Wave-Based Remediation
+## Current Status: Wave 4 Complete
 
-**Route Coverage:** 81/116 routes (70%)
-**Test Count:** 1,012+ tests
+**Route Coverage:** 105/116 routes (90%)
+**Test Count:** 1,411 tests
 **Agent Structure:** Hierarchical (Launch PM → Coordinators → Executors → Auditors)
 
 ---
@@ -43,19 +43,33 @@
 | Add PLAN_LIMITS | `remediate-plan-limits` | Added |
 | Add RATE_LIMITS | `remediate-rate-limits-constants` | Added |
 
+### Wave 4: Feature Completion ✅
+| Task | Routes | Tests |
+|------|--------|-------|
+| Channels system | 5 | 33 |
+| Health reports | 4 | 40 |
+| Advanced metrics | 4 | 40 |
+| Bundle size tracking | 2 | 30 |
+| Device management | 7 | 35 |
+| Upload status | 2 | 20 |
+
 ---
 
-## Current Phase: Wave 4 - Feature Completion 🔄
+## Next Phase: Wave 5 - Admin System 🔄
 
-**Focus:** Missing routes and systems
+**Focus:** Admin authentication and management
 
-### Remaining Gaps (35 routes)
-- Channels system (5 routes)
-- Admin auth + CRUD (10 routes)
-- Additional device management (4 routes)
-- Build system stubs (8 routes)
-- Advanced analytics (4 routes)
-- Health reports (4 routes)
+### Wave 5 Tasks
+| Task | Routes | Prompt |
+|------|--------|--------|
+| Admin Auth | 3 | api-admin-auth.md |
+| Admin Users | 4 | api-admin-users.md |
+| Admin Dashboard | 3 | api-admin-dashboard.md |
+| Admin Subscriptions | 4 | api-admin-subscriptions.md |
+
+### Remaining Gaps (11 routes)
+- Admin system (14 routes) - Wave 5
+- Build system stubs (8 routes) - Wave 6
 
 ---
 
@@ -65,7 +79,7 @@
 |----------|--------|---------|-----|
 | Apps | 14 | 13 | 93% ✅ |
 | Releases | 15 | 10 | 67% |
-| Devices | 12 | 4 | 33% |
+| Devices | 12 | 11 | 92% ✅ |
 | Updates | 3 | 1 | 33% |
 | Telemetry | 5 | 3 | 60% |
 | Teams | 18 | 17 | 94% ✅ |
@@ -74,28 +88,14 @@
 | Webhooks | 9 | 7 | 78% |
 | Integrations | 8 | 6 | 75% |
 | GitHub | 10 | 7 | 70% |
-| **Admin** | 12 | 0 | 0% ❌ |
-| **Builds** | 15 | 0 | 0% ❌ |
-| **Channels** | 6 | 0 | 0% ❌ |
-| **Total** | 116 | 81 | 70% |
-
----
-
-## Agent Hierarchy (MANDATORY)
-
-All future work MUST use:
-
-```
-Launch PM (Main Claude)
-    │
-    └──► Wave Coordinator
-            │
-            ├──► Executor 1 ─┐
-            ├──► Executor 2 ─┼──► Auditors ──► GO/NO-GO
-            └──► Executor N ─┘
-```
-
-See: `.claude/workflows/wave-remediation/workflow.md`
+| Channels | 6 | 5 | 83% ✅ |
+| Health | 4 | 4 | 100% ✅ |
+| Metrics | 4 | 4 | 100% ✅ |
+| Bundles | 2 | 2 | 100% ✅ |
+| Uploads | 2 | 2 | 100% ✅ |
+| **Admin** | 14 | 0 | 0% ❌ |
+| **Builds** | 8 | 0 | 0% ❌ |
+| **Total** | 116 | 105 | 90% |
 
 ---
 
@@ -103,23 +103,25 @@ See: `.claude/workflows/wave-remediation/workflow.md`
 
 | Package | Tests | Status |
 |---------|-------|--------|
-| API | 901 | ✅ |
-| Shared | 111 | ✅ |
+| API | 1,267 | ✅ |
+| Shared | 144 | ✅ |
 | SDK | ~20 | 🟡 |
-| **Total** | 1,012+ | Growing |
+| **Total** | 1,411+ | Growing |
 
 ---
 
 ## Quality Metrics
 
-| Metric | Before Remediation | After Remediation |
-|--------|-------------------|-------------------|
+| Metric | Before Remediation | After Wave 4 |
+|--------|-------------------|--------------|
 | Critical security bugs | 5 | 0 ✅ |
 | Missing rate limiting | All auth | None ✅ |
 | Unencrypted secrets | 2 systems | 0 ✅ |
 | Broken hash | Yes | Fixed ✅ |
 | Missing schemas | 3 categories | 0 ✅ |
 | Missing constants | 2 categories | 0 ✅ |
+| Route coverage | 70% | 90% ✅ |
+| Test count | 1,012 | 1,411 ✅ |
 
 ---
 
@@ -127,10 +129,10 @@ See: `.claude/workflows/wave-remediation/workflow.md`
 
 1. ✅ Phase 0-5 features (24 features) - DONE
 2. ✅ Wave 1-3 Remediation - DONE
-3. 🔄 **Wave 4: Feature Completion** ← WE ARE HERE
-4. ⏳ Wave 5: Admin System
-5. ⏳ Wave 6: Integration Tests
-6. ⏳ Phase 6+: Admin, Builds, Dashboard, SDK
+3. ✅ **Wave 4: Feature Completion** - DONE
+4. 🔄 **Wave 5: Admin System** ← NEXT
+5. ⏳ Wave 6: Build System
+6. ⏳ Wave 7: Dashboard + SDK
 
 ---
 
@@ -142,3 +144,5 @@ See: `.claude/workflows/wave-remediation/workflow.md`
 4. **Quality over speed** - Better to fix early than debug in production
 5. **Document agent work** - Track who built what with `@agent` attribution
 6. **Semantic understanding** - Know WHAT we're building, not just HOW
+7. **Resource management** - Run tests sequentially on limited RAM machines
+8. **Fix lint/type errors immediately** - Don't let them accumulate
