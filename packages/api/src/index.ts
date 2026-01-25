@@ -18,6 +18,14 @@
  * @agent wave5-admin
  * @modified 2026-01-25
  * @description Added admin authentication and management routes
+ *
+ * @agent health-reports
+ * @modified 2026-01-25
+ * @description Added health reports routes for app health monitoring
+ *
+ * @agent bundle-size-tracking
+ * @modified 2026-01-25
+ * @description Added bundle size tracking routes for monitoring bundle sizes
  */
 
 /**
@@ -32,6 +40,7 @@ import { logger } from 'hono/logger'
 
 import { updatesRouter } from './routes/updates'
 import { devicesRouter } from './routes/devices'
+import { deviceManagementRouter } from './routes/devices/management'
 import { releasesRouter } from './routes/releases'
 import { telemetryRouter } from './routes/telemetry'
 import { appsRoutes } from './routes/apps/index'
@@ -44,6 +53,10 @@ import { githubWebhookRouter } from './routes/github/webhook'
 import { authRoutes, githubLinkRoutes } from './routes/auth'
 import { adminAuthRouter } from './routes/admin-auth'
 import { adminRouter } from './routes/admin'
+import { metricsRouter } from './routes/metrics'
+import { healthRouter } from './routes/health'
+import { uploadsRouter } from './routes/uploads'
+import { bundlesRouter } from './routes/bundles'
 import {
   rateLimitUpdates,
   rateLimitDevices,
@@ -94,8 +107,13 @@ app.route('/v1/apps', channelsRouter)
 app.route('/v1/subscriptions', subscriptionsRouter)
 app.route('/v1/teams', teamsRouter)
 app.route('/v1/apps', integrationsRouter)
+app.route('/v1/apps', deviceManagementRouter)
 app.route('/v1/github', githubRouter)
 app.route('/v1/github/webhook', githubWebhookRouter)
+app.route('/v1/apps', metricsRouter)
+app.route('/v1/apps', healthRouter)
+app.route('/v1/uploads', uploadsRouter)
+app.route('/v1/apps', bundlesRouter)
 
 // Admin routes (OTP-based auth, no rate limiting on auth routes themselves)
 app.use('/v1/admin-auth/*', rateLimitAuth)

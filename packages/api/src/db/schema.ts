@@ -44,6 +44,7 @@ export const devices = sqliteTable('devices', {
   appVersion: text('app_version').notNull(),
   currentBundleVersion: text('current_bundle_version'),
   currentBundleHash: text('current_bundle_hash'),
+  targetGroup: text('target_group'),
   tokenHash: text('token_hash'),
   tokenExpiresAt: integer('token_expires_at'),
   lastSeenAt: integer('last_seen_at', { mode: 'timestamp' }),
@@ -55,6 +56,7 @@ export const devices = sqliteTable('devices', {
   deviceIdIdx: index('devices_device_id_idx').on(table.deviceId),
   appDeviceIdx: index('devices_app_device_idx').on(table.appId, table.deviceId),
   lastSeenIdx: index('devices_last_seen_idx').on(table.lastSeenAt),
+  targetGroupIdx: index('devices_target_group_idx').on(table.appId, table.targetGroup),
 }))
 
 /**
@@ -356,16 +358,25 @@ export const appRepos = sqliteTable('app_repos', {
  * Release channels for environment-based deployments (production, staging, development)
  *
  * @agent wave4-channels
+ * @modified 2026-01-25
+ * @description Enhanced with display_name, description, is_default, rollout_percentage, targeting_rules
  */
 export const channels = sqliteTable('channels', {
   id: text('id').primaryKey(),
   appId: text('app_id').notNull().references(() => apps.id),
   name: text('name').notNull(),
+  displayName: text('display_name').notNull(),
+  description: text('description'),
+  isDefault: integer('is_default', { mode: 'boolean' }).default(false),
+  rolloutPercentage: integer('rollout_percentage').default(100),
+  targetingRules: text('targeting_rules', { mode: 'json' }),
   activeReleaseId: text('active_release_id'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 }, (table) => ({
   appIdx: index('channels_app_idx').on(table.appId),
   appNameIdx: index('channels_app_name_idx').on(table.appId, table.name),
+  defaultIdx: index('channels_default_idx').on(table.appId, table.isDefault),
 }))
 
 /**
@@ -476,4 +487,31 @@ export const otpAttempts = sqliteTable('otp_attempts', {
   lastAttemptAt: integer('last_attempt_at', { mode: 'timestamp' }),
 }, (table) => ({
   lockedIdx: index('otp_attempts_locked_idx').on(table.lockedUntil),
+}))
+
+// ============================================
+// Health Reports Tables
+// ============================================
+
+/**
+ * Health reports table
+ * Stores health telemetry from SDK devices for app health monitoring
+ *
+ * @agent health-reports
+ */
+export const healthReports = sqliteTable('health_reports', {
+  id: text('id').primaryKey(),
+  deviceId: text('device_id').notNull(),
+  appId: text('app_id').notNull().references(() => apps.id),
+  releaseId: text('release_id').references(() => releases.id),
+  updateSuccess: integer('update_success', { mode: 'boolean' }),
+  updateDuration: integer('update_duration'), // milliseconds
+  crashDetected: integer('crash_detected', { mode: 'boolean' }).default(false),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  appIdx: index('health_reports_app_idx').on(table.appId),
+  deviceIdx: index('health_reports_device_idx').on(table.deviceId),
+  releaseIdx: index('health_reports_release_idx').on(table.releaseId),
+  createdIdx: index('health_reports_created_idx').on(table.createdAt),
+  appCreatedIdx: index('health_reports_app_created_idx').on(table.appId, table.createdAt),
 }))

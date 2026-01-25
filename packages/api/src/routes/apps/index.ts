@@ -270,18 +270,28 @@ appsRoutes.post('/:appId/regenerate-key', async (c) => {
 /**
  * Create default channels for a new app
  * @agent wave4-channels
+ * @modified 2026-01-25
+ * @description Updated to include new channel fields (display_name, is_default, updated_at)
  */
 async function createDefaultChannels(
   db: Env['DB'],
   appId: string,
   timestamp: number
 ): Promise<void> {
-  for (const channelName of DEFAULT_CHANNELS) {
+  const displayNames: Record<string, string> = {
+    production: 'Production',
+    staging: 'Staging',
+    development: 'Development',
+  }
+
+  for (let i = 0; i < DEFAULT_CHANNELS.length; i++) {
+    const channelName = DEFAULT_CHANNELS[i]
     const channelId = crypto.randomUUID()
+    const isDefault = i === 0 // production is the default channel
     await db.prepare(`
-      INSERT INTO channels (id, app_id, name, created_at)
-      VALUES (?, ?, ?, ?)
-    `).bind(channelId, appId, channelName, timestamp).run()
+      INSERT INTO channels (id, app_id, name, display_name, is_default, rollout_percentage, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 100, ?, ?)
+    `).bind(channelId, appId, channelName, displayNames[channelName], isDefault ? 1 : 0, timestamp, timestamp).run()
   }
 }
 

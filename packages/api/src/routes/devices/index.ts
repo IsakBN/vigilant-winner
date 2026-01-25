@@ -1,6 +1,7 @@
 /**
  * @agent fix-validation
  * @agent remediate-pagination
+ * @agent device-management
  * @modified 2026-01-25
  *
  * Device Registration Routes
@@ -16,6 +17,9 @@ import { deviceRegisterRequestSchema, ERROR_CODES } from '@bundlenudge/shared'
 import { generateDeviceToken, verifyDeviceToken, decodeJwtPayload } from '../../lib/device-token'
 import { authMiddleware, type AuthUser } from '../../middleware/auth'
 import type { Env } from '../../types/env'
+
+// Re-export the management router for app-scoped device routes
+export { deviceManagementRouter } from './management'
 
 // =============================================================================
 // Local Schemas
@@ -48,6 +52,9 @@ interface AuthVariables {
 }
 
 export const devicesRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>()
+
+// Alias for compatibility with main index imports
+export { devicesRoutes as devicesRouter }
 
 /**
  * Hash a token for storage (using SHA-256)
