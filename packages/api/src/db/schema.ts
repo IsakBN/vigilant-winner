@@ -250,3 +250,41 @@ export const teamAuditLog = sqliteTable('team_audit_log', {
   eventIdx: index('team_audit_event_idx').on(table.event),
   createdIdx: index('team_audit_created_idx').on(table.createdAt),
 }))
+
+/**
+ * Webhooks table
+ * Outgoing webhook configurations for apps
+ */
+export const webhooks = sqliteTable('webhooks', {
+  id: text('id').primaryKey(),
+  appId: text('app_id').notNull().references(() => apps.id),
+  url: text('url').notNull(),
+  events: text('events', { mode: 'json' }).notNull(),
+  secret: text('secret').notNull(),
+  isActive: integer('is_active', { mode: 'boolean' }).default(true),
+  lastTriggeredAt: integer('last_triggered_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  appIdx: index('webhooks_app_idx').on(table.appId),
+  activeIdx: index('webhooks_active_idx').on(table.isActive),
+}))
+
+/**
+ * Webhook events table
+ * Tracks webhook delivery attempts
+ */
+export const webhookEvents = sqliteTable('webhook_events', {
+  id: text('id').primaryKey(),
+  webhookId: text('webhook_id').notNull().references(() => webhooks.id),
+  event: text('event').notNull(),
+  payload: text('payload', { mode: 'json' }).notNull(),
+  status: text('status', { enum: ['delivered', 'failed'] }).notNull(),
+  statusCode: integer('status_code'),
+  errorMessage: text('error_message'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  webhookIdx: index('webhook_events_webhook_idx').on(table.webhookId),
+  statusIdx: index('webhook_events_status_idx').on(table.status),
+  createdIdx: index('webhook_events_created_idx').on(table.createdAt),
+}))
