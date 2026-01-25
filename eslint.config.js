@@ -55,6 +55,16 @@ export default tseslint.config(
       'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
   },
+  // Test file overrides - allow type assertions needed for TypeScript strict mode
+  {
+    files: ['**/*.test.ts', '**/*.spec.ts'],
+    rules: {
+      // Test files need type assertions for res.json() and similar patterns
+      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+      // Allow non-null assertions in tests for cleaner test code
+      '@typescript-eslint/no-non-null-assertion': 'off',
+    },
+  },
   {
     ignores: ['**/dist/**', '**/build/**', '**/node_modules/**', '**/*.js'],
   }
