@@ -216,6 +216,22 @@ export const teamInvitations = sqliteTable('team_invitations', {
 }))
 
 /**
+ * Project members table
+ * Per-project access control beyond organization membership
+ */
+export const projectMembers = sqliteTable('project_members', {
+  id: text('id').primaryKey(),
+  appId: text('app_id').notNull().references(() => apps.id),
+  userId: text('user_id').notNull(),
+  role: text('role', { enum: ['admin', 'developer', 'viewer'] }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  appIdx: index('project_members_app_idx').on(table.appId),
+  userIdx: index('project_members_user_idx').on(table.userId),
+  appUserIdx: index('project_members_app_user_idx').on(table.appId, table.userId),
+}))
+
+/**
  * Team audit log table
  * Tracks team-related events for compliance
  */

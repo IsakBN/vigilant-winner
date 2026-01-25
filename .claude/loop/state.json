@@ -1,7 +1,7 @@
 {
   "phase": "ready",
   "currentPackage": "api",
-  "currentFeature": "teams-rbac",
+  "currentFeature": "teams-audit",
   "completedPackages": [],
   "completedFeatures": [
     "setup:setup",
@@ -21,7 +21,8 @@
     "api:targeting-engine",
     "api:stripe-billing",
     "api:teams-crud",
-    "api:teams-invitations"
+    "api:teams-invitations",
+    "api:teams-rbac"
   ],
   "failedAttempts": [
     {
