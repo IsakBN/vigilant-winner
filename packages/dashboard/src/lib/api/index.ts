@@ -22,3 +22,14 @@ export type { ApiFetchOptions } from './client'
 // Re-export auth API
 export { auth, github } from './auth'
 export type { User, GitHubStatus } from './auth'
+
+// Re-export apps API
+export { apps } from './apps'
+export type {
+    App,
+    Platform,
+    CreateAppInput,
+    CreateAppResponse,
+    ListAppsResponse,
+    GetAppResponse,
+} from './apps'
