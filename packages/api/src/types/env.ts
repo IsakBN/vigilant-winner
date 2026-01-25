@@ -12,6 +12,9 @@ export interface Env {
   // KV for rate limiting
   RATE_LIMIT: KVNamespace
 
+  // KV for caching (admin dashboard, etc.)
+  CACHE: KVNamespace
+
   // Environment variables
   ENVIRONMENT: 'development' | 'staging' | 'production'
   JWT_SECRET?: string

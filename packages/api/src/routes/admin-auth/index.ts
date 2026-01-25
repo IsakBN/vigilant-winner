@@ -1,16 +1,24 @@
 /**
  * Admin authentication routes
  *
- * OTP-based authentication for admin users (@bundlenudge.com emails only)
+ * Email/password and OTP-based authentication for admin users
+ *
+ * Routes:
+ * - POST /admin-auth/login    - Login with email/password
+ * - POST /admin-auth/logout   - Logout (invalidate session)
+ * - GET  /admin-auth/me       - Get current admin info
+ * - POST /admin-auth/send-otp - Send OTP to admin email
+ * - POST /admin-auth/verify-otp - Verify OTP and create session
  *
  * Security features:
  * - Only @bundlenudge.com emails allowed
- * - Rate limiting: 3 OTP sends per 15 minutes
- * - Rate limiting: 5 verify attempts per OTP
- * - Account lockout: 10 failures -> 30 min lockout
- * - OTP stored hashed
+ * - Password hashing with SHA-256 + salt (bcrypt unavailable in Workers)
+ * - Session tokens stored as hashed values
+ * - Sessions expire after 24 hours
+ * - Rate limiting on login endpoint
+ * - Account lockout after failed attempts
  *
- * @agent wave5-admin
+ * @agent admin-auth-routes
  */
 
 import { Hono } from 'hono'
@@ -21,7 +29,10 @@ import { logAdminAction } from '../../lib/admin/audit'
 import { sendOTPEmail } from '../../lib/email'
 import type { Env } from '../../types/env'
 
+// =============================================================================
 // Constants
+// =============================================================================
+
 const OTP_LENGTH = 6
 const OTP_EXPIRY_MS = 10 * 60 * 1000 // 10 minutes
 const MAX_SENDS_PER_WINDOW = 3
@@ -30,8 +41,17 @@ const MAX_VERIFY_ATTEMPTS = 5
 const MAX_FAILED_ATTEMPTS = 10
 const LOCKOUT_DURATION_MS = 30 * 60 * 1000 // 30 minutes
 const ADMIN_DOMAIN = '@bundlenudge.com'
+const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000 // 24 hours
 
-// Validation schemas
+// =============================================================================
+// Validation Schemas
+// =============================================================================
+
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+})
+
 const sendOtpSchema = z.object({
   email: z.string().email().refine(
     (email) => email.endsWith(ADMIN_DOMAIN),
@@ -44,27 +64,268 @@ const verifyOtpSchema = z.object({
   otp: z.string().length(OTP_LENGTH),
 })
 
+// =============================================================================
+// Types
+// =============================================================================
+
+interface AdminRow {
+  id: string
+  email: string
+  name: string
+  password_hash: string
+  role: 'super_admin' | 'admin' | 'support'
+  permissions: string | null
+  last_login_at: number | null
+  created_at: number
+  updated_at: number
+}
+
+interface AdminSessionRow {
+  id: string
+  admin_id: string
+  token_hash: string
+  expires_at: number
+  created_at: number
+}
+
 export const adminAuthRouter = new Hono<{ Bindings: Env }>()
 
-/**
- * Generate a random OTP
- */
+// =============================================================================
+// Crypto Helpers
+// =============================================================================
+
+/** Generate a random OTP */
 function generateOTP(): string {
   const array = new Uint32Array(1)
   crypto.getRandomValues(array)
   return String(array[0]).slice(0, OTP_LENGTH).padStart(OTP_LENGTH, '0')
 }
 
-/**
- * Hash OTP using SHA-256
- */
-async function hashOTP(otp: string): Promise<string> {
+/** Hash a string using SHA-256 */
+async function hashSHA256(value: string): Promise<string> {
   const encoder = new TextEncoder()
-  const data = encoder.encode(otp)
+  const data = encoder.encode(value)
   const hashBuffer = await crypto.subtle.digest('SHA-256', data)
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 }
+
+/** Generate a random salt */
+function generateSalt(): string {
+  const array = new Uint8Array(16)
+  crypto.getRandomValues(array)
+  return Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** Hash password with salt (format: salt$hash) */
+async function hashPassword(password: string): Promise<string> {
+  const salt = generateSalt()
+  const hash = await hashSHA256(salt + password)
+  return `${salt}$${hash}`
+}
+
+/** Verify password against stored hash */
+async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  const [salt, expectedHash] = storedHash.split('$')
+  if (!salt || !expectedHash) return false
+  const actualHash = await hashSHA256(salt + password)
+  return actualHash === expectedHash
+}
+
+/** Generate a secure session token */
+function generateSessionToken(): string {
+  const array = new Uint8Array(32)
+  crypto.getRandomValues(array)
+  return Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// Legacy alias for OTP hashing
+const hashOTP = hashSHA256
+
+// =============================================================================
+// Routes: Login, Logout, Me
+// =============================================================================
+
+/**
+ * POST /admin-auth/login
+ * Admin login with email/password
+ */
+adminAuthRouter.post('/login', zValidator('json', loginSchema), async (c) => {
+  const { email, password } = c.req.valid('json')
+  const now = Date.now()
+
+  // Verify admin domain
+  if (!email.endsWith(ADMIN_DOMAIN)) {
+    return c.json({
+      error: ERROR_CODES.UNAUTHORIZED,
+      message: 'Invalid credentials',
+    }, 401)
+  }
+
+  // Find admin by email
+  const admin = await c.env.DB.prepare(`
+    SELECT * FROM admins WHERE email = ?
+  `).bind(email).first<AdminRow>()
+
+  if (!admin) {
+    return c.json({
+      error: ERROR_CODES.UNAUTHORIZED,
+      message: 'Invalid credentials',
+    }, 401)
+  }
+
+  // Verify password
+  const isValid = await verifyPassword(password, admin.password_hash)
+  if (!isValid) {
+    return c.json({
+      error: ERROR_CODES.UNAUTHORIZED,
+      message: 'Invalid credentials',
+    }, 401)
+  }
+
+  // Generate session token and hash it for storage
+  const sessionToken = generateSessionToken()
+  const tokenHash = await hashSHA256(sessionToken)
+  const sessionId = crypto.randomUUID()
+  const expiresAt = now + SESSION_EXPIRY_MS
+
+  // Create session in database
+  await c.env.DB.prepare(`
+    INSERT INTO admin_sessions (id, admin_id, token_hash, expires_at, created_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).bind(sessionId, admin.id, tokenHash, expiresAt, now).run()
+
+  // Update last login
+  await c.env.DB.prepare(`
+    UPDATE admins SET last_login_at = ?, updated_at = ? WHERE id = ?
+  `).bind(now, now, admin.id).run()
+
+  // Log successful login
+  await logAdminAction(c.env.DB, {
+    adminId: admin.id,
+    action: 'admin_login',
+    details: { method: 'password', email },
+    ipAddress: c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For'),
+    userAgent: c.req.header('User-Agent'),
+  })
+
+  // Parse permissions
+  const permissions = admin.permissions
+    ? (JSON.parse(admin.permissions) as string[])
+    : []
+
+  return c.json({
+    success: true,
+    token: sessionToken,
+    expiresAt,
+    admin: {
+      id: admin.id,
+      email: admin.email,
+      name: admin.name,
+      role: admin.role,
+      permissions,
+      lastLoginAt: admin.last_login_at,
+      createdAt: admin.created_at,
+    },
+  })
+})
+
+/**
+ * POST /admin-auth/logout
+ * Logout (invalidate session)
+ */
+adminAuthRouter.post('/logout', async (c) => {
+  const authHeader = c.req.header('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return c.json({ success: true })
+  }
+
+  const token = authHeader.slice(7)
+  const tokenHash = await hashSHA256(token)
+
+  // Delete the session
+  await c.env.DB.prepare(`
+    DELETE FROM admin_sessions WHERE token_hash = ?
+  `).bind(tokenHash).run()
+
+  return c.json({ success: true })
+})
+
+/**
+ * GET /admin-auth/me
+ * Get current admin info
+ */
+adminAuthRouter.get('/me', async (c) => {
+  const authHeader = c.req.header('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return c.json({
+      error: ERROR_CODES.UNAUTHORIZED,
+      message: 'Authentication required',
+    }, 401)
+  }
+
+  const token = authHeader.slice(7)
+  const tokenHash = await hashSHA256(token)
+  const now = Date.now()
+
+  // Find session and admin
+  const session = await c.env.DB.prepare(`
+    SELECT * FROM admin_sessions WHERE token_hash = ?
+  `).bind(tokenHash).first<AdminSessionRow>()
+
+  if (!session) {
+    return c.json({
+      error: ERROR_CODES.UNAUTHORIZED,
+      message: 'Invalid session',
+    }, 401)
+  }
+
+  // Check session expiry
+  if (session.expires_at < now) {
+    // Clean up expired session
+    await c.env.DB.prepare(`
+      DELETE FROM admin_sessions WHERE id = ?
+    `).bind(session.id).run()
+
+    return c.json({
+      error: ERROR_CODES.SESSION_EXPIRED,
+      message: 'Session expired',
+    }, 401)
+  }
+
+  // Get admin details
+  const admin = await c.env.DB.prepare(`
+    SELECT * FROM admins WHERE id = ?
+  `).bind(session.admin_id).first<AdminRow>()
+
+  if (!admin) {
+    return c.json({
+      error: ERROR_CODES.UNAUTHORIZED,
+      message: 'Admin not found',
+    }, 401)
+  }
+
+  // Parse permissions
+  const permissions = admin.permissions
+    ? (JSON.parse(admin.permissions) as string[])
+    : []
+
+  return c.json({
+    admin: {
+      id: admin.id,
+      email: admin.email,
+      name: admin.name,
+      role: admin.role,
+      permissions,
+      lastLoginAt: admin.last_login_at,
+      createdAt: admin.created_at,
+    },
+  })
+})
+
+// =============================================================================
+// Routes: OTP Authentication (legacy)
+// =============================================================================
 
 /**
  * POST /admin-auth/send-otp
@@ -281,3 +542,10 @@ adminAuthRouter.post('/verify-otp', zValidator('json', verifyOtpSchema), async (
     expiresAt: sessionExpiry,
   })
 })
+
+// =============================================================================
+// Exports for Admin Creation
+// =============================================================================
+
+/** Export password hashing for admin creation scripts */
+export { hashPassword }

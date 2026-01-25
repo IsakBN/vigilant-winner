@@ -1,7 +1,7 @@
 /**
  * Admin user management routes
  *
- * User listing, details, limit overrides, and suspension management
+ * User listing, details, updates, and deletion
  *
  * @agent wave5-admin
  */
@@ -16,55 +16,70 @@ import type { Env } from '../../types/env'
 
 // Validation schemas
 const listUsersSchema = z.object({
-  search: z.string().optional(),
-  plan: z.string().optional(),
-  status: z.enum(['active', 'suspended']).optional(),
   limit: z.coerce.number().min(1).max(100).default(20),
   offset: z.coerce.number().min(0).default(0),
+  search: z.string().optional(),
+  status: z.enum(['active', 'banned', 'deleted']).optional(),
+  plan: z.string().optional(),
+  sortBy: z.enum(['createdAt', 'lastLoginAt', 'email']).default('createdAt'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
 })
 
 const userIdSchema = z.object({
   userId: z.string().uuid(),
 })
 
-const overrideLimitsSchema = z.object({
-  mauLimit: z.number().int().positive().optional(),
-  storageGb: z.number().int().positive().optional(),
-  expiresAt: z.number().int().positive().optional(),
-  reason: z.string().min(5).max(500),
-})
-
-const suspendUserSchema = z.object({
-  reason: z.string().min(10).max(500),
-  until: z.number().int().positive().optional(),
+const updateUserSchema = z.object({
+  status: z.enum(['active', 'banned']).optional(),
+  banReason: z.string().min(10).max(500).optional(),
+  subscription: z.object({
+    planId: z.string().uuid(),
+    expiresAt: z.number().int().positive().nullable().optional(),
+  }).optional(),
 })
 
 export const adminUsersRouter = new Hono<{ Bindings: Env }>()
 
 /**
  * GET /admin/users
- * List all users with filtering
+ * List all users with pagination and filtering
  */
 adminUsersRouter.get('/', zValidator('query', listUsersSchema), async (c) => {
-  const { search, plan, status, limit, offset } = c.req.valid('query')
+  const { limit, offset, search, status, plan, sortBy, sortOrder } = c.req.valid('query')
   const adminId = getAdminId(c)
 
   const conditions: string[] = []
   const bindings: (string | number)[] = []
 
+  // Search filter
   if (search) {
     conditions.push('(u.email LIKE ? OR u.name LIKE ?)')
     bindings.push(`%${search}%`, `%${search}%`)
   }
 
+  // Plan filter
   if (plan) {
     conditions.push('sp.name = ?')
     bindings.push(plan)
   }
 
+  // Status filter (active, banned, deleted)
+  if (status === 'deleted') {
+    conditions.push('u.deleted_at IS NOT NULL')
+  } else {
+    conditions.push('u.deleted_at IS NULL')
+  }
+
   const whereClause = conditions.length > 0
     ? `WHERE ${conditions.join(' AND ')}`
     : ''
+
+  // Map sortBy to database column
+  const sortColumn = {
+    createdAt: 'u.created_at',
+    lastLoginAt: 'u.updated_at', // Use updated_at as proxy for last login
+    email: 'u.email',
+  }[sortBy]
 
   // Get total count
   const countResult = await c.env.DB.prepare(`
@@ -76,48 +91,58 @@ adminUsersRouter.get('/', zValidator('query', listUsersSchema), async (c) => {
   `).bind(...bindings).first<{ total: number }>()
 
   const total = countResult?.total ?? 0
+  const now = Date.now()
 
-  // Get paginated results with subscription info
+  // Get paginated results with subscription and ban info
   const results = await c.env.DB.prepare(`
     SELECT
-      u.id, u.email, u.name, u.created_at,
-      sp.name as plan_name,
+      u.id, u.email, u.name, u.created_at, u.updated_at, u.deleted_at,
+      sp.name as plan_name, sp.id as plan_id,
       s.status as subscription_status,
-      (SELECT COUNT(*) FROM apps WHERE owner_id = u.id) as app_count,
-      (SELECT 1 FROM user_suspensions
+      s.current_period_end as subscription_expires_at,
+      (SELECT COUNT(*) FROM apps WHERE owner_id = u.id AND deleted_at IS NULL) as app_count,
+      (SELECT COUNT(*) FROM devices d
+       JOIN apps a ON d.app_id = a.id
+       WHERE a.owner_id = u.id) as device_count,
+      (SELECT reason FROM user_suspensions
        WHERE user_id = u.id AND lifted_at IS NULL
-       AND (until IS NULL OR until > ?) LIMIT 1) as is_suspended
+       AND (until IS NULL OR until > ?) LIMIT 1) as ban_reason
     FROM user u
     LEFT JOIN subscriptions s ON s.user_id = u.id
     LEFT JOIN subscription_plans sp ON s.plan_id = sp.id
     ${whereClause}
     GROUP BY u.id
-    ORDER BY u.created_at DESC
+    ORDER BY ${sortColumn} ${sortOrder.toUpperCase()}
     LIMIT ? OFFSET ?
-  `).bind(...bindings, Date.now(), limit, offset).all<{
+  `).bind(...bindings, now, limit, offset).all<{
     id: string
     email: string
     name: string | null
     created_at: number
+    updated_at: number | null
+    deleted_at: number | null
     plan_name: string | null
+    plan_id: string | null
     subscription_status: string | null
+    subscription_expires_at: number | null
     app_count: number
-    is_suspended: number | null
+    device_count: number
+    ban_reason: string | null
   }>()
 
-  // Filter by suspension status if requested
+  // Filter by ban status if requested
   let users = results.results
-  if (status === 'suspended') {
-    users = users.filter(u => u.is_suspended === 1)
+  if (status === 'banned') {
+    users = users.filter(u => u.ban_reason !== null)
   } else if (status === 'active') {
-    users = users.filter(u => u.is_suspended !== 1)
+    users = users.filter(u => u.ban_reason === null)
   }
 
   // Log view action
   await logAdminAction(c.env.DB, {
     adminId,
     action: 'view_user',
-    details: { search, plan, status, count: users.length },
+    details: { search, plan, status, sortBy, sortOrder, count: users.length },
   })
 
   return c.json({
@@ -125,11 +150,19 @@ adminUsersRouter.get('/', zValidator('query', listUsersSchema), async (c) => {
       id: u.id,
       email: u.email,
       name: u.name,
+      status: u.deleted_at ? 'deleted' : (u.ban_reason ? 'banned' : 'active'),
+      subscription: u.plan_id ? {
+        planId: u.plan_id,
+        planName: u.plan_name,
+        status: u.subscription_status,
+        expiresAt: u.subscription_expires_at,
+      } : null,
+      stats: {
+        appCount: u.app_count,
+        deviceCount: u.device_count,
+      },
       createdAt: u.created_at,
-      plan: u.plan_name,
-      subscriptionStatus: u.subscription_status,
-      appCount: u.app_count,
-      isSuspended: u.is_suspended === 1,
+      lastLoginAt: u.updated_at,
     })),
     pagination: { total, limit, offset, hasMore: offset + users.length < total },
   })
@@ -137,7 +170,7 @@ adminUsersRouter.get('/', zValidator('query', listUsersSchema), async (c) => {
 
 /**
  * GET /admin/users/:userId
- * Get detailed user information
+ * Get detailed user information with stats
  */
 adminUsersRouter.get('/:userId', zValidator('param', userIdSchema), async (c) => {
   const { userId } = c.req.valid('param')
@@ -145,49 +178,53 @@ adminUsersRouter.get('/:userId', zValidator('param', userIdSchema), async (c) =>
 
   // Get user with subscription
   const user = await c.env.DB.prepare(`
-    SELECT u.id, u.email, u.name, u.created_at,
+    SELECT u.id, u.email, u.name, u.created_at, u.updated_at, u.deleted_at,
            s.id as subscription_id, s.status as subscription_status,
-           sp.name as plan_name, sp.display_name as plan_display,
-           sp.mau_limit as plan_mau_limit, sp.storage_gb as plan_storage_gb
+           s.current_period_end as subscription_expires_at,
+           sp.id as plan_id, sp.name as plan_name, sp.display_name as plan_display
     FROM user u
     LEFT JOIN subscriptions s ON s.user_id = u.id
     LEFT JOIN subscription_plans sp ON s.plan_id = sp.id
     WHERE u.id = ?
   `).bind(userId).first<{
-    id: string; email: string; name: string | null; created_at: number
+    id: string; email: string; name: string | null
+    created_at: number; updated_at: number | null; deleted_at: number | null
     subscription_id: string | null; subscription_status: string | null
-    plan_name: string | null; plan_display: string | null
-    plan_mau_limit: number | null; plan_storage_gb: number | null
+    subscription_expires_at: number | null
+    plan_id: string | null; plan_name: string | null; plan_display: string | null
   }>()
 
   if (!user) {
     return c.json({ error: ERROR_CODES.NOT_FOUND, message: 'User not found' }, 404)
   }
 
-  // Get apps
-  const apps = await c.env.DB.prepare(`
-    SELECT id, name, platform, created_at FROM apps
-    WHERE owner_id = ? AND deleted_at IS NULL
-    ORDER BY created_at DESC LIMIT 20
-  `).bind(userId).all<{ id: string; name: string; platform: string; created_at: number }>()
+  // Get stats
+  const [appCount, deviceCount, releaseCount] = await Promise.all([
+    c.env.DB.prepare(`
+      SELECT COUNT(*) as cnt FROM apps WHERE owner_id = ? AND deleted_at IS NULL
+    `).bind(userId).first<{ cnt: number }>(),
+    c.env.DB.prepare(`
+      SELECT COUNT(*) as cnt FROM devices d
+      JOIN apps a ON d.app_id = a.id
+      WHERE a.owner_id = ?
+    `).bind(userId).first<{ cnt: number }>(),
+    c.env.DB.prepare(`
+      SELECT COUNT(*) as cnt FROM releases r
+      JOIN apps a ON r.app_id = a.id
+      WHERE a.owner_id = ?
+    `).bind(userId).first<{ cnt: number }>(),
+  ])
 
-  // Get limit overrides
-  const overrides = await c.env.DB.prepare(`
-    SELECT * FROM user_limit_overrides
-    WHERE user_id = ? AND (expires_at IS NULL OR expires_at > ?)
-  `).bind(userId, Date.now()).first<{
-    id: string; mau_limit: number | null; storage_gb: number | null
-    expires_at: number | null; reason: string | null
-  }>()
-
-  // Get suspension
-  const suspension = await c.env.DB.prepare(`
-    SELECT * FROM user_suspensions
+  // Get ban status
+  const now = Date.now()
+  const banRecord = await c.env.DB.prepare(`
+    SELECT reason, until, suspended_by, created_at
+    FROM user_suspensions
     WHERE user_id = ? AND lifted_at IS NULL
     AND (until IS NULL OR until > ?)
     ORDER BY created_at DESC LIMIT 1
-  `).bind(userId, Date.now()).first<{
-    id: string; reason: string; until: number | null; suspended_by: string; created_at: number
+  `).bind(userId, now).first<{
+    reason: string; until: number | null; suspended_by: string; created_at: number
   }>()
 
   // Log view action
@@ -197,172 +234,242 @@ adminUsersRouter.get('/:userId', zValidator('param', userIdSchema), async (c) =>
     targetUserId: userId,
   })
 
+  // Determine status
+  let status: 'active' | 'banned' | 'deleted' = 'active'
+  if (user.deleted_at) {
+    status = 'deleted'
+  } else if (banRecord) {
+    status = 'banned'
+  }
+
   return c.json({
-    user: {
-      id: user.id, email: user.email, name: user.name, createdAt: user.created_at,
-    },
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    status,
     subscription: user.subscription_id ? {
-      id: user.subscription_id,
+      planId: user.plan_id,
+      planName: user.plan_name,
       status: user.subscription_status,
-      plan: { name: user.plan_name, display: user.plan_display,
-              mauLimit: user.plan_mau_limit, storageGb: user.plan_storage_gb },
+      expiresAt: user.subscription_expires_at,
     } : null,
-    apps: apps.results,
-    overrides: overrides ? {
-      mauLimit: overrides.mau_limit,
-      storageGb: overrides.storage_gb,
-      expiresAt: overrides.expires_at,
-      reason: overrides.reason,
-    } : null,
-    suspension: suspension ? {
-      reason: suspension.reason,
-      until: suspension.until,
-      suspendedBy: suspension.suspended_by,
-      createdAt: suspension.created_at,
+    stats: {
+      appCount: appCount?.cnt ?? 0,
+      deviceCount: deviceCount?.cnt ?? 0,
+      totalReleases: releaseCount?.cnt ?? 0,
+    },
+    createdAt: user.created_at,
+    lastLoginAt: user.updated_at,
+    banInfo: banRecord ? {
+      reason: banRecord.reason,
+      until: banRecord.until,
+      bannedBy: banRecord.suspended_by,
+      bannedAt: banRecord.created_at,
     } : null,
   })
 })
 
 /**
- * POST /admin/users/:userId/override-limits
- * Set custom limits for a user
+ * PATCH /admin/users/:userId
+ * Update user status or subscription
  */
-adminUsersRouter.post(
-  '/:userId/override-limits',
+adminUsersRouter.patch(
+  '/:userId',
   zValidator('param', userIdSchema),
-  zValidator('json', overrideLimitsSchema),
+  zValidator('json', updateUserSchema),
   async (c) => {
     const { userId } = c.req.valid('param')
     const body = c.req.valid('json')
     const adminId = getAdminId(c)
 
-    // Verify user exists
-    const user = await c.env.DB.prepare('SELECT id FROM user WHERE id = ?')
-      .bind(userId).first()
-    if (!user) {
-      return c.json({ error: ERROR_CODES.NOT_FOUND, message: 'User not found' }, 404)
-    }
-
-    const now = Date.now()
-    const id = crypto.randomUUID()
-
-    // Upsert override
-    await c.env.DB.prepare(`
-      INSERT INTO user_limit_overrides (
-        id, user_id, mau_limit, storage_gb, expires_at, reason, created_by, created_at, updated_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(user_id) DO UPDATE SET
-        mau_limit = COALESCE(excluded.mau_limit, mau_limit),
-        storage_gb = COALESCE(excluded.storage_gb, storage_gb),
-        expires_at = excluded.expires_at,
-        reason = excluded.reason,
-        updated_at = excluded.updated_at
-    `).bind(
-      id, userId, body.mauLimit ?? null, body.storageGb ?? null,
-      body.expiresAt ?? null, body.reason, adminId, now, now
-    ).run()
-
-    await logAdminAction(c.env.DB, {
-      adminId, action: 'override_limits', targetUserId: userId,
-      details: { mauLimit: body.mauLimit, storageGb: body.storageGb, reason: body.reason },
-    })
-
-    return c.json({ success: true, message: 'Limits overridden successfully' })
-  }
-)
-
-/**
- * DELETE /admin/users/:userId/override-limits
- * Remove custom limit overrides
- */
-adminUsersRouter.delete(
-  '/:userId/override-limits',
-  zValidator('param', userIdSchema),
-  async (c) => {
-    const { userId } = c.req.valid('param')
-    const adminId = getAdminId(c)
-
-    await c.env.DB.prepare('DELETE FROM user_limit_overrides WHERE user_id = ?')
-      .bind(userId).run()
-
-    await logAdminAction(c.env.DB, {
-      adminId, action: 'remove_override_limits', targetUserId: userId,
-    })
-
-    return c.json({ success: true, message: 'Limit overrides removed' })
-  }
-)
-
-/**
- * POST /admin/users/:userId/suspend
- * Suspend a user account
- */
-adminUsersRouter.post(
-  '/:userId/suspend',
-  zValidator('param', userIdSchema),
-  zValidator('json', suspendUserSchema),
-  async (c) => {
-    const { userId } = c.req.valid('param')
-    const body = c.req.valid('json')
-    const adminId = getAdminId(c)
-
-    // Don't allow self-suspension
+    // Don't allow self-modification
     if (userId === adminId) {
-      return c.json({ error: ERROR_CODES.FORBIDDEN, message: 'Cannot suspend yourself' }, 400)
+      return c.json(
+        { error: ERROR_CODES.FORBIDDEN, message: 'Cannot modify yourself' },
+        400
+      )
     }
 
-    // Verify user exists
-    const user = await c.env.DB.prepare('SELECT id, email FROM user WHERE id = ?')
-      .bind(userId).first<{ id: string; email: string }>()
+    // Verify user exists and is not deleted
+    const user = await c.env.DB.prepare(
+      'SELECT id, email, deleted_at FROM user WHERE id = ?'
+    ).bind(userId).first<{ id: string; email: string; deleted_at: number | null }>()
+
     if (!user) {
       return c.json({ error: ERROR_CODES.NOT_FOUND, message: 'User not found' }, 404)
     }
 
+    if (user.deleted_at) {
+      return c.json(
+        { error: ERROR_CODES.INVALID_STATE, message: 'Cannot modify deleted user' },
+        400
+      )
+    }
+
     const now = Date.now()
-    const id = crypto.randomUUID()
+    const changes: string[] = []
 
-    await c.env.DB.prepare(`
-      INSERT INTO user_suspensions (id, user_id, reason, until, suspended_by, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).bind(id, userId, body.reason, body.until ?? null, adminId, now).run()
+    // Handle status change (ban/unban)
+    if (body.status) {
+      if (body.status === 'banned') {
+        if (!body.banReason) {
+          return c.json(
+            { error: ERROR_CODES.VALIDATION_ERROR, message: 'Ban reason required' },
+            400
+          )
+        }
 
-    await logAdminAction(c.env.DB, {
-      adminId, action: 'suspend_user', targetUserId: userId,
-      details: { reason: body.reason, until: body.until, email: user.email },
-    })
+        // Create ban record
+        const banId = crypto.randomUUID()
+        await c.env.DB.prepare(`
+          INSERT INTO user_suspensions (id, user_id, reason, suspended_by, created_at)
+          VALUES (?, ?, ?, ?, ?)
+        `).bind(banId, userId, body.banReason, adminId, now).run()
+
+        await logAdminAction(c.env.DB, {
+          adminId,
+          action: 'ban_user',
+          targetUserId: userId,
+          details: { reason: body.banReason, email: user.email },
+        })
+
+        changes.push('User banned')
+      } else {
+        // Lift all active bans
+        await c.env.DB.prepare(`
+          UPDATE user_suspensions SET lifted_at = ?, lifted_by = ?
+          WHERE user_id = ? AND lifted_at IS NULL
+        `).bind(now, adminId, userId).run()
+
+        await logAdminAction(c.env.DB, {
+          adminId,
+          action: 'unban_user',
+          targetUserId: userId,
+          details: { email: user.email },
+        })
+
+        changes.push('User unbanned')
+      }
+    }
+
+    // Handle subscription update
+    if (body.subscription) {
+      // Verify plan exists
+      const plan = await c.env.DB.prepare(
+        'SELECT id, name FROM subscription_plans WHERE id = ?'
+      ).bind(body.subscription.planId).first<{ id: string; name: string }>()
+
+      if (!plan) {
+        return c.json(
+          { error: ERROR_CODES.NOT_FOUND, message: 'Plan not found' },
+          404
+        )
+      }
+
+      // Upsert subscription
+      const subId = crypto.randomUUID()
+      await c.env.DB.prepare(`
+        INSERT INTO subscriptions (
+          id, user_id, plan_id, status, current_period_end, created_at, updated_at
+        )
+        VALUES (?, ?, ?, 'active', ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+          plan_id = excluded.plan_id,
+          current_period_end = excluded.current_period_end,
+          updated_at = excluded.updated_at
+      `).bind(
+        subId, userId, body.subscription.planId,
+        body.subscription.expiresAt ?? null, now, now
+      ).run()
+
+      await logAdminAction(c.env.DB, {
+        adminId,
+        action: 'update_user',
+        targetUserId: userId,
+        details: {
+          subscriptionChange: { planId: plan.id, planName: plan.name },
+          email: user.email,
+        },
+      })
+
+      changes.push(`Subscription updated to ${plan.name}`)
+    }
+
+    if (changes.length === 0) {
+      return c.json(
+        { error: ERROR_CODES.VALIDATION_ERROR, message: 'No changes provided' },
+        400
+      )
+    }
 
     return c.json({
       success: true,
-      message: body.until
-        ? `User suspended until ${new Date(body.until).toISOString()}`
-        : 'User suspended indefinitely',
+      message: changes.join(', '),
     })
   }
 )
 
 /**
- * DELETE /admin/users/:userId/suspend
- * Unsuspend a user account
+ * DELETE /admin/users/:userId
+ * Soft delete a user (set deleted_at timestamp)
  */
-adminUsersRouter.delete(
-  '/:userId/suspend',
-  zValidator('param', userIdSchema),
-  async (c) => {
-    const { userId } = c.req.valid('param')
-    const adminId = getAdminId(c)
+adminUsersRouter.delete('/:userId', zValidator('param', userIdSchema), async (c) => {
+  const { userId } = c.req.valid('param')
+  const adminId = getAdminId(c)
 
-    const now = Date.now()
-
-    await c.env.DB.prepare(`
-      UPDATE user_suspensions SET lifted_at = ?, lifted_by = ?
-      WHERE user_id = ? AND lifted_at IS NULL
-    `).bind(now, adminId, userId).run()
-
-    await logAdminAction(c.env.DB, {
-      adminId, action: 'unsuspend_user', targetUserId: userId,
-    })
-
-    return c.json({ success: true, message: 'User unsuspended' })
+  // Don't allow self-deletion
+  if (userId === adminId) {
+    return c.json(
+      { error: ERROR_CODES.FORBIDDEN, message: 'Cannot delete yourself' },
+      400
+    )
   }
-)
+
+  // Verify user exists
+  const user = await c.env.DB.prepare(
+    'SELECT id, email, deleted_at FROM user WHERE id = ?'
+  ).bind(userId).first<{ id: string; email: string; deleted_at: number | null }>()
+
+  if (!user) {
+    return c.json({ error: ERROR_CODES.NOT_FOUND, message: 'User not found' }, 404)
+  }
+
+  if (user.deleted_at) {
+    return c.json(
+      { error: ERROR_CODES.INVALID_STATE, message: 'User already deleted' },
+      400
+    )
+  }
+
+  const now = Date.now()
+
+  // Soft delete the user
+  await c.env.DB.prepare(
+    'UPDATE user SET deleted_at = ? WHERE id = ?'
+  ).bind(now, userId).run()
+
+  // Also soft delete all user's apps
+  await c.env.DB.prepare(
+    'UPDATE apps SET deleted_at = ? WHERE owner_id = ? AND deleted_at IS NULL'
+  ).bind(now, userId).run()
+
+  // Get counts for audit
+  const appCount = await c.env.DB.prepare(
+    'SELECT COUNT(*) as cnt FROM apps WHERE owner_id = ?'
+  ).bind(userId).first<{ cnt: number }>()
+
+  await logAdminAction(c.env.DB, {
+    adminId,
+    action: 'delete_user',
+    targetUserId: userId,
+    details: {
+      email: user.email,
+      appsDeleted: appCount?.cnt ?? 0,
+    },
+  })
+
+  return c.json({
+    success: true,
+    message: 'User deactivated successfully',
+  })
+})

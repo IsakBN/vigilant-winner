@@ -405,6 +405,45 @@ export const crashIntegrations = sqliteTable('crash_integrations', {
 // ============================================
 
 /**
+ * Admins table
+ * Stores admin user accounts with elevated privileges
+ *
+ * @agent admin-auth-routes
+ */
+export const admins = sqliteTable('admins', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  name: text('name').notNull(),
+  passwordHash: text('password_hash').notNull(),
+  role: text('role', { enum: ['super_admin', 'admin', 'support'] }).notNull().default('admin'),
+  permissions: text('permissions', { mode: 'json' }), // JSON array of permission strings
+  lastLoginAt: integer('last_login_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  emailIdx: index('admins_email_idx').on(table.email),
+  roleIdx: index('admins_role_idx').on(table.role),
+}))
+
+/**
+ * Admin sessions table
+ * Tracks active admin sessions with hashed tokens
+ *
+ * @agent admin-auth-routes
+ */
+export const adminSessions = sqliteTable('admin_sessions', {
+  id: text('id').primaryKey(),
+  adminId: text('admin_id').notNull().references(() => admins.id),
+  tokenHash: text('token_hash').notNull(),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  adminIdx: index('admin_sessions_admin_idx').on(table.adminId),
+  tokenHashIdx: index('admin_sessions_token_hash_idx').on(table.tokenHash),
+  expiresIdx: index('admin_sessions_expires_idx').on(table.expiresAt),
+}))
+
+/**
  * Admin audit log table
  * Tracks all admin actions for compliance and debugging
  *
