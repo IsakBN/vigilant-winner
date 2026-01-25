@@ -12,10 +12,11 @@
     "api:auth-middleware",
     "api:github-oauth",
     "api:apps-crud",
-    "api:releases-crud"
+    "api:releases-crud",
+    "api:release-management"
   ],
   "failedAttempts": [],
-  "lastCheckpoint": "2026-01-25T16:37:11Z",
+  "lastCheckpoint": "2026-01-25T16:40:35Z",
   "startedAt": null,
   "totalTokensUsed": 0,
   "buildOrder": [
