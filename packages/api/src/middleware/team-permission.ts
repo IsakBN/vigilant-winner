@@ -4,6 +4,7 @@
  * Checks user's role within a team/organization
  */
 
+import type { MiddlewareHandler } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import { ERROR_CODES } from '@bundlenudge/shared'
 import type { Env } from '../types/env'
@@ -33,7 +34,7 @@ const ROLE_HIERARCHY: Record<TeamRole, number> = {
  * Must be used after authMiddleware
  * Expects :teamId param in the route
  */
-export function requireTeamRole(minRole: TeamRole): ReturnType<typeof createMiddleware> {
+export function requireTeamRole(minRole: TeamRole): MiddlewareHandler<{ Bindings: Env; Variables: TeamPermissionVariables }> {
   return createMiddleware<{
     Bindings: Env
     Variables: TeamPermissionVariables
