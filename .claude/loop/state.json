@@ -4,6 +4,7 @@
   "currentFeature": null,
   "completedPackages": [],
   "completedFeatures": [
+    "setup:setup",
     "shared:types",
     "shared:schemas",
     "shared:constants",
@@ -13,7 +14,8 @@
     "api:github-oauth",
     "api:apps-crud",
     "api:releases-crud",
-    "api:release-management"
+    "api:release-management",
+    "api:device-registration"
   ],
   "failedAttempts": [],
   "lastCheckpoint": "2026-01-25T16:40:35Z",

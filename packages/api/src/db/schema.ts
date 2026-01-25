@@ -35,17 +35,25 @@ export const apps = sqliteTable('apps', {
 export const devices = sqliteTable('devices', {
   id: text('id').primaryKey(),
   appId: text('app_id').notNull().references(() => apps.id),
+  deviceId: text('device_id').notNull(),
   platform: text('platform', { enum: ['ios', 'android'] }).notNull(),
   osVersion: text('os_version'),
   deviceModel: text('device_model'),
+  timezone: text('timezone'),
+  locale: text('locale'),
   appVersion: text('app_version').notNull(),
   currentBundleVersion: text('current_bundle_version'),
   currentBundleHash: text('current_bundle_hash'),
+  tokenHash: text('token_hash'),
+  tokenExpiresAt: integer('token_expires_at'),
   lastSeenAt: integer('last_seen_at', { mode: 'timestamp' }),
+  revokedAt: integer('revoked_at', { mode: 'timestamp' }),
   crashCount: integer('crash_count').default(0),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 }, (table) => ({
   appIdx: index('devices_app_idx').on(table.appId),
+  deviceIdIdx: index('devices_device_id_idx').on(table.deviceId),
+  appDeviceIdx: index('devices_app_device_idx').on(table.appId, table.deviceId),
   lastSeenIdx: index('devices_last_seen_idx').on(table.lastSeenAt),
 }))
 
