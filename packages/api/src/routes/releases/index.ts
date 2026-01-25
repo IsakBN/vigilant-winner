@@ -2,6 +2,9 @@
  * Releases CRUD routes
  *
  * Handles release creation, management, and bundle uploads
+ *
+ * @agent fix-subscription-enforcement
+ * @modified 2026-01-25
  */
 
 import { Hono } from 'hono'
@@ -13,6 +16,7 @@ import {
   ERROR_CODES,
 } from '@bundlenudge/shared'
 import { authMiddleware, type AuthUser } from '../../middleware/auth'
+import { checkStorageLimitWithAddition } from '../../lib/subscription-limits'
 import type { Env } from '../../types/env'
 
 interface ReleaseRow {
@@ -231,6 +235,18 @@ releasesRoutes.post('/:appId/:releaseId/bundle', async (c) => {
     return c.json(
       { error: ERROR_CODES.VALIDATION_ERROR, message: 'Bundle file required' },
       400
+    )
+  }
+
+  // Check storage limit before upload
+  const storageCheck = await checkStorageLimitWithAddition(c.env, user.id, body.byteLength)
+  if (!storageCheck.allowed) {
+    return c.json(
+      {
+        error: ERROR_CODES.STORAGE_LIMIT_EXCEEDED,
+        message: storageCheck.message ?? 'Storage limit exceeded. Please upgrade your plan.',
+      },
+      403
     )
   }
 

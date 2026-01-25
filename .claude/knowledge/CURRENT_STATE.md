@@ -1,18 +1,54 @@
 # BundleNudge Current State
 
-> **Last Updated:** 2026-01-25 (auto-updated by loop)
+> **Last Updated:** 2026-01-25
 >
 > This document tracks what has been built vs what remains.
 
 ---
 
-## Loop Progress: 24/50 features (48%)
+## ⚠️ AUDIT CHECKPOINT - Issues Caught at 48%
+
+**Date:** 2026-01-25
+**Features Completed Before Audit:** 24/50 (48%)
+**Commits Made:** 15 iterations (loop: iteration 1-15)
+
+### What Went Wrong
+
+Implementation proceeded WITHOUT following the documented agent structure:
+- ❌ Did NOT use Task tool to spawn subagents
+- ❌ Did NOT add agent attribution to files
+- ❌ Did NOT properly read all planning docs before implementing
+- ❌ Built ~9,500 LOC vs legacy's 72,000 LOC (13%) - missing critical functionality
+
+### Critical Issues Found
+
+| Issue | Severity | File | Problem |
+|-------|----------|------|---------|
+| Device auth broken | 🔴 CRITICAL | `middleware/device-auth.ts` | Queries `registered_devices` table that doesn't exist (should be `devices`) |
+| No rate limiting | 🔴 CRITICAL | Missing | SDK endpoints vulnerable to abuse/DDoS |
+| No upload limits | 🔴 CRITICAL | `routes/releases/` | Bundle upload accepts unlimited size |
+| Targeting rules unused | 🟠 HIGH | `routes/updates/` | Stored in DB but never evaluated |
+| Subscription limits unenforced | 🟠 HIGH | Multiple | Plans exist but limits never checked |
+| Race conditions | 🟠 HIGH | Multiple | Device upserts, stats updates not atomic |
+| No data retention | 🟡 MEDIUM | Missing | Telemetry grows forever |
+
+### Correction Plan
+
+Now using proper agent structure:
+1. Fix critical bugs with dedicated agents
+2. Each agent named: `fix-{issue}` or `phase-{N}-{feature}`
+3. All files get `@agent` attribution
+4. Progress tracked in "Completed by Agents" section below
+
+---
+
+## Loop Progress: 24/50 features (48%) - PAUSED FOR FIXES
 
 ```
-[███████████████░░░░░░░░░░░░░░░] 48%
+[███████████████░░░░░░░░░░░░░░░] 48% - FIXING ISSUES
 ```
 
-### Completed Features
+### Completed Features (Before Audit)
 - ✅ setup:setup
 - ✅ shared:types
 - ✅ shared:schemas
@@ -38,159 +74,72 @@
 - ✅ api:github-app
 - ✅ api:email-service
 
-### Next Up
-- 🔄 api:admin-auth (Phase 6 - Admin system)
+### Current Phase: Bug Fixes - COMPLETE ✅
+- ✅ fix-device-auth
+- ✅ fix-rate-limiting
+- ✅ fix-validation
+- ✅ fix-targeting-rules
+- ✅ fix-subscription-enforcement
+
+### Next Up (After Fixes)
+- ⏳ api:admin-auth (Phase 6 - Admin system)
 
 ---
 
-## Completion Status
+## Completed by Agents
+
+| Agent | Date | Work Done |
+|-------|------|-----------|
+| fix-device-auth | 2026-01-25 | Fixed middleware to query correct `devices` table instead of non-existent `registered_devices` |
+| fix-rate-limiting | 2026-01-25 | Created rate limit middleware (60/100/10 req/min), applied to SDK routes, 15 new tests (711 total) |
+| fix-validation | 2026-01-25 | Added body size limits (1MB/50MB), Zod validation on all routes, 77 new tests (788 total) |
+| fix-targeting-rules | 2026-01-25 | Wired targeting rules evaluation into update check endpoint, 27 new tests |
+| fix-subscription-enforcement | 2026-01-25 | Created limit checking utils, enforced MAU/storage at 110%, 23 new tests |
+
+---
+
+## Code Statistics
+
+| Metric | Legacy | Current | Gap |
+|--------|--------|---------|-----|
+| API LOC | 72,479 | 9,530 | 13% |
+| Route Files | 144 | 23 | 16% |
+| DB Tables | 45+ | 16 | 35% |
+| Middleware | 9 | 5 | 55% |
+| Lib Utils | 43 | 22 | 51% |
+| Tests | ? | 696 | - |
+
+**Note:** Goal is not LOC parity but functional parity with proper quality.
+
+---
+
+## Package Status
 
 | Package | Status | Notes |
 |---------|--------|-------|
-| `shared` | ✅ COMPLETE | Types, schemas, constants done - SKIP IN LOOP |
-| `api` | 🟡 60% | DB + Auth + Apps done, needs releases + SaaS |
+| `shared` | ✅ 90% | Types, schemas, constants done |
+| `api` | 🟡 40% | Core done, needs fixes + remaining features |
 | `sdk` | 🟡 50% | Core files exist, needs integration |
 | `dashboard` | ❌ 5% | Only plan files exist |
 
 ---
 
-## packages/shared (90% complete)
+## Critical Path
 
-### Done
-- [x] `src/types.ts` - All core types (DeviceAttributes, Release, UpdateCheck, Telemetry, etc.)
-- [x] `src/schemas.ts` - Zod validation schemas
-- [x] `src/constants.ts` - Constants
-- [x] `src/index.ts` - Re-exports
-- [x] `vitest.config.ts` - Test config
-- [x] `package.json` - Dependencies
-- [x] `tsconfig.json` - TypeScript config
-
-### Remaining
-- [ ] Add more test coverage
+1. ✅ Phase 0-5 features (24 features) - DONE but needs fixes
+2. 🔄 **FIX CRITICAL BUGS** ← WE ARE HERE
+3. ⏳ Phase 6: Admin system
+4. ⏳ Phase 7: Build system
+5. ⏳ Phase 8-10: Dashboard
+6. ⏳ Phase 11: SDK
+7. ⏳ Phase 12-14: Advanced features
 
 ---
 
-## packages/api (40% complete)
+## Lessons Learned
 
-### Done
-- [x] `src/index.ts` - Hono app with middleware and route mounting
-- [x] `src/types/env.ts` - Cloudflare bindings type (needs expansion)
-- [x] `src/routes/apps.ts` - App CRUD routes (basic)
-- [x] `src/routes/releases.ts` - Release routes (basic)
-- [x] `src/routes/devices.ts` - Device registration route
-- [x] `src/routes/updates.ts` - Update check route
-- [x] `src/routes/telemetry.ts` - Telemetry route
-- [x] `wrangler.toml` - D1, R2, KV bindings
-- [x] `vitest.config.ts` - Test config
-- [x] `package.json` - Dependencies
-- [x] `tsconfig.json` - TypeScript config
-
-### Done (from loop)
-- [x] `src/db/schema.ts` - Drizzle ORM schema ✅
-- [x] `src/db/index.ts` - Database exports ✅
-- [x] `src/lib/auth.ts` - Better Auth setup ✅
-- [x] `src/lib/auth-schema.ts` - Auth schema ✅
-- [x] `src/middleware/auth.ts` - Auth middleware ✅
-- [x] `src/middleware/device-auth.ts` - Device auth ✅
-- [x] `src/lib/device-token.ts` - Device tokens ✅
-
-### NOT Done (Required for Phase 3+)
-- [ ] `src/middleware/rate-limit.ts` - Rate limiting
-- [ ] `src/lib/encryption.ts` - AES-256-GCM encryption
-
-### NOT Done (Required for Phase 3+)
-- [ ] Teams/Organizations routes
-- [ ] Stripe billing routes
-- [ ] Admin routes
-- [ ] Webhooks (outgoing)
-- [ ] GitHub App integration
-- [ ] Email service
-
----
-
-## packages/sdk (50% complete)
-
-### Done
-- [x] `src/index.ts` - Exports
-- [x] `src/types.ts` - SDK-specific types
-- [x] `src/utils.ts` - Utility functions
-- [x] `src/utils.test.ts` - Utility tests
-- [x] `src/storage.ts` - AsyncStorage wrapper
-- [x] `src/updater.ts` - Update checker
-- [x] `src/crash-detector.ts` - Crash detection
-- [x] `src/rollback-manager.ts` - Rollback logic
-- [x] `src/bundlenudge.ts` - Main SDK class
-- [x] `vitest.config.ts` - Test config
-- [x] `package.json` - Dependencies
-- [x] `tsconfig.json` - TypeScript config
-
-### NOT Done
-- [ ] Device authentication (keyless auth)
-- [ ] Route monitoring
-- [ ] Integration tests
-- [ ] React Native native module setup
-
----
-
-## packages/dashboard (5% complete)
-
-### Done
-- [x] `CLAUDE.md` - Dashboard instructions
-- [x] `plan.md` - Implementation plan
-
-### NOT Done (Everything)
-- [ ] Next.js 15 scaffold
-- [ ] Auth pages (login, signup, OAuth)
-- [ ] API client (TanStack Query)
-- [ ] App list/detail pages
-- [ ] Release management pages
-- [ ] Team management pages
-- [ ] Billing pages
-- [ ] Admin pages
-
----
-
-## Infrastructure Files
-
-### Done
-- [x] `/package.json` - Root monorepo config
-- [x] `/pnpm-workspace.yaml` - Workspace definition
-- [x] `/tsconfig.json` - Base TypeScript config
-- [x] `/CLAUDE.md` - Project instructions
-- [x] `/.env.example` - Environment variables template
-
-### NOT Done
-- [ ] `/eslint.config.js` - ESLint config (v9 flat config)
-- [ ] `/.prettierrc` - Prettier config
-- [ ] `/scripts/` - Build/deploy scripts
-
----
-
-## Loop Infrastructure
-
-### Done
-- [x] `.claude/loop/state.json` - 49 features, 12 phases
-- [x] `.claude/loop/prompts/` - 49 feature prompts
-- [x] `.claude/loop/prompts/phase-0-setup.md` - Setup prompt
-- [x] `.claude/knowledge/INDEX.md` - Knowledge index
-- [x] `.claude/knowledge/API_FEATURES.md` - 180+ endpoints
-- [x] `.claude/knowledge/IMPLEMENTATION_DETAILS.md` - DB, auth, Stripe
-- [x] `.claude/knowledge/CODEBASE_DEEP_DIVE.md` - Dashboard + SDK
-- [x] `.claude/knowledge/KNOWLEDGE.md` - SDK architecture
-- [x] `.claude/knowledge/PRODUCT.md` - Product overview
-- [x] `.claude/knowledge/QUALITY_RULES.md` - Code quality
-
----
-
-## Critical Path to Working MVP
-
-To get a working system, complete in order:
-
-1. **Phase 0** - Setup (DB schema, env types)
-2. **Phase 1** - Shared types (already done!)
-3. **Phase 2** - Auth (Better Auth + middleware)
-4. **Phase 3** - Core API (apps, releases, devices, updates)
-5. **Phase 8** - Dashboard scaffold
-6. **Phase 11** - SDK integration
-
-Phases 4-7, 9-10 are SaaS features (teams, billing, admin) - can come later.
+1. **Read ALL docs before implementing** - The planning docs exist for a reason
+2. **Use subagents** - Task tool spawns focused agents that do better work
+3. **Add attribution** - Track which agent built what for accountability
+4. **Quality over speed** - 13% of legacy LOC means we're missing functionality
+5. **Catch issues early** - Better to pause at 48% than find bugs at 100%

@@ -1,4 +1,7 @@
 /**
+ * @agent fix-validation
+ * @modified 2026-01-25
+ *
  * Device Registration Routes
  *
  * Handles device registration and token management for SDK authentication.
@@ -7,10 +10,21 @@
 
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
+import { z } from 'zod'
 import { deviceRegisterRequestSchema, ERROR_CODES } from '@bundlenudge/shared'
 import { generateDeviceToken, verifyDeviceToken, decodeJwtPayload } from '../../lib/device-token'
 import { authMiddleware, type AuthUser } from '../../middleware/auth'
 import type { Env } from '../../types/env'
+
+// =============================================================================
+// Local Schemas
+// =============================================================================
+
+/** Schema for revoking a device's access token */
+const deviceRevokeSchema = z.object({
+  appId: z.string().uuid(),
+  deviceId: z.string().min(1).max(100),
+})
 
 interface DeviceRow {
   id: string
@@ -269,43 +283,41 @@ devicesRoutes.get('/', authMiddleware, async (c) => {
  *
  * Revoke a device's token (dashboard only).
  */
-devicesRoutes.post('/revoke', authMiddleware, async (c) => {
-  const user = c.get('user')
-  const body = await c.req.json<{ appId: string; deviceId: string }>()
+devicesRoutes.post(
+  '/revoke',
+  authMiddleware,
+  zValidator('json', deviceRevokeSchema),
+  async (c) => {
+    const user = c.get('user')
+    const body = c.req.valid('json')
 
-  if (!body.appId || !body.deviceId) {
-    return c.json(
-      { error: ERROR_CODES.VALIDATION_ERROR, message: 'appId and deviceId required' },
-      400
-    )
+    // Verify app ownership
+    const app = await c.env.DB.prepare(
+      'SELECT * FROM apps WHERE id = ? AND owner_id = ? AND deleted_at IS NULL'
+    ).bind(body.appId, user.id).first()
+
+    if (!app) {
+      return c.json(
+        { error: ERROR_CODES.APP_NOT_FOUND, message: 'App not found' },
+        404
+      )
+    }
+
+    const now = Math.floor(Date.now() / 1000)
+
+    const result = await c.env.DB.prepare(`
+      UPDATE devices
+      SET revoked_at = ?
+      WHERE app_id = ? AND device_id = ? AND revoked_at IS NULL
+    `).bind(now, body.appId, body.deviceId).run()
+
+    if (!result.meta.changes) {
+      return c.json(
+        { error: ERROR_CODES.DEVICE_NOT_FOUND, message: 'Device not found' },
+        404
+      )
+    }
+
+    return c.json({ success: true, revokedAt: now })
   }
-
-  // Verify app ownership
-  const app = await c.env.DB.prepare(
-    'SELECT * FROM apps WHERE id = ? AND owner_id = ? AND deleted_at IS NULL'
-  ).bind(body.appId, user.id).first()
-
-  if (!app) {
-    return c.json(
-      { error: ERROR_CODES.APP_NOT_FOUND, message: 'App not found' },
-      404
-    )
-  }
-
-  const now = Math.floor(Date.now() / 1000)
-
-  const result = await c.env.DB.prepare(`
-    UPDATE devices
-    SET revoked_at = ?
-    WHERE app_id = ? AND device_id = ? AND revoked_at IS NULL
-  `).bind(now, body.appId, body.deviceId).run()
-
-  if (!result.meta.changes) {
-    return c.json(
-      { error: ERROR_CODES.DEVICE_NOT_FOUND, message: 'Device not found' },
-      404
-    )
-  }
-
-  return c.json({ success: true, revokedAt: now })
-})
+)

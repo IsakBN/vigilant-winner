@@ -3,12 +3,25 @@
  *
  * Handles update checks from SDK. Returns available updates
  * based on device attributes and targeting rules.
+ *
+ * @agent fix-subscription-enforcement, fix-targeting-rules
+ * @modified 2026-01-25
  */
 
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
-import { updateCheckRequestSchema, ERROR_CODES } from '@bundlenudge/shared'
+import {
+  updateCheckRequestSchema,
+  ERROR_CODES,
+} from '@bundlenudge/shared'
+import type {
+  TargetingRules,
+  DeviceAttributes,
+  UpdateCheckRequestSchema,
+} from '@bundlenudge/shared'
 import { verifyDeviceToken } from '../../lib/device-token'
+import { evaluateRules } from '../../lib/targeting'
+import { checkMAULimitForApp } from '../../lib/subscription-limits'
 import type { Env } from '../../types/env'
 
 interface ReleaseRow {
@@ -23,6 +36,7 @@ interface ReleaseRow {
   min_app_version: string | null
   max_app_version: string | null
   release_notes: string | null
+  targeting_rules: string | null
 }
 
 interface AppRow {
@@ -67,6 +81,19 @@ updatesRouter.post(
       }
     }
 
+    // Check MAU limit for app owner
+    const mauCheck = await checkMAULimitForApp(c.env, body.appId)
+    if (!mauCheck.allowed) {
+      return c.json(
+        {
+          error: ERROR_CODES.MAU_LIMIT_EXCEEDED,
+          message: mauCheck.message ?? 'MAU limit exceeded. Please upgrade your plan.',
+          updateAvailable: false,
+        },
+        403
+      )
+    }
+
     // Get the latest active release for this app
     const release = await c.env.DB.prepare(`
       SELECT * FROM releases
@@ -101,6 +128,15 @@ updatesRouter.post(
     // Check rollout percentage
     if (!isInRollout(body.deviceId, release.rollout_percentage)) {
       return c.json({ updateAvailable: false })
+    }
+
+    // Evaluate targeting rules
+    const targetingRules = parseTargetingRules(release.targeting_rules)
+    if (targetingRules) {
+      const deviceAttributes = buildDeviceAttributes(body)
+      if (!evaluateRules(targetingRules, deviceAttributes)) {
+        return c.json({ updateAvailable: false })
+      }
     }
 
     // Update device last seen
@@ -178,4 +214,37 @@ function isInRollout(deviceId: string, rolloutPercentage: number): boolean {
   }
 
   return hash < rolloutPercentage
+}
+
+/**
+ * Parse targeting rules from JSON string stored in database
+ */
+function parseTargetingRules(json: string | null): TargetingRules | null {
+  if (!json) return null
+
+  try {
+    const parsed = JSON.parse(json) as TargetingRules
+    if (!parsed.rules || parsed.rules.length === 0) {
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Build DeviceAttributes from update check request body
+ */
+function buildDeviceAttributes(body: UpdateCheckRequestSchema): DeviceAttributes {
+  return {
+    deviceId: body.deviceId,
+    os: body.platform,
+    osVersion: body.deviceInfo?.osVersion ?? '',
+    deviceModel: body.deviceInfo?.deviceModel ?? '',
+    timezone: body.deviceInfo?.timezone ?? '',
+    locale: body.deviceInfo?.locale ?? '',
+    appVersion: body.appVersion,
+    currentBundleVersion: body.currentBundleVersion ?? null,
+  }
 }

@@ -1,5 +1,17 @@
+/**
+ * @agent fix-validation
+ * @modified 2026-01-25
+ */
+
 import { describe, it, expect } from 'vitest'
+import { z } from 'zod'
 import { deviceRegisterRequestSchema, ERROR_CODES } from '@bundlenudge/shared'
+
+// Local schema for revoke endpoint (matching route definition)
+const deviceRevokeSchema = z.object({
+  appId: z.string().uuid(),
+  deviceId: z.string().min(1).max(100),
+})
 
 describe('device registration routes logic', () => {
   describe('deviceRegisterRequestSchema', () => {
@@ -58,7 +70,7 @@ describe('device registration routes logic', () => {
   })
 
   describe('token hash format', () => {
-    it('generates SHA-256 hash (64 hex chars)', async () => {
+    it('generates SHA-256 hash (64 hex chars)', () => {
       const mockHash = 'a'.repeat(64)
       expect(mockHash).toMatch(/^[a-f0-9]{64}$/)
       expect(mockHash.length).toBe(64)
@@ -117,9 +129,57 @@ describe('device registration routes logic', () => {
     })
 
     it('revoked devices should be denied', () => {
-      const device = { revoked_at: 1700000000 }
+      const device: { revoked_at: number | null } = { revoked_at: 1700000000 }
       const isRevoked = device.revoked_at !== null
       expect(isRevoked).toBe(true)
+    })
+  })
+
+  describe('deviceRevokeSchema', () => {
+    it('validates valid revoke request', () => {
+      const result = deviceRevokeSchema.safeParse({
+        appId: '550e8400-e29b-41d4-a716-446655440000',
+        deviceId: 'device-123',
+      })
+      expect(result.success).toBe(true)
+    })
+
+    it('rejects invalid appId format', () => {
+      const result = deviceRevokeSchema.safeParse({
+        appId: 'not-a-uuid',
+        deviceId: 'device-123',
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects empty deviceId', () => {
+      const result = deviceRevokeSchema.safeParse({
+        appId: '550e8400-e29b-41d4-a716-446655440000',
+        deviceId: '',
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects missing appId', () => {
+      const result = deviceRevokeSchema.safeParse({
+        deviceId: 'device-123',
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects missing deviceId', () => {
+      const result = deviceRevokeSchema.safeParse({
+        appId: '550e8400-e29b-41d4-a716-446655440000',
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects deviceId exceeding max length', () => {
+      const result = deviceRevokeSchema.safeParse({
+        appId: '550e8400-e29b-41d4-a716-446655440000',
+        deviceId: 'x'.repeat(101),
+      })
+      expect(result.success).toBe(false)
     })
   })
 

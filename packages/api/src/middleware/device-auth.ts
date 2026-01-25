@@ -1,4 +1,10 @@
 /**
+ * @agent fix-device-auth
+ * @modified 2026-01-25
+ * @description Fixed device auth to query correct 'devices' table
+ */
+
+/**
  * Device authentication middleware
  *
  * Validates device tokens for SDK requests
@@ -81,7 +87,7 @@ export const deviceAuthMiddleware = createMiddleware<{
 
   // Check if device is revoked
   const device = await c.env.DB.prepare(
-    'SELECT revoked_at FROM registered_devices WHERE app_id = ? AND device_id = ?'
+    'SELECT revoked_at FROM devices WHERE app_id = ? AND device_id = ?'
   ).bind(payload.appId, payload.deviceId).first<{ revoked_at: number | null }>()
 
   if (device?.revoked_at) {
