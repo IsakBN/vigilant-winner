@@ -1,7 +1,7 @@
 {
   "phase": "ready",
   "currentPackage": "api",
-  "currentFeature": "email-service",
+  "currentFeature": "admin-auth",
   "completedPackages": [],
   "completedFeatures": [
     "setup:setup",
@@ -26,7 +26,8 @@
     "api:teams-audit",
     "api:webhooks-outgoing",
     "api:crash-integrations",
-    "api:github-app"
+    "api:github-app",
+    "api:email-service"
   ],
   "failedAttempts": [
     {
@@ -263,7 +264,14 @@
     "sdk/route-monitor": "sdk-route-monitor.md",
     "api/release-management": "api-release-management.md",
     "api/targeting-engine": "api-targeting-engine.md",
-    "dashboard/adapt": "dashboard-adapt.md"
+    "dashboard/adapt": "dashboard-adapt.md",
+    "api/bundle-size": "api-bundle-size.md",
+    "api/uploads": "api-uploads.md",
+    "api/metrics-advanced": "api-metrics-advanced.md",
+    "api/health-reports": "api-health-reports.md",
+    "api/websocket": "api-websocket.md",
+    "api/edge-nodes": "api-edge-nodes.md",
+    "api/onboarding": "api-onboarding.md"
   },
   "knowledgeDocs": [
     ".claude/knowledge/INDEX.md",
@@ -275,6 +283,6 @@
     ".claude/knowledge/PRODUCT.md",
     ".claude/knowledge/QUALITY_RULES.md"
   ],
-  "totalFeatures": 50,
-  "estimatedPhases": 13
+  "totalFeatures": 57,
+  "estimatedPhases": 15
 }
