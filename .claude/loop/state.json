@@ -3,7 +3,7 @@
   "currentPackage": null,
   "currentFeature": null,
   "completedPackages": [],
-  "completedFeatures": [],
+  "completedFeatures": ["shared:types", "shared:schemas", "shared:constants", "api:database-schema"],
   "failedAttempts": [],
   "lastCheckpoint": null,
   "startedAt": null,
