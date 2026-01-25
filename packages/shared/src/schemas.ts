@@ -25,6 +25,31 @@ export type CreateAppSchema = z.infer<typeof createAppSchema>
 export type UpdateAppSchema = z.infer<typeof updateAppSchema>
 
 // =============================================================================
+// Releases
+// =============================================================================
+
+export const createReleaseSchema = z.object({
+  version: z.string().min(1).max(50),
+  releaseNotes: z.string().max(5000).optional(),
+  minAppVersion: z.string().max(50).optional(),
+  maxAppVersion: z.string().max(50).optional(),
+})
+
+export const updateReleaseSchema = z.object({
+  releaseNotes: z.string().max(5000).optional(),
+  status: z.enum(['active', 'paused', 'rolled_back']).optional(),
+  rollbackReason: z.string().max(500).optional(),
+})
+
+export const updateRolloutSchema = z.object({
+  rolloutPercentage: z.number().min(0).max(100).optional(),
+})
+
+export type CreateReleaseSchema = z.infer<typeof createReleaseSchema>
+export type UpdateReleaseSchema = z.infer<typeof updateReleaseSchema>
+export type UpdateRolloutSchema = z.infer<typeof updateRolloutSchema>
+
+// =============================================================================
 // Device & Targeting
 // =============================================================================
 
@@ -96,7 +121,7 @@ export const criticalRouteSchema = z.object({
   name: z.string().optional(),
 })
 
-export const updateReleaseSchema = z.object({
+export const updateCheckReleaseInfoSchema = z.object({
   version: z.string(),
   bundleUrl: z.string().url(),
   bundleSize: z.number().positive(),
@@ -110,7 +135,7 @@ export const updateCheckResponseSchema = z.object({
   updateAvailable: z.boolean(),
   requiresAppStoreUpdate: z.boolean().optional(),
   appStoreMessage: z.string().optional(),
-  release: updateReleaseSchema.optional(),
+  release: updateCheckReleaseInfoSchema.optional(),
 })
 
 // =============================================================================

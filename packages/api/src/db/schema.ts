@@ -13,9 +13,11 @@ import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core'
 export const apps = sqliteTable('apps', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
-  bundleId: text('bundle_id').notNull(),
+  bundleId: text('bundle_id'),
   platform: text('platform', { enum: ['ios', 'android'] }).notNull(),
   ownerId: text('owner_id').notNull(),
+  apiKey: text('api_key').notNull(),
+  webhookSecret: text('webhook_secret').notNull(),
   settings: text('settings', { mode: 'json' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
@@ -23,6 +25,7 @@ export const apps = sqliteTable('apps', {
 }, (table) => ({
   ownerIdx: index('apps_owner_idx').on(table.ownerId),
   bundleIdIdx: index('apps_bundle_id_idx').on(table.bundleId),
+  apiKeyIdx: index('apps_api_key_idx').on(table.apiKey),
 }))
 
 /**
@@ -57,6 +60,7 @@ export const releases = sqliteTable('releases', {
   bundleUrl: text('bundle_url').notNull(),
   bundleSize: integer('bundle_size').notNull(),
   bundleHash: text('bundle_hash').notNull(),
+  rolloutPercentage: integer('rollout_percentage').default(100),
   targetingRules: text('targeting_rules', { mode: 'json' }),
   releaseNotes: text('release_notes'),
   status: text('status', { enum: ['active', 'paused', 'rolled_back'] }).default('active'),

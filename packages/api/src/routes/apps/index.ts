@@ -55,7 +55,7 @@ appsRoutes.get('/', async (c) => {
     ORDER BY a.created_at DESC
   `).bind(user.id).all<AppRow>()
 
-  return c.json({ apps: results.results ?? [] })
+  return c.json({ apps: results.results })
 })
 
 /**

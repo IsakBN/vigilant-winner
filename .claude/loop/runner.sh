@@ -29,17 +29,69 @@ NC='\033[0m'
 
 # Config
 MAX_RETRIES=3
-CHECKPOINT_EVERY=3  # features
+CHECKPOINT_EVERY=5  # features (reduced from default for better recovery)
+STOP_FILE="$SCRIPT_DIR/STOP"
+FAILURES_DIR="$SCRIPT_DIR/failures"
 
 # Ensure directories exist
 mkdir -p "$LOG_DIR"
 mkdir -p "$PROMPTS_DIR"
+mkdir -p "$FAILURES_DIR"
 
 # Summary log helper - writes to both console and summary log
 summary() {
   local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
   echo "$msg" >> "$SUMMARY_LOG"
   echo -e "${CYAN}$msg${NC}"
+}
+
+# Check for emergency stop
+check_stop() {
+  if [ -f "$STOP_FILE" ]; then
+    error "STOP file detected - halting build loop"
+    summary "🛑 EMERGENCY STOP triggered by user"
+    checkpoint "emergency-stop"
+    rm -f "$STOP_FILE"
+    exit 0
+  fi
+}
+
+# Get last N completed features for context
+get_recent_completed() {
+  local n="${1:-3}"
+  jq -r ".completedFeatures | .[-${n}:] | .[]" "$STATE_FILE" 2>/dev/null || echo ""
+}
+
+# Save failure details for debugging
+save_failure() {
+  local feature="$1"
+  local attempt="$2"
+  local log_file="$3"
+  local failure_file="$FAILURES_DIR/${feature//://}-$(date +%Y%m%d-%H%M%S).md"
+
+  cat > "$failure_file" << FAILURE_EOF
+# Failure Report: $feature
+
+**Time:** $(date '+%Y-%m-%d %H:%M:%S')
+**Attempt:** $attempt
+**Run ID:** $RUN_ID
+
+## State at Failure
+\`\`\`json
+$(jq '{currentPackage, currentFeature, completedFeatures, failedAttempts}' "$STATE_FILE")
+\`\`\`
+
+## Last 50 Lines of Log
+\`\`\`
+$(tail -50 "$log_file" 2>/dev/null || echo "Log not available")
+\`\`\`
+
+## Recent Completed Features
+$(get_recent_completed 5 | sed 's/^/- /')
+
+FAILURE_EOF
+
+  warn "Failure details saved to: $failure_file"
 }
 
 # ============================================================================
@@ -132,17 +184,19 @@ build_feature() {
   local prompt=$(build_prompt "$package" "$feature_name")
 
   while [ $attempt -le $MAX_RETRIES ]; do
+    # Check for emergency stop before each attempt
+    check_stop
+
     log "Attempt $attempt/$MAX_RETRIES"
 
     # Run Claude with fresh context (no --continue, explicit new session)
-    # --print: Non-interactive mode
+    # -p: Non-interactive mode (prints output, doesn't wait for input)
     # --dangerously-skip-permissions: Auto-approve tool use
     # --model: Use sonnet for speed/cost balance
     # Each invocation is a NEW session with NO prior context
-    if $CLAUDE_BIN --print \
+    if echo "$prompt" | $CLAUDE_BIN -p \
       --dangerously-skip-permissions \
       --model sonnet \
-      "$prompt" \
       2>&1 | tee "$log_file"; then
 
       # Run tests
@@ -176,6 +230,10 @@ build_feature() {
   local duration=$((end_time - start_time))
   error "Feature failed after $MAX_RETRIES attempts: $feature"
   summary "❌ FAILED: $package/$feature_name (${duration}s, $MAX_RETRIES attempts)"
+
+  # Save failure details for debugging
+  save_failure "$feature" "$MAX_RETRIES" "$log_file"
+
   update_state "phase" "\"failed\""
   return 1
 }
@@ -192,6 +250,20 @@ build_prompt() {
   local decisions=$(cat "$PROJECT_ROOT/.claude/design/DECISIONS.md")
   local knowledge=$(cat "$PROJECT_ROOT/.claude/knowledge/KNOWLEDGE.md")
   local claude_md=$(cat "$PROJECT_ROOT/CLAUDE.md")
+  local current_state=$(cat "$PROJECT_ROOT/.claude/knowledge/CURRENT_STATE.md")
+
+  # Build context primer (reduces warm-up time)
+  local completed_count=$(jq '.completedFeatures | length' "$STATE_FILE")
+  local total_features=$(jq '.totalFeatures' "$STATE_FILE")
+  local recent_completed=$(get_recent_completed 3)
+  local context_primer="## Context Primer (READ FIRST)
+Progress: $completed_count / $total_features features completed
+
+Last 3 completed features:
+$recent_completed
+
+Current task: $package/$feature
+"
 
   # Load feature-specific prompt if exists
   local feature_prompt=""
@@ -210,10 +282,15 @@ build_prompt() {
   cat << EOF
 You are building BundleNudge, an OTA update system for React Native.
 
+$context_primer
+
 ## Your Task
 Build the "$feature" feature for the "$package" package.
 
-## Context Files (READ THESE FIRST)
+## Current State (What Already Exists)
+$current_state
+
+## Context Files
 
 ### DECISIONS.md (Design decisions - follow these exactly)
 $decisions
@@ -228,11 +305,12 @@ $claude_md
 $feature_prompt
 
 ## Requirements
-1. Follow ALL patterns from KNOWLEDGE.md
-2. Respect ALL decisions from DECISIONS.md
-3. Follow ALL code quality rules from CLAUDE.md (max 250 lines/file, etc.)
-4. Write tests for the feature (colocated *.test.ts files)
-5. Tests MUST pass before you're done
+1. READ CURRENT_STATE.md first - don't recreate existing files
+2. Follow ALL patterns from KNOWLEDGE.md
+3. Respect ALL decisions from DECISIONS.md
+4. Follow ALL code quality rules from CLAUDE.md (max 250 lines/file, etc.)
+5. Write tests for the feature (colocated *.test.ts files)
+6. Tests MUST pass before you're done
 
 ## Output
 - Create/edit files as needed
@@ -319,9 +397,15 @@ main() {
 
   # Main build loop
   local features_since_checkpoint=0
+  local loop_start_time=$(date +%s)
+  local iteration=0
 
   while true; do
+    # Check for emergency stop at start of each iteration
+    check_stop
+
     local next=$(get_next_feature)
+    iteration=$((iteration + 1))
 
     if [ -z "$next" ] || [ "$next" = "null" ]; then
       success "All features complete!"
@@ -391,6 +475,108 @@ main() {
   echo ""
   echo "Full summary log: $SUMMARY_LOG"
   echo ""
+
+  # Generate morning summary report
+  generate_morning_summary
+}
+
+# ============================================================================
+# MORNING SUMMARY REPORT
+# ============================================================================
+
+generate_morning_summary() {
+  local report_file="$LOG_DIR/morning-summary-${RUN_ID}.md"
+  local completed_count=$(jq '.completedFeatures | length' "$STATE_FILE")
+  local failed_count=$(jq '.failedAttempts | length' "$STATE_FILE")
+  local total_features=$(jq '.totalFeatures' "$STATE_FILE")
+  local started=$(read_state startedAt)
+  local finished=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+  # Calculate duration
+  local start_epoch=$(date -d "$started" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$started" +%s 2>/dev/null || echo "0")
+  local end_epoch=$(date +%s)
+  local duration_mins=$(( (end_epoch - start_epoch) / 60 ))
+  local avg_time_per_feature=0
+  if [ "$completed_count" -gt 0 ]; then
+    avg_time_per_feature=$(( duration_mins / completed_count ))
+  fi
+
+  # Count files created
+  local files_created=$(git diff --name-only --diff-filter=A HEAD~$((completed_count > 10 ? 10 : completed_count)) 2>/dev/null | wc -l | tr -d ' ')
+
+  cat > "$report_file" << MORNING_EOF
+# BundleNudge Build Loop - Morning Summary
+
+**Generated:** $(date '+%Y-%m-%d %H:%M:%S')
+**Run ID:** $RUN_ID
+
+---
+
+## Overview
+
+| Metric | Value |
+|--------|-------|
+| Features Completed | $completed_count / $total_features |
+| Failed Attempts | $failed_count |
+| Total Duration | ${duration_mins} minutes |
+| Avg Time/Feature | ${avg_time_per_feature} minutes |
+| Files Created | ~$files_created |
+
+---
+
+## Progress
+
+\`\`\`
+[$completed_count/$total_features] $(printf '█%.0s' $(seq 1 $((completed_count * 30 / total_features)))) $(printf '░%.0s' $(seq 1 $(( (total_features - completed_count) * 30 / total_features ))))
+\`\`\`
+
+---
+
+## Completed Features
+
+$(jq -r '.completedFeatures[]' "$STATE_FILE" | nl -w2 -s'. ' | sed 's/^/- /')
+
+---
+
+## Failed Attempts
+
+$(if [ "$failed_count" -gt 0 ]; then
+  jq -r '.failedAttempts[] | "- **\(.feature)** - attempt \(.attempt) at \(.time)"' "$STATE_FILE"
+else
+  echo "_No failures_"
+fi)
+
+---
+
+## Failure Reports
+
+$(ls -1 "$FAILURES_DIR"/*.md 2>/dev/null | while read f; do echo "- [$f]($f)"; done || echo "_No failure reports_")
+
+---
+
+## Next Steps
+
+$(if [ "$completed_count" -lt "$total_features" ]; then
+  echo "1. Resume with: \`pnpm loop:continue\`"
+  echo "2. Next feature: $(get_next_feature)"
+else
+  echo "1. Run full verification: \`pnpm verify\`"
+  echo "2. Test on device"
+fi)
+
+---
+
+## Logs
+
+- Summary: \`$SUMMARY_LOG\`
+- Individual: \`$LOG_DIR/*.log\`
+- Failures: \`$FAILURES_DIR/\`
+
+MORNING_EOF
+
+  success "Morning summary generated: $report_file"
+  echo ""
+  cat "$report_file"
 }
 
 main "$@"

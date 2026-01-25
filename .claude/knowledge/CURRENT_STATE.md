@@ -1,8 +1,29 @@
 # BundleNudge Current State
 
-> **Last Updated:** 2026-01-25
+> **Last Updated:** 2026-01-25 (auto-updated by loop)
 >
 > This document tracks what has been built vs what remains.
+
+---
+
+## Loop Progress: 8/50 features (16%)
+
+```
+[████░░░░░░░░░░░░░░░░░░░░░░░░░░] 16%
+```
+
+### Completed Features
+- ✅ shared:types
+- ✅ shared:schemas
+- ✅ shared:constants
+- ✅ api:database-schema
+- ✅ api:better-auth-setup
+- ✅ api:auth-middleware
+- ✅ api:github-oauth
+- ✅ api:apps-crud
+
+### Next Up
+- 🔄 api:releases-crud
 
 ---
 
@@ -10,8 +31,8 @@
 
 | Package | Status | Notes |
 |---------|--------|-------|
-| `shared` | ✅ 90% | Types, schemas, constants done |
-| `api` | 🟡 40% | Routes scaffolded, needs DB schema + auth |
+| `shared` | ✅ COMPLETE | Types, schemas, constants done - SKIP IN LOOP |
+| `api` | 🟡 60% | DB + Auth + Apps done, needs releases + SaaS |
 | `sdk` | 🟡 50% | Core files exist, needs integration |
 | `dashboard` | ❌ 5% | Only plan files exist |
 
@@ -48,12 +69,16 @@
 - [x] `package.json` - Dependencies
 - [x] `tsconfig.json` - TypeScript config
 
-### NOT Done (Required for Phase 1-2)
-- [ ] `src/db/schema.ts` - Drizzle ORM schema
-- [ ] `src/db/index.ts` - Database exports
-- [ ] `drizzle.config.ts` - Drizzle config
-- [ ] `src/lib/auth.ts` - Better Auth setup
-- [ ] `src/middleware/auth.ts` - Auth middleware
+### Done (from loop)
+- [x] `src/db/schema.ts` - Drizzle ORM schema ✅
+- [x] `src/db/index.ts` - Database exports ✅
+- [x] `src/lib/auth.ts` - Better Auth setup ✅
+- [x] `src/lib/auth-schema.ts` - Auth schema ✅
+- [x] `src/middleware/auth.ts` - Auth middleware ✅
+- [x] `src/middleware/device-auth.ts` - Device auth ✅
+- [x] `src/lib/device-token.ts` - Device tokens ✅
+
+### NOT Done (Required for Phase 3+)
 - [ ] `src/middleware/rate-limit.ts` - Rate limiting
 - [ ] `src/lib/encryption.ts` - AES-256-GCM encryption
 
