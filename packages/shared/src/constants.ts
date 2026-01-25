@@ -66,3 +66,46 @@ export const HASH_ALGORITHM = 'SHA-256'
 
 /** Hash prefix in responses */
 export const HASH_PREFIX = 'sha256:'
+
+// =============================================================================
+// Error Codes
+// =============================================================================
+
+/** Standardized error codes for API responses */
+export const ERROR_CODES = {
+  // Authentication & Authorization
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  FORBIDDEN: 'FORBIDDEN',
+  INVALID_TOKEN: 'INVALID_TOKEN',
+  TOKEN_EXPIRED: 'TOKEN_EXPIRED',
+  SESSION_EXPIRED: 'SESSION_EXPIRED',
+
+  // Validation
+  INVALID_INPUT: 'INVALID_INPUT',
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  MISSING_REQUIRED_FIELD: 'MISSING_REQUIRED_FIELD',
+
+  // Resources
+  NOT_FOUND: 'NOT_FOUND',
+  APP_NOT_FOUND: 'APP_NOT_FOUND',
+  RELEASE_NOT_FOUND: 'RELEASE_NOT_FOUND',
+  DEVICE_NOT_FOUND: 'DEVICE_NOT_FOUND',
+  TEAM_NOT_FOUND: 'TEAM_NOT_FOUND',
+
+  // Rate Limiting
+  RATE_LIMITED: 'RATE_LIMITED',
+  QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
+
+  // Server Errors
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
+  DATABASE_ERROR: 'DATABASE_ERROR',
+
+  // Business Logic
+  ALREADY_EXISTS: 'ALREADY_EXISTS',
+  CONFLICT: 'CONFLICT',
+  INVALID_STATE: 'INVALID_STATE',
+  OPERATION_FAILED: 'OPERATION_FAILED',
+} as const
+
+export type ErrorCode = keyof typeof ERROR_CODES
