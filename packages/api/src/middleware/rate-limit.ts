@@ -2,6 +2,10 @@
  * @agent fix-rate-limiting
  * @created 2026-01-25
  * @description Rate limiting middleware for SDK endpoints
+ *
+ * @agent remediate-auth-rate-limit
+ * @modified 2026-01-25
+ * @description Added auth rate limiting to prevent brute force attacks
  */
 
 /**
@@ -29,6 +33,8 @@ export const RATE_LIMITS = {
   telemetry: { limit: 100, windowSeconds: 60 },
   /** Device registration: rare operation */
   devices: { limit: 10, windowSeconds: 60 },
+  /** Auth routes: strict to prevent brute force and OTP guessing */
+  auth: { limit: 10, windowSeconds: 60 },
 } as const
 
 export type RateLimitType = keyof typeof RATE_LIMITS
@@ -201,3 +207,6 @@ export const rateLimitTelemetry = createRateLimitMiddleware('telemetry')
 
 /** Rate limit middleware for device registration endpoints */
 export const rateLimitDevices = createRateLimitMiddleware('devices')
+
+/** Rate limit middleware for auth endpoints (login, OAuth, OTP) */
+export const rateLimitAuth = createRateLimitMiddleware('auth')

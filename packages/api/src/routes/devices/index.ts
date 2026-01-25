@@ -1,5 +1,6 @@
 /**
  * @agent fix-validation
+ * @agent remediate-pagination
  * @modified 2026-01-25
  *
  * Device Registration Routes
@@ -240,11 +241,13 @@ devicesRoutes.post('/refresh', async (c) => {
 /**
  * GET /v1/devices
  *
- * List registered devices for an app (dashboard only).
+ * List registered devices for an app with pagination (dashboard only).
  */
 devicesRoutes.get('/', authMiddleware, async (c) => {
   const user = c.get('user')
   const appId = c.req.query('appId')
+  const limit = Math.min(Number(c.req.query('limit')) || 20, 100)
+  const offset = Number(c.req.query('offset')) || 0
 
   if (!appId) {
     return c.json(
@@ -265,6 +268,13 @@ devicesRoutes.get('/', authMiddleware, async (c) => {
     )
   }
 
+  // Get total count
+  const countResult = await c.env.DB.prepare(
+    'SELECT COUNT(*) as total FROM devices WHERE app_id = ?'
+  ).bind(appId).first<{ total: number }>()
+  const total = countResult?.total ?? 0
+
+  // Get paginated results
   const devices = await c.env.DB.prepare(`
     SELECT
       id, device_id, platform, os_version, device_model, app_version,
@@ -272,10 +282,18 @@ devicesRoutes.get('/', authMiddleware, async (c) => {
     FROM devices
     WHERE app_id = ?
     ORDER BY last_seen_at DESC
-    LIMIT 100
-  `).bind(appId).all()
+    LIMIT ? OFFSET ?
+  `).bind(appId, limit, offset).all()
 
-  return c.json({ devices: devices.results })
+  return c.json({
+    data: devices.results,
+    pagination: {
+      total,
+      limit,
+      offset,
+      hasMore: offset + devices.results.length < total,
+    },
+  })
 })
 
 /**

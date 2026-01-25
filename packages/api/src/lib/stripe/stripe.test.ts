@@ -36,9 +36,9 @@ describe('stripe client', () => {
         'client_reference_id': 'user-123',
       }
 
-      expect(params['mode']).toBe('subscription')
+      expect(params.mode).toBe('subscription')
       expect(params['line_items[0][price]']).toBe('price_abc')
-      expect(params['client_reference_id']).toBe('user-123')
+      expect(params.client_reference_id).toBe('user-123')
     })
 
     it('includes metadata params', () => {
@@ -62,8 +62,8 @@ describe('stripe client', () => {
         'return_url': 'https://example.com/billing',
       }
 
-      expect(params['customer']).toBe('cus_123')
-      expect(params['return_url']).toBe('https://example.com/billing')
+      expect(params.customer).toBe('cus_123')
+      expect(params.return_url).toBe('https://example.com/billing')
     })
   })
 })
@@ -81,8 +81,8 @@ describe('stripe webhook', () => {
         }
       }
 
-      expect(elements['t']).toBe('1614556800')
-      expect(elements['v1']).toBe('abc123def456')
+      expect(elements.t).toBe('1614556800')
+      expect(elements.v1).toBe('abc123def456')
     })
 
     it('handles multiple v1 signatures', () => {
@@ -97,8 +97,8 @@ describe('stripe webhook', () => {
         }
       }
 
-      expect(elements['t']).toBe('1614556800')
-      expect(elements['v1']).toBe('sig2')
+      expect(elements.t).toBe('1614556800')
+      expect(elements.v1).toBe('sig2')
     })
   })
 

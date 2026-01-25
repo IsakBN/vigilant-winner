@@ -200,10 +200,9 @@ function groupEventsByRelease(events: TelemetryEvent[]): Record<string, string[]
 
   for (const event of events) {
     if (event.releaseId && shouldUpdateStats(event.eventType)) {
-      if (!result[event.releaseId]) {
-        result[event.releaseId] = []
-      }
-      result[event.releaseId].push(event.eventType)
+      const releaseEvents = result[event.releaseId] ?? []
+      releaseEvents.push(event.eventType)
+      result[event.releaseId] = releaseEvents
     }
   }
 

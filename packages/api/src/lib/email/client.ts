@@ -74,7 +74,7 @@ export async function sendEmail(env: Env, options: EmailOptions): Promise<EmailR
       }
     }
 
-    const data = (await response.json()) as { id: string }
+    const data = (await response.json())
     return { success: true, id: data.id }
   } catch (error) {
     return {

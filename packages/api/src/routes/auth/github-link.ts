@@ -1,12 +1,16 @@
 /**
- * GitHub account linking routes
+ * @agent remediate-github-token-encryption
+ * @modified 2026-01-25
+ * @description GitHub account linking routes with token encryption at rest
  *
- * Allows authenticated users to link/unlink GitHub accounts
+ * Allows authenticated users to link/unlink GitHub accounts.
+ * Access tokens are encrypted before storage using AES-256-GCM.
  */
 
 import { Hono } from 'hono'
 import { ERROR_CODES } from '@bundlenudge/shared'
 import { authMiddleware } from '../../middleware/auth'
+import { encryptGitHubToken } from '../../lib/github-token'
 import type { Env } from '../../types/env'
 
 const GITHUB_AUTHORIZE_URL = 'https://github.com/login/oauth/authorize'
@@ -123,6 +127,12 @@ githubLinkRoutes.get('/link/callback', async (c) => {
       return c.redirect(`${dashboardUrl}/settings?error=github_already_linked`)
     }
 
+    // Encrypt access token before storing
+    const encryptedToken = await encryptGitHubToken(
+      tokens.access_token,
+      c.env.GITHUB_TOKEN_ENCRYPTION_KEY
+    )
+
     // Link GitHub account (upsert)
     await c.env.DB.prepare(`
       INSERT INTO account (id, user_id, account_id, provider_id, access_token, created_at, updated_at)
@@ -134,7 +144,7 @@ githubLinkRoutes.get('/link/callback', async (c) => {
       crypto.randomUUID(),
       userId,
       String(githubUser.id),
-      tokens.access_token
+      encryptedToken
     ).run()
 
     return c.redirect(`${dashboardUrl}/settings?success=github_linked`)

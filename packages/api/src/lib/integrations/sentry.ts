@@ -13,7 +13,7 @@ const REQUEST_TIMEOUT_MS = 10000
 export async function testSentry(config: SentryConfig): Promise<IntegrationTestResult> {
   try {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    const timeoutId = setTimeout(() => { controller.abort(); }, REQUEST_TIMEOUT_MS)
 
     const response = await fetch(
       `${SENTRY_API_BASE}/organizations/${config.organization}/`,
@@ -84,7 +84,7 @@ export async function sendCrashToSentry(
 ): Promise<boolean> {
   try {
     // Parse DSN to get project ID and key
-    const dsnMatch = config.dsn.match(/https:\/\/([^@]+)@[^/]+\/(\d+)/)
+    const dsnMatch = /https:\/\/([^@]+)@[^/]+\/(\d+)/.exec(config.dsn)
     if (!dsnMatch) {
       return false
     }
@@ -135,13 +135,13 @@ export async function sendCrashToSentry(
 /**
  * Parse stack trace into Sentry frames
  */
-function parseStackTrace(stackTrace: string): Array<{ filename: string; lineno?: number }> {
+function parseStackTrace(stackTrace: string): { filename: string; lineno?: number; function?: string }[] {
   const lines = stackTrace.split('\n')
   return lines
     .filter((line) => line.trim())
     .map((line) => {
-      const match = line.match(/at\s+(.+?)\s*\((.+?):(\d+)/)
-      if (match) {
+      const match = /at\s+(.+?)\s*\((.+?):(\d+)/.exec(line)
+      if (match && match[1] && match[2] && match[3]) {
         return {
           function: match[1],
           filename: match[2],

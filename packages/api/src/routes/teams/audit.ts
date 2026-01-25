@@ -2,6 +2,9 @@
  * Team Audit Log Routes
  *
  * Provides read-only access to team audit logs for compliance.
+ *
+ * @agent remediate-pagination
+ * @modified 2026-01-25
  */
 
 import { Hono } from 'hono'
@@ -92,11 +95,17 @@ auditRouter.get(
       SELECT COUNT(*) as total FROM team_audit_log WHERE ${whereClause}
     `).bind(...countParams).first<{ total: number }>()
 
+    const data = results.results.map(formatAuditEntry)
+    const total = countResult?.total ?? 0
+
     return c.json({
-      entries: results.results.map(formatAuditEntry),
-      total: countResult?.total ?? 0,
-      limit,
-      offset,
+      data,
+      pagination: {
+        total,
+        limit,
+        offset,
+        hasMore: offset + data.length < total,
+      },
     })
   }
 )

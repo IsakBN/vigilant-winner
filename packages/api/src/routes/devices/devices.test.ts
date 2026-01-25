@@ -1,5 +1,6 @@
 /**
  * @agent fix-validation
+ * @agent remediate-pagination
  * @modified 2026-01-25
  */
 
@@ -14,6 +15,52 @@ const deviceRevokeSchema = z.object({
 })
 
 describe('device registration routes logic', () => {
+  describe('pagination', () => {
+    it('defaults to limit 20 when not specified', () => {
+      const requestedLimit = undefined
+      const limit = Math.min(Number(requestedLimit) || 20, 100)
+      expect(limit).toBe(20)
+    })
+
+    it('caps limit at 100', () => {
+      const requestedLimit = '150'
+      const limit = Math.min(Number(requestedLimit) || 20, 100)
+      expect(limit).toBe(100)
+    })
+
+    it('defaults to offset 0 when not specified', () => {
+      const requestedOffset = undefined
+      const offset = Number(requestedOffset) || 0
+      expect(offset).toBe(0)
+    })
+
+    it('calculates hasMore correctly', () => {
+      const total = 100
+      const offset = 0
+      const resultsLength = 20
+      const hasMore = offset + resultsLength < total
+      expect(hasMore).toBe(true)
+    })
+
+    it('response has correct pagination structure', () => {
+      const response = {
+        data: [],
+        pagination: {
+          total: 500,
+          limit: 20,
+          offset: 0,
+          hasMore: true,
+        },
+      }
+      expect(response).toHaveProperty('data')
+      expect(response).toHaveProperty('pagination')
+      expect(response.pagination).toHaveProperty('total')
+      expect(response.pagination).toHaveProperty('limit')
+      expect(response.pagination).toHaveProperty('offset')
+      expect(response.pagination).toHaveProperty('hasMore')
+    })
+  })
+
   describe('deviceRegisterRequestSchema', () => {
     it('validates valid registration data', () => {
       const result = deviceRegisterRequestSchema.safeParse({

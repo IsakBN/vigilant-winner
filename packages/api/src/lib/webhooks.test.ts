@@ -1,3 +1,6 @@
+/**
+ * @agent remediate-webhook-encryption
+ */
 import { describe, it, expect } from 'vitest'
 import {
   generateSignature,
@@ -5,6 +8,7 @@ import {
   WEBHOOK_EVENTS,
   type WebhookPayload,
 } from './webhooks'
+import { encrypt, decrypt, generateKey } from './crypto'
 
 describe('webhooks', () => {
   describe('generateSignature', () => {
@@ -271,6 +275,96 @@ describe('webhooks', () => {
       expect(signaturePart).toBe('v1=abc123')
       expect(timestampPart?.slice(2)).toBe('1700000000')
       expect(signaturePart?.slice(3)).toBe('abc123')
+    })
+  })
+
+  /**
+   * @agent remediate-webhook-encryption
+   */
+  describe('encrypted webhook secret workflow', () => {
+    const encryptionKey = generateKey()
+
+    /**
+     * Simulates the decryptSecret helper used in production
+     */
+    async function decryptSecret(
+      encryptedOrPlaintext: string,
+      key: string
+    ): Promise<string> {
+      try {
+        return await decrypt(encryptedOrPlaintext, key)
+      } catch {
+        return encryptedOrPlaintext
+      }
+    }
+
+    it('generates valid signature with decrypted secret', async () => {
+      const plaintextSecret = 'whsec_test_secret_key'
+      const encryptedSecret = await encrypt(plaintextSecret, encryptionKey)
+
+      // Simulate what happens when triggering a webhook
+      const decryptedSecret = await decryptSecret(encryptedSecret, encryptionKey)
+      expect(decryptedSecret).toBe(plaintextSecret)
+
+      // Generate signature with decrypted secret
+      const timestamp = Math.floor(Date.now() / 1000)
+      const body = JSON.stringify({ event: 'test', data: {} })
+      const signature = await generateSignature(decryptedSecret, timestamp, body)
+
+      // Verify signature would be valid for recipient
+      const header = `t=${String(timestamp)},v1=${signature}`
+      const isValid = await verifySignature(header, body, plaintextSecret)
+      expect(isValid).toBe(true)
+    })
+
+    it('handles legacy plaintext secret correctly', async () => {
+      const plaintextSecret = 'whsec_legacy_not_encrypted'
+
+      // Legacy secret should be returned as-is when decryption fails
+      const result = await decryptSecret(plaintextSecret, encryptionKey)
+      expect(result).toBe(plaintextSecret)
+
+      // Should still generate valid signatures
+      const timestamp = Math.floor(Date.now() / 1000)
+      const body = '{"event":"test"}'
+      const signature = await generateSignature(result, timestamp, body)
+
+      expect(signature).toMatch(/^[a-f0-9]{64}$/)
+    })
+
+    it('produces consistent signatures after decrypt roundtrip', async () => {
+      const secret = 'whsec_consistency_test'
+      const timestamp = 1700000000
+      const body = '{"event":"release.created"}'
+
+      // Direct signature
+      const directSig = await generateSignature(secret, timestamp, body)
+
+      // Roundtrip through encryption
+      const encrypted = await encrypt(secret, encryptionKey)
+      const decrypted = await decryptSecret(encrypted, encryptionKey)
+      const roundtripSig = await generateSignature(decrypted, timestamp, body)
+
+      expect(roundtripSig).toBe(directSig)
+    })
+
+    it('different encryption keys produce same signature after decryption', async () => {
+      const secret = 'whsec_multikey_test'
+      const key1 = generateKey()
+      const key2 = generateKey()
+      const timestamp = 1700000000
+      const body = '{"test":true}'
+
+      const encrypted1 = await encrypt(secret, key1)
+      const encrypted2 = await encrypt(secret, key2)
+
+      const decrypted1 = await decryptSecret(encrypted1, key1)
+      const decrypted2 = await decryptSecret(encrypted2, key2)
+
+      const sig1 = await generateSignature(decrypted1, timestamp, body)
+      const sig2 = await generateSignature(decrypted2, timestamp, body)
+
+      expect(sig1).toBe(sig2)
     })
   })
 })

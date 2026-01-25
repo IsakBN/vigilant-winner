@@ -37,14 +37,14 @@ interface PushPayload {
     name: string
     full_name: string
   }
-  commits: Array<{
+  commits: {
     id: string
     message: string
     author: {
       name: string
       email: string
     }
-  }>
+  }[]
   sender: {
     login: string
   }
@@ -55,16 +55,16 @@ interface RepositoriesPayload {
   installation: {
     id: number
   }
-  repositories_added?: Array<{
+  repositories_added?: {
     id: number
     name: string
     full_name: string
-  }>
-  repositories_removed?: Array<{
+  }[]
+  repositories_removed?: {
     id: number
     name: string
     full_name: string
-  }>
+  }[]
 }
 
 // =============================================================================

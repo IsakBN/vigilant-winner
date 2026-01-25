@@ -1,5 +1,12 @@
+/**
+ * @agent remediate-github-token-encryption
+ * @modified 2026-01-25
+ */
+
 import { describe, it, expect } from 'vitest'
 import { ERROR_CODES } from '@bundlenudge/shared'
+import { generateKey } from '../../lib/crypto'
+import { encryptGitHubToken, isTokenEncrypted } from '../../lib/github-token'
 
 describe('githubLinkRoutes logic', () => {
   describe('POST /link logic', () => {
@@ -61,6 +68,33 @@ describe('githubLinkRoutes logic', () => {
 
       expect(response.linked).toBe(true)
       expect(response.githubId).toBe('12345678')
+    })
+  })
+
+  describe('token encryption', () => {
+    it('encrypts access tokens before storage', async () => {
+      const accessToken = 'gho_test123456789'
+      const encryptionKey = generateKey()
+
+      const encryptedToken = await encryptGitHubToken(accessToken, encryptionKey)
+
+      // Token should be encrypted with enc: prefix
+      expect(isTokenEncrypted(encryptedToken)).toBe(true)
+      expect(encryptedToken).not.toContain(accessToken)
+    })
+
+    it('encrypted token format is suitable for DB storage', async () => {
+      const accessToken = 'gho_test123456789'
+      const encryptionKey = generateKey()
+
+      const encryptedToken = await encryptGitHubToken(accessToken, encryptionKey)
+
+      // Token should be a valid string (base64 with prefix)
+      expect(typeof encryptedToken).toBe('string')
+      expect(encryptedToken.length).toBeGreaterThan(accessToken.length)
+      // Should not contain any characters that would break SQL
+      expect(encryptedToken).not.toContain("'")
+      expect(encryptedToken).not.toContain('"')
     })
   })
 })

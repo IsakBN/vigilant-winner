@@ -104,6 +104,41 @@ named exports          // export { Thing }
 - Deep nesting (> 3 levels)
 - Circular dependencies
 
+## Resource Management (M4 Air)
+
+**CRITICAL:** This machine has limited RAM. Prevent crashes by running tasks sequentially.
+
+### Rules
+
+| Rule | Reason |
+|------|--------|
+| Run ONE test suite at a time | `pnpm test` spawns 6+ Node processes |
+| Run checks sequentially | `pnpm test && pnpm typecheck && pnpm lint` (NOT parallel) |
+| Max 2 parallel agents | More than 2 executors = memory pressure |
+| Close other apps | Especially Chrome and Docker |
+
+### Verification Command (Sequential)
+
+```bash
+# Run one at a time, not in parallel
+cd packages/api && pnpm test
+cd packages/shared && pnpm test
+pnpm typecheck
+pnpm lint
+```
+
+### Agent Workflow (Slower Mode)
+
+```
+Wave Coordinator
+    │
+    ├──► Executor 1 ──► Wait ──► Auditor
+    │
+    ├──► Executor 2 ──► Wait ──► Auditor  (SEQUENTIAL, not parallel)
+    │
+    └──► Executor N ──► Wait ──► Auditor
+```
+
 ## Reference Implementation
 
 This project is being rebuilt from: `/Users/isaks_macbook/Desktop/Dev/codepush`
@@ -121,8 +156,52 @@ Available commands:
 | `/verify` | Run verification pipeline |
 | `/ultra-think` | Multi-perspective analysis |
 
+## Agent Hierarchy (MANDATORY)
+
+When working on multi-task changes, ALWAYS use the hierarchical agent structure:
+
+```
+YOU (Launch PM)
+    │
+    └──► Wave Coordinator
+            │
+            ├──► Executor 1 ──► wait
+            ├──► Executor 2 ──► wait   (SEQUENTIAL - max 2 at a time)
+            └──► Executor N ──► wait
+                    │
+                    ▼
+            ┌───────┴───────┐
+            │   Auditors    │
+            │  (one by one) │
+            └───────────────┘
+                    │
+                    ▼
+              GO/NO-GO Decision
+```
+
+### Rules
+
+1. **Never execute tasks directly** - Spawn executor agents
+2. **Max 2 parallel agents** - Prevents memory crashes on M4 Air
+3. **Always run auditors** after each wave completes
+4. **GO/NO-GO gate** - Don't proceed without passing audits
+5. **Document everything** - Wave plans, audit reports, decisions
+
+### Workflow Location
+
+See `.claude/workflows/wave-remediation/workflow.md` for full details.
+
+### Agent Prompts
+
+- Wave Coordinator: `.claude/workflows/wave-remediation/agents/wave-coordinator.md`
+- Security Auditor: `.claude/workflows/wave-remediation/agents/security-auditor.md`
+- Integration Auditor: `.claude/workflows/wave-remediation/agents/integration-auditor.md`
+- Performance Auditor: `.claude/workflows/wave-remediation/agents/performance-auditor.md`
+
 ## Project Status
 
-**Stage:** Rebuilding from scratch using infinity loops
+**Stage:** Rebuilding with hierarchical agent orchestration
+
+**Current Phase:** Wave-based remediation (post-audit fixes)
 
 **License:** BSL 1.1 (free for self-use, converts to Apache 2.0 in 2030)

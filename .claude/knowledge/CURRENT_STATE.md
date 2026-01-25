@@ -6,140 +6,139 @@
 
 ---
 
-## ⚠️ AUDIT CHECKPOINT - Issues Caught at 48%
+## 🎯 Current Status: Wave-Based Remediation
 
-**Date:** 2026-01-25
-**Features Completed Before Audit:** 24/50 (48%)
-**Commits Made:** 15 iterations (loop: iteration 1-15)
-
-### What Went Wrong
-
-Implementation proceeded WITHOUT following the documented agent structure:
-- ❌ Did NOT use Task tool to spawn subagents
-- ❌ Did NOT add agent attribution to files
-- ❌ Did NOT properly read all planning docs before implementing
-- ❌ Built ~9,500 LOC vs legacy's 72,000 LOC (13%) - missing critical functionality
-
-### Critical Issues Found
-
-| Issue | Severity | File | Problem |
-|-------|----------|------|---------|
-| Device auth broken | 🔴 CRITICAL | `middleware/device-auth.ts` | Queries `registered_devices` table that doesn't exist (should be `devices`) |
-| No rate limiting | 🔴 CRITICAL | Missing | SDK endpoints vulnerable to abuse/DDoS |
-| No upload limits | 🔴 CRITICAL | `routes/releases/` | Bundle upload accepts unlimited size |
-| Targeting rules unused | 🟠 HIGH | `routes/updates/` | Stored in DB but never evaluated |
-| Subscription limits unenforced | 🟠 HIGH | Multiple | Plans exist but limits never checked |
-| Race conditions | 🟠 HIGH | Multiple | Device upserts, stats updates not atomic |
-| No data retention | 🟡 MEDIUM | Missing | Telemetry grows forever |
-
-### Correction Plan
-
-Now using proper agent structure:
-1. Fix critical bugs with dedicated agents
-2. Each agent named: `fix-{issue}` or `phase-{N}-{feature}`
-3. All files get `@agent` attribution
-4. Progress tracked in "Completed by Agents" section below
+**Route Coverage:** 81/116 routes (70%)
+**Test Count:** 1,012+ tests
+**Agent Structure:** Hierarchical (Launch PM → Coordinators → Executors → Auditors)
 
 ---
 
-## Loop Progress: 24/50 features (48%) - PAUSED FOR FIXES
+## Completed Waves
+
+### Wave 1: Security Critical ✅
+| Task | Agent | Result |
+|------|-------|--------|
+| Fix rollout hash (FNV-1a) | `remediate-rollout-hash` | Fixed |
+| Add auth rate limiting | `remediate-auth-rate-limit` | Fixed |
+| Create encryption utils | `remediate-encryption-utils` | Created |
+| Encrypt GitHub tokens | `remediate-github-token-encryption` | Fixed |
+| Encrypt webhook secrets | `remediate-webhook-encryption` | Fixed |
+
+### Wave 2: Core Functionality ✅
+| Task | Agent | Result |
+|------|-------|--------|
+| Implement API key middleware | `remediate-api-key-middleware` | Created |
+| Fix multi-release resolution | `remediate-multi-release-resolution` | Fixed |
+| Add pagination to list endpoints | `remediate-pagination` | Added |
+| Add project members CRUD | `remediate-project-members` | Created |
+| Switch OTP to bcrypt | `remediate-otp-bcrypt` | Fixed |
+
+### Wave 3: Schemas/Constants ✅
+| Task | Agent | Result |
+|------|-------|--------|
+| Create auth schemas | `remediate-auth-schemas` | Created |
+| Create team schemas | `remediate-team-schemas` | Created |
+| Create billing schemas | `remediate-billing-schemas` | Created |
+| Add PLAN_LIMITS | `remediate-plan-limits` | Added |
+| Add RATE_LIMITS | `remediate-rate-limits-constants` | Added |
+
+---
+
+## Current Phase: Wave 4 - Feature Completion 🔄
+
+**Focus:** Missing routes and systems
+
+### Remaining Gaps (35 routes)
+- Channels system (5 routes)
+- Admin auth + CRUD (10 routes)
+- Additional device management (4 routes)
+- Build system stubs (8 routes)
+- Advanced analytics (4 routes)
+- Health reports (4 routes)
+
+---
+
+## Route Statistics
+
+| Category | Legacy | Current | Gap |
+|----------|--------|---------|-----|
+| Apps | 14 | 13 | 93% ✅ |
+| Releases | 15 | 10 | 67% |
+| Devices | 12 | 4 | 33% |
+| Updates | 3 | 1 | 33% |
+| Telemetry | 5 | 3 | 60% |
+| Teams | 18 | 17 | 94% ✅ |
+| Auth | 8 | 5 | 63% |
+| Subscriptions | 8 | 6 | 75% |
+| Webhooks | 9 | 7 | 78% |
+| Integrations | 8 | 6 | 75% |
+| GitHub | 10 | 7 | 70% |
+| **Admin** | 12 | 0 | 0% ❌ |
+| **Builds** | 15 | 0 | 0% ❌ |
+| **Channels** | 6 | 0 | 0% ❌ |
+| **Total** | 116 | 81 | 70% |
+
+---
+
+## Agent Hierarchy (MANDATORY)
+
+All future work MUST use:
 
 ```
-[███████████████░░░░░░░░░░░░░░░] 48% - FIXING ISSUES
+Launch PM (Main Claude)
+    │
+    └──► Wave Coordinator
+            │
+            ├──► Executor 1 ─┐
+            ├──► Executor 2 ─┼──► Auditors ──► GO/NO-GO
+            └──► Executor N ─┘
 ```
 
-### Completed Features (Before Audit)
-- ✅ setup:setup
-- ✅ shared:types
-- ✅ shared:schemas
-- ✅ shared:constants
-- ✅ api:database-schema
-- ✅ api:better-auth-setup
-- ✅ api:auth-middleware
-- ✅ api:github-oauth
-- ✅ api:apps-crud
-- ✅ api:releases-crud
-- ✅ api:release-management
-- ✅ api:device-registration
-- ✅ api:update-check
-- ✅ api:telemetry
-- ✅ api:targeting-engine
-- ✅ api:stripe-billing
-- ✅ api:teams-crud
-- ✅ api:teams-invitations
-- ✅ api:teams-rbac
-- ✅ api:teams-audit
-- ✅ api:webhooks-outgoing
-- ✅ api:crash-integrations
-- ✅ api:github-app
-- ✅ api:email-service
-
-### Current Phase: Bug Fixes - COMPLETE ✅
-- ✅ fix-device-auth
-- ✅ fix-rate-limiting
-- ✅ fix-validation
-- ✅ fix-targeting-rules
-- ✅ fix-subscription-enforcement
-
-### Next Up (After Fixes)
-- ⏳ api:admin-auth (Phase 6 - Admin system)
+See: `.claude/workflows/wave-remediation/workflow.md`
 
 ---
 
-## Completed by Agents
+## Test Coverage
 
-| Agent | Date | Work Done |
-|-------|------|-----------|
-| fix-device-auth | 2026-01-25 | Fixed middleware to query correct `devices` table instead of non-existent `registered_devices` |
-| fix-rate-limiting | 2026-01-25 | Created rate limit middleware (60/100/10 req/min), applied to SDK routes, 15 new tests (711 total) |
-| fix-validation | 2026-01-25 | Added body size limits (1MB/50MB), Zod validation on all routes, 77 new tests (788 total) |
-| fix-targeting-rules | 2026-01-25 | Wired targeting rules evaluation into update check endpoint, 27 new tests |
-| fix-subscription-enforcement | 2026-01-25 | Created limit checking utils, enforced MAU/storage at 110%, 23 new tests |
-
----
-
-## Code Statistics
-
-| Metric | Legacy | Current | Gap |
-|--------|--------|---------|-----|
-| API LOC | 72,479 | 9,530 | 13% |
-| Route Files | 144 | 23 | 16% |
-| DB Tables | 45+ | 16 | 35% |
-| Middleware | 9 | 5 | 55% |
-| Lib Utils | 43 | 22 | 51% |
-| Tests | ? | 696 | - |
-
-**Note:** Goal is not LOC parity but functional parity with proper quality.
+| Package | Tests | Status |
+|---------|-------|--------|
+| API | 901 | ✅ |
+| Shared | 111 | ✅ |
+| SDK | ~20 | 🟡 |
+| **Total** | 1,012+ | Growing |
 
 ---
 
-## Package Status
+## Quality Metrics
 
-| Package | Status | Notes |
-|---------|--------|-------|
-| `shared` | ✅ 90% | Types, schemas, constants done |
-| `api` | 🟡 40% | Core done, needs fixes + remaining features |
-| `sdk` | 🟡 50% | Core files exist, needs integration |
-| `dashboard` | ❌ 5% | Only plan files exist |
+| Metric | Before Remediation | After Remediation |
+|--------|-------------------|-------------------|
+| Critical security bugs | 5 | 0 ✅ |
+| Missing rate limiting | All auth | None ✅ |
+| Unencrypted secrets | 2 systems | 0 ✅ |
+| Broken hash | Yes | Fixed ✅ |
+| Missing schemas | 3 categories | 0 ✅ |
+| Missing constants | 2 categories | 0 ✅ |
 
 ---
 
 ## Critical Path
 
-1. ✅ Phase 0-5 features (24 features) - DONE but needs fixes
-2. 🔄 **FIX CRITICAL BUGS** ← WE ARE HERE
-3. ⏳ Phase 6: Admin system
-4. ⏳ Phase 7: Build system
-5. ⏳ Phase 8-10: Dashboard
-6. ⏳ Phase 11: SDK
-7. ⏳ Phase 12-14: Advanced features
+1. ✅ Phase 0-5 features (24 features) - DONE
+2. ✅ Wave 1-3 Remediation - DONE
+3. 🔄 **Wave 4: Feature Completion** ← WE ARE HERE
+4. ⏳ Wave 5: Admin System
+5. ⏳ Wave 6: Integration Tests
+6. ⏳ Phase 6+: Admin, Builds, Dashboard, SDK
 
 ---
 
-## Lessons Learned
+## Lessons Learned (Updated)
 
-1. **Read ALL docs before implementing** - The planning docs exist for a reason
-2. **Use subagents** - Task tool spawns focused agents that do better work
-3. **Add attribution** - Track which agent built what for accountability
-4. **Quality over speed** - 13% of legacy LOC means we're missing functionality
-5. **Catch issues early** - Better to pause at 48% than find bugs at 100%
+1. **Use hierarchical agents** - PM → Coordinators → Executors → Auditors
+2. **Always run auditors** - Security, Performance, Integration after each wave
+3. **GO/NO-GO gates** - Don't proceed without passing audits
+4. **Quality over speed** - Better to fix early than debug in production
+5. **Document agent work** - Track who built what with `@agent` attribution
+6. **Semantic understanding** - Know WHAT we're building, not just HOW

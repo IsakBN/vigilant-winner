@@ -134,7 +134,7 @@ export function createGitHubApp(env: Env) {
         throw new Error(`Failed to get installation token: ${error}`)
       }
 
-      const data = (await response.json()) as { token: string; expires_at: string }
+      const data = (await response.json())
       return {
         token: data.token,
         expiresAt: data.expires_at,
@@ -170,7 +170,7 @@ export function createGitHubApp(env: Env) {
         owner: { login: string; type: string }
       }
 
-      const data = (await response.json()) as { repositories: RepoData[] }
+      const data = (await response.json())
 
       return data.repositories.map((repo) => ({
         id: repo.id,
@@ -224,7 +224,7 @@ export function createGitHubApp(env: Env) {
         size?: number
       }
 
-      const data = (await response.json()) as ContentData | ContentData[]
+      const data = (await response.json())
 
       if (Array.isArray(data)) {
         return data.map((item) => ({

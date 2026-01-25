@@ -2,6 +2,9 @@
  * @agent fix-validation
  * @modified 2026-01-25
  *
+ * @agent remediate-api-key-middleware
+ * @modified 2026-01-25
+ *
  * Middleware exports
  */
 
@@ -10,6 +13,14 @@ export type { AuthUser, AuthSession } from './auth'
 
 export { deviceAuthMiddleware } from './device-auth'
 export type { DeviceContext } from './device-auth'
+
+export {
+  apiKeyMiddleware,
+  requirePermission,
+  hashApiKey,
+  API_KEY_PERMISSIONS,
+} from './api-key'
+export type { ApiKeyData, ApiKeyPermission } from './api-key'
 
 export { requireTeamRole, hasMinRole } from './team-permission'
 

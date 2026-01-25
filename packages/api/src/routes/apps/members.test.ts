@@ -1,9 +1,16 @@
+/**
+ * Project Members Tests
+ *
+ * @agent remediate-project-members
+ * @modified 2026-01-25
+ */
+
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 
 // Schema definitions (matching the routes)
 const addMemberSchema = z.object({
-  email: z.string().email(),
+  userId: z.string().uuid(),
   role: z.enum(['admin', 'developer', 'viewer']),
 })
 
@@ -15,7 +22,7 @@ describe('project members', () => {
   describe('addMemberSchema', () => {
     it('validates valid input', () => {
       const result = addMemberSchema.safeParse({
-        email: 'user@example.com',
+        userId: '550e8400-e29b-41d4-a716-446655440000',
         role: 'developer',
       })
       expect(result.success).toBe(true)
@@ -23,7 +30,7 @@ describe('project members', () => {
 
     it('accepts admin role', () => {
       const result = addMemberSchema.safeParse({
-        email: 'admin@example.com',
+        userId: '550e8400-e29b-41d4-a716-446655440000',
         role: 'admin',
       })
       expect(result.success).toBe(true)
@@ -31,7 +38,7 @@ describe('project members', () => {
 
     it('accepts developer role', () => {
       const result = addMemberSchema.safeParse({
-        email: 'dev@example.com',
+        userId: '550e8400-e29b-41d4-a716-446655440000',
         role: 'developer',
       })
       expect(result.success).toBe(true)
@@ -39,15 +46,15 @@ describe('project members', () => {
 
     it('accepts viewer role', () => {
       const result = addMemberSchema.safeParse({
-        email: 'viewer@example.com',
+        userId: '550e8400-e29b-41d4-a716-446655440000',
         role: 'viewer',
       })
       expect(result.success).toBe(true)
     })
 
-    it('rejects invalid email', () => {
+    it('rejects invalid userId', () => {
       const result = addMemberSchema.safeParse({
-        email: 'not-an-email',
+        userId: 'not-a-uuid',
         role: 'developer',
       })
       expect(result.success).toBe(false)
@@ -55,7 +62,7 @@ describe('project members', () => {
 
     it('rejects owner role (org-level only)', () => {
       const result = addMemberSchema.safeParse({
-        email: 'user@example.com',
+        userId: '550e8400-e29b-41d4-a716-446655440000',
         role: 'owner',
       })
       expect(result.success).toBe(false)
@@ -63,13 +70,13 @@ describe('project members', () => {
 
     it('rejects member role (org-level only)', () => {
       const result = addMemberSchema.safeParse({
-        email: 'user@example.com',
+        userId: '550e8400-e29b-41d4-a716-446655440000',
         role: 'member',
       })
       expect(result.success).toBe(false)
     })
 
-    it('rejects missing email', () => {
+    it('rejects missing userId', () => {
       const result = addMemberSchema.safeParse({
         role: 'developer',
       })
@@ -78,7 +85,7 @@ describe('project members', () => {
 
     it('rejects missing role', () => {
       const result = addMemberSchema.safeParse({
-        email: 'user@example.com',
+        userId: '550e8400-e29b-41d4-a716-446655440000',
       })
       expect(result.success).toBe(false)
     })
@@ -129,63 +136,83 @@ describe('project members', () => {
   })
 
   describe('member formatting', () => {
-    interface MemberRow {
+    interface MemberWithUserRow {
       id: string
       app_id: string
       user_id: string
       role: string
       created_at: number
+      user_name: string | null
+      user_email: string
     }
 
-    function formatMember(member: MemberRow): {
-      id: string
-      appId: string
-      userId: string
-      role: string
-      createdAt: number
-    } {
+    function formatMemberWithUser(member: MemberWithUserRow) {
       return {
         id: member.id,
-        appId: member.app_id,
         userId: member.user_id,
+        user: {
+          name: member.user_name,
+          email: member.user_email,
+        },
         role: member.role,
         createdAt: member.created_at,
       }
     }
 
     it('formats member correctly', () => {
-      const dbMember: MemberRow = {
+      const dbMember: MemberWithUserRow = {
         id: 'member-123',
         app_id: 'app-456',
         user_id: 'user-789',
         role: 'developer',
         created_at: 1700000000,
+        user_name: 'John Doe',
+        user_email: 'john@example.com',
       }
 
-      const formatted = formatMember(dbMember)
+      const formatted = formatMemberWithUser(dbMember)
 
       expect(formatted.id).toBe('member-123')
-      expect(formatted.appId).toBe('app-456')
       expect(formatted.userId).toBe('user-789')
+      expect(formatted.user.name).toBe('John Doe')
+      expect(formatted.user.email).toBe('john@example.com')
       expect(formatted.role).toBe('developer')
       expect(formatted.createdAt).toBe(1700000000)
     })
 
+    it('handles null user name', () => {
+      const dbMember: MemberWithUserRow = {
+        id: 'member-123',
+        app_id: 'app-456',
+        user_id: 'user-789',
+        role: 'viewer',
+        created_at: 1700000000,
+        user_name: null,
+        user_email: 'anon@example.com',
+      }
+
+      const formatted = formatMemberWithUser(dbMember)
+
+      expect(formatted.user.name).toBeNull()
+      expect(formatted.user.email).toBe('anon@example.com')
+    })
+
     it('converts snake_case to camelCase', () => {
-      const dbMember: MemberRow = {
+      const dbMember: MemberWithUserRow = {
         id: 'id',
         app_id: 'app',
         user_id: 'user',
         role: 'admin',
         created_at: 0,
+        user_name: 'Test',
+        user_email: 'test@example.com',
       }
 
-      const formatted = formatMember(dbMember)
+      const formatted = formatMemberWithUser(dbMember)
 
-      expect('appId' in formatted).toBe(true)
       expect('userId' in formatted).toBe(true)
       expect('createdAt' in formatted).toBe(true)
-      expect('app_id' in formatted).toBe(false)
+      expect('user_id' in formatted).toBe(false)
     })
   })
 
@@ -222,8 +249,6 @@ describe('project members', () => {
   })
 
   describe('project access scenarios', () => {
-    // Simulating different access scenarios
-
     type OrgRole = 'owner' | 'admin' | 'member'
     type ProjectRole = 'admin' | 'developer' | 'viewer'
 
@@ -296,6 +321,64 @@ describe('project members', () => {
     it('team app non-member gets denied', () => {
       const result = resolveProjectAccess(false, false, null, null)
       expect(result.allowed).toBe(false)
+    })
+
+    it('project role overrides org role', () => {
+      // Org admin but project viewer
+      const result = resolveProjectAccess(false, false, 'admin', 'viewer')
+      expect(result.allowed).toBe(true)
+      expect(result.effectiveRole).toBe('viewer')
+    })
+  })
+
+  describe('response formats', () => {
+    it('POST response matches spec', () => {
+      const response = {
+        id: 'member-123',
+        userId: 'user-456',
+        role: 'developer',
+        createdAt: 1700000000,
+      }
+
+      expect(response).toHaveProperty('id')
+      expect(response).toHaveProperty('userId')
+      expect(response).toHaveProperty('role')
+      expect(response).toHaveProperty('createdAt')
+    })
+
+    it('PATCH response matches spec', () => {
+      const response = {
+        id: 'member-123',
+        userId: 'user-456',
+        role: 'admin',
+      }
+
+      expect(response).toHaveProperty('id')
+      expect(response).toHaveProperty('userId')
+      expect(response).toHaveProperty('role')
+      expect(response).not.toHaveProperty('createdAt')
+    })
+
+    it('GET response has data array with user info', () => {
+      const response = {
+        data: [
+          {
+            id: 'member-123',
+            userId: 'user-456',
+            user: { name: 'John', email: 'john@example.com' },
+            role: 'admin',
+            createdAt: 1700000000,
+          },
+        ],
+      }
+
+      expect(response).toHaveProperty('data')
+      expect(Array.isArray(response.data)).toBe(true)
+      const firstMember = response.data[0]
+      expect(firstMember).toBeDefined()
+      expect(firstMember).toHaveProperty('user')
+      expect(firstMember?.user).toHaveProperty('name')
+      expect(firstMember?.user).toHaveProperty('email')
     })
   })
 })

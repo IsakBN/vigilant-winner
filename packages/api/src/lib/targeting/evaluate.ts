@@ -50,7 +50,7 @@ export function evaluateRule(
     return evaluatePercentage(device.deviceId, rule.value as number)
   }
 
-  const value = device[rule.field as keyof DeviceAttributes]
+  const value = device[rule.field]
 
   // Null/undefined field values don't match any rule
   if (value === undefined || value === null) {

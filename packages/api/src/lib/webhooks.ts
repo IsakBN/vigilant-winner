@@ -1,10 +1,13 @@
 /**
  * Webhook delivery utilities
  *
- * Handles sending webhooks with HMAC-SHA256 signatures and retry logic.
+ * @agent remediate-webhook-encryption
+ * @description Handles sending webhooks with HMAC-SHA256 signatures and retry logic.
+ *              Secrets are encrypted at rest and decrypted before signing.
  */
 
 import type { Env } from '../types/env'
+import { decrypt } from './crypto'
 
 // =============================================================================
 // Types
@@ -142,7 +145,7 @@ export async function sendWebhook(
 
   try {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS)
+    const timeoutId = setTimeout(() => { controller.abort(); }, WEBHOOK_TIMEOUT_MS)
 
     const response = await fetch(url, {
       method: 'POST',
@@ -206,6 +209,26 @@ export async function sendWebhookWithRetry(
 }
 
 // =============================================================================
+// Secret Decryption
+// =============================================================================
+
+/**
+ * Decrypt a webhook secret, falling back to plaintext for legacy secrets
+ * @agent remediate-webhook-encryption
+ */
+async function decryptSecret(
+  encryptedOrPlaintext: string,
+  encryptionKey: string
+): Promise<string> {
+  try {
+    return await decrypt(encryptedOrPlaintext, encryptionKey)
+  } catch {
+    // Legacy unencrypted secret - return as-is
+    return encryptedOrPlaintext
+  }
+}
+
+// =============================================================================
 // Trigger
 // =============================================================================
 
@@ -248,7 +271,9 @@ export async function triggerWebhooks(
         return
       }
 
-      const result = await sendWebhookWithRetry(webhook.url, webhook.secret, payload)
+      // Decrypt secret (handles legacy plaintext secrets)
+      const secret = await decryptSecret(webhook.secret, env.WEBHOOK_ENCRYPTION_KEY)
+      const result = await sendWebhookWithRetry(webhook.url, secret, payload)
 
       // Log the delivery attempt
       await env.DB.prepare(`

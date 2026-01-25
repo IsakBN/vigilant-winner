@@ -2,6 +2,9 @@
  * Teams (Organizations) Routes
  *
  * Handles team CRUD operations and membership management.
+ *
+ * @agent remediate-pagination
+ * @modified 2026-01-25
  */
 
 import { Hono } from 'hono'
@@ -37,15 +40,27 @@ export const teamsRouter = new Hono<{ Bindings: Env }>()
 
 /**
  * GET /v1/teams
- * List user's teams
+ * List user's teams with pagination
  */
 teamsRouter.get('/', async (c) => {
   const userId = c.req.header('X-User-Id')
+  const limit = Math.min(Number(c.req.query('limit')) || 20, 100)
+  const offset = Number(c.req.query('offset')) || 0
 
   if (!userId) {
     return c.json({ error: 'unauthorized', message: 'Authentication required' }, 401)
   }
 
+  // Get total count
+  const countResult = await c.env.DB.prepare(`
+    SELECT COUNT(*) as total
+    FROM organizations o
+    JOIN organization_members om ON om.organization_id = o.id
+    WHERE om.user_id = ?
+  `).bind(userId).first<{ total: number }>()
+  const total = countResult?.total ?? 0
+
+  // Get paginated results
   const results = await c.env.DB.prepare(`
     SELECT
       o.id, o.name, o.slug, o.owner_id, o.created_at, o.updated_at,
@@ -55,10 +70,19 @@ teamsRouter.get('/', async (c) => {
     JOIN organization_members om ON om.organization_id = o.id
     WHERE om.user_id = ?
     ORDER BY o.created_at DESC
-  `).bind(userId).all()
+    LIMIT ? OFFSET ?
+  `).bind(userId, limit, offset).all()
+
+  const data = results.results?.map(formatTeam) ?? []
 
   return c.json({
-    teams: results.results?.map(formatTeam) ?? [],
+    data,
+    pagination: {
+      total,
+      limit,
+      offset,
+      hasMore: offset + data.length < total,
+    },
   })
 })
 
@@ -264,11 +288,13 @@ teamsRouter.delete('/:teamId', async (c) => {
 
 /**
  * GET /v1/teams/:teamId/members
- * List team members
+ * List team members with pagination
  */
 teamsRouter.get('/:teamId/members', async (c) => {
   const userId = c.req.header('X-User-Id')
   const teamId = c.req.param('teamId')
+  const limit = Math.min(Number(c.req.query('limit')) || 20, 100)
+  const offset = Number(c.req.query('offset')) || 0
 
   if (!userId) {
     return c.json({ error: 'unauthorized', message: 'Authentication required' }, 401)
@@ -284,16 +310,32 @@ teamsRouter.get('/:teamId/members', async (c) => {
     return c.json({ error: 'not_found', message: 'Team not found' }, 404)
   }
 
+  // Get total count
+  const countResult = await c.env.DB.prepare(
+    'SELECT COUNT(*) as total FROM organization_members WHERE organization_id = ?'
+  ).bind(teamId).first<{ total: number }>()
+  const total = countResult?.total ?? 0
+
+  // Get paginated results
   const results = await c.env.DB.prepare(`
     SELECT
       om.id, om.user_id, om.role, om.created_at
     FROM organization_members om
     WHERE om.organization_id = ?
     ORDER BY om.created_at ASC
-  `).bind(teamId).all()
+    LIMIT ? OFFSET ?
+  `).bind(teamId, limit, offset).all()
+
+  const data = results.results?.map(formatMember) ?? []
 
   return c.json({
-    members: results.results?.map(formatMember) ?? [],
+    data,
+    pagination: {
+      total,
+      limit,
+      offset,
+      hasMore: offset + data.length < total,
+    },
   })
 })
 

@@ -96,6 +96,9 @@ export const ERROR_CODES = {
   RATE_LIMITED: 'RATE_LIMITED',
   QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
 
+  // OTP / Auth
+  INVALID_OTP: 'INVALID_OTP',
+
   // Subscription Limits
   MAU_LIMIT_EXCEEDED: 'MAU_LIMIT_EXCEEDED',
   STORAGE_LIMIT_EXCEEDED: 'STORAGE_LIMIT_EXCEEDED',
@@ -114,3 +117,117 @@ export const ERROR_CODES = {
 } as const
 
 export type ErrorCode = keyof typeof ERROR_CODES
+
+// =============================================================================
+// Rate Limits
+// =============================================================================
+
+/**
+ * Rate limiting configuration for API endpoints
+ * @agent remediate-rate-limits-constants
+ */
+export const RATE_LIMITS = {
+  /** Default rate limit for most endpoints */
+  default: {
+    requests: 100,
+    windowSeconds: 60,
+  },
+  /** Auth routes (login, signup, OTP) - strict to prevent brute force */
+  auth: {
+    requests: 10,
+    windowSeconds: 60,
+  },
+  /** SDK update check endpoint - relaxed for app launches */
+  updateCheck: {
+    requests: 60,
+    windowSeconds: 60,
+  },
+  /** SDK device registration */
+  devices: {
+    requests: 10,
+    windowSeconds: 60,
+  },
+  /** SDK telemetry endpoint - higher limit for event batching */
+  telemetry: {
+    requests: 100,
+    windowSeconds: 60,
+  },
+  /** Bundle upload endpoint - low limit for expensive operations */
+  upload: {
+    requests: 10,
+    windowSeconds: 60,
+  },
+  /** Admin OTP send - very strict */
+  adminOtpSend: {
+    requests: 3,
+    windowSeconds: 900, // 15 minutes
+  },
+  /** Admin OTP verify - strict but allows retries */
+  adminOtpVerify: {
+    requests: 5,
+    windowSeconds: 60,
+  },
+  /** Webhook retry configuration */
+  webhookRetry: {
+    maxAttempts: 3,
+    backoffMs: [1000, 5000, 30000], // 1s, 5s, 30s
+  },
+} as const
+
+export type RateLimitKey = keyof typeof RATE_LIMITS
+export type RateLimitConfig = typeof RATE_LIMITS[Exclude<RateLimitKey, 'webhookRetry'>]
+
+// =============================================================================
+// Plan Limits
+// =============================================================================
+
+/**
+ * Plan limits for each subscription tier
+ * Used for subscription enforcement and UI display
+ * @agent remediate-plan-limits
+ */
+export const PLAN_LIMITS = {
+  free: {
+    mauLimit: 1_000,
+    storageGb: 1,
+    appsLimit: 2,
+    teamMembersLimit: 1,
+    buildsPerMonth: 10,
+    hasAnalytics: false,
+    hasWebhooks: false,
+    hasPrioritySupport: false,
+  },
+  pro: {
+    mauLimit: 10_000,
+    storageGb: 10,
+    appsLimit: 10,
+    teamMembersLimit: 5,
+    buildsPerMonth: 100,
+    hasAnalytics: true,
+    hasWebhooks: true,
+    hasPrioritySupport: false,
+  },
+  team: {
+    mauLimit: 100_000,
+    storageGb: 50,
+    appsLimit: 50,
+    teamMembersLimit: 20,
+    buildsPerMonth: 500,
+    hasAnalytics: true,
+    hasWebhooks: true,
+    hasPrioritySupport: true,
+  },
+  enterprise: {
+    mauLimit: Infinity,
+    storageGb: Infinity,
+    appsLimit: Infinity,
+    teamMembersLimit: Infinity,
+    buildsPerMonth: Infinity,
+    hasAnalytics: true,
+    hasWebhooks: true,
+    hasPrioritySupport: true,
+  },
+} as const
+
+export type PlanId = keyof typeof PLAN_LIMITS
+export type PlanLimits = typeof PLAN_LIMITS[PlanId]

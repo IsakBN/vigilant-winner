@@ -4,8 +4,12 @@
  * Handles update checks from SDK. Returns available updates
  * based on device attributes and targeting rules.
  *
- * @agent fix-subscription-enforcement, fix-targeting-rules
+ * @agent fix-subscription-enforcement, fix-targeting-rules, remediate-rollout-hash, remediate-multi-release-resolution
  * @modified 2026-01-25
+ *
+ * @agent wave4-channels
+ * @modified 2026-01-25
+ * @description Added channel filtering for update checks
  */
 
 import { Hono } from 'hono'
@@ -21,12 +25,14 @@ import type {
 } from '@bundlenudge/shared'
 import { verifyDeviceToken } from '../../lib/device-token'
 import { evaluateRules } from '../../lib/targeting'
+import { getBucket } from '../../lib/targeting/hash'
 import { checkMAULimitForApp } from '../../lib/subscription-limits'
 import type { Env } from '../../types/env'
 
 interface ReleaseRow {
   id: string
   app_id: string
+  channel_id: string | null
   version: string
   bundle_url: string
   bundle_size: number
@@ -38,6 +44,13 @@ interface ReleaseRow {
   release_notes: string | null
   targeting_rules: string | null
 }
+
+interface ChannelRow {
+  id: string
+  name: string
+}
+
+const DEFAULT_CHANNEL = 'production'
 
 interface AppRow {
   id: string
@@ -73,7 +86,7 @@ updatesRouter.post(
       const token = authHeader.slice(7)
       const payload = await verifyDeviceToken(token, app.webhook_secret)
 
-      if (!payload || payload.appId !== body.appId) {
+      if (payload?.appId !== body.appId) {
         return c.json(
           { error: ERROR_CODES.INVALID_TOKEN, message: 'Invalid token' },
           401
@@ -94,49 +107,47 @@ updatesRouter.post(
       )
     }
 
-    // Get the latest active release for this app
-    const release = await c.env.DB.prepare(`
-      SELECT * FROM releases
-      WHERE app_id = ? AND status = 'active' AND bundle_url != ''
-      ORDER BY created_at DESC
-      LIMIT 1
-    `).bind(body.appId).first<ReleaseRow>()
+    // Resolve channel - use provided channel or default to 'production'
+    // @agent wave4-channels
+    const requestedChannel = body.channel ?? DEFAULT_CHANNEL
+    const channel = await c.env.DB.prepare(
+      'SELECT id, name FROM channels WHERE app_id = ? AND name = ?'
+    ).bind(body.appId, requestedChannel).first<ChannelRow>()
+
+    // Get all active releases for this app (limited to newest 10)
+    // Filter by channel if one was found, otherwise get all releases
+    // We iterate through them to find the first that matches targeting rules
+    // @agent remediate-multi-release-resolution, wave4-channels
+    const releases = channel
+      ? await c.env.DB.prepare(`
+          SELECT * FROM releases
+          WHERE app_id = ? AND status = 'active' AND bundle_url != '' AND channel_id = ?
+          ORDER BY created_at DESC
+          LIMIT 10
+        `).bind(body.appId, channel.id).all<ReleaseRow>()
+      : await c.env.DB.prepare(`
+          SELECT * FROM releases
+          WHERE app_id = ? AND status = 'active' AND bundle_url != ''
+          ORDER BY created_at DESC
+          LIMIT 10
+        `).bind(body.appId).all<ReleaseRow>()
+
+    if (releases.results.length === 0) {
+      return c.json({ updateAvailable: false })
+    }
+
+    // Build device attributes once for all release evaluations
+    const deviceAttributes = buildDeviceAttributes(body)
+
+    // Find the first (newest) release that matches all criteria
+    const release = findMatchingRelease(
+      releases.results,
+      body,
+      deviceAttributes
+    )
 
     if (!release) {
       return c.json({ updateAvailable: false })
-    }
-
-    // Check if device already has this version
-    if (body.currentBundleVersion === release.version) {
-      return c.json({ updateAvailable: false })
-    }
-
-    // Check if device already has this bundle hash
-    if (body.currentBundleHash === release.bundle_hash) {
-      return c.json({ updateAvailable: false })
-    }
-
-    // Check app version constraints
-    if (!isVersionInRange(body.appVersion, release.min_app_version, release.max_app_version)) {
-      return c.json({
-        updateAvailable: false,
-        requiresAppStoreUpdate: true,
-        appStoreMessage: 'Please update to the latest app version to receive OTA updates.',
-      })
-    }
-
-    // Check rollout percentage
-    if (!isInRollout(body.deviceId, release.rollout_percentage)) {
-      return c.json({ updateAvailable: false })
-    }
-
-    // Evaluate targeting rules
-    const targetingRules = parseTargetingRules(release.targeting_rules)
-    if (targetingRules) {
-      const deviceAttributes = buildDeviceAttributes(body)
-      if (!evaluateRules(targetingRules, deviceAttributes)) {
-        return c.json({ updateAvailable: false })
-      }
     }
 
     // Update device last seen
@@ -201,19 +212,14 @@ function compareVersions(a: string, b: string): number {
 
 /**
  * Deterministic rollout check based on device ID
- * Uses hash of deviceId to get consistent assignment
+ * Uses FNV-1a hash for even bucket distribution
+ *
+ * @agent remediate-rollout-hash
  */
 function isInRollout(deviceId: string, rolloutPercentage: number): boolean {
   if (rolloutPercentage >= 100) return true
   if (rolloutPercentage <= 0) return false
-
-  // Simple hash: sum of char codes modulo 100
-  let hash = 0
-  for (let i = 0; i < deviceId.length; i++) {
-    hash = (hash + deviceId.charCodeAt(i)) % 100
-  }
-
-  return hash < rolloutPercentage
+  return getBucket(deviceId) < rolloutPercentage
 }
 
 /**
@@ -223,11 +229,18 @@ function parseTargetingRules(json: string | null): TargetingRules | null {
   if (!json) return null
 
   try {
-    const parsed = JSON.parse(json) as TargetingRules
-    if (!parsed.rules || parsed.rules.length === 0) {
+    const parsed: unknown = JSON.parse(json)
+    // Validate shape before type assertion
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      !('rules' in parsed) ||
+      !Array.isArray(parsed.rules) ||
+      parsed.rules.length === 0
+    ) {
       return null
     }
-    return parsed
+    return parsed as TargetingRules
   } catch {
     return null
   }
@@ -247,4 +260,56 @@ function buildDeviceAttributes(body: UpdateCheckRequestSchema): DeviceAttributes
     appVersion: body.appVersion,
     currentBundleVersion: body.currentBundleVersion ?? null,
   }
+}
+
+/**
+ * Find the first (newest) release that matches all eligibility criteria
+ *
+ * Iterates through releases (already sorted by createdAt DESC) and returns
+ * the first one that passes:
+ * - Version check (not already installed)
+ * - Hash check (not already installed)
+ * - App version constraints
+ * - Rollout percentage
+ * - Targeting rules
+ *
+ * @agent remediate-multi-release-resolution
+ */
+function findMatchingRelease(
+  releases: ReleaseRow[],
+  body: UpdateCheckRequestSchema,
+  deviceAttributes: DeviceAttributes
+): ReleaseRow | null {
+  for (const release of releases) {
+    // Skip if device already has this version
+    if (body.currentBundleVersion === release.version) {
+      continue
+    }
+
+    // Skip if device already has this bundle hash
+    if (body.currentBundleHash === release.bundle_hash) {
+      continue
+    }
+
+    // Skip if app version is outside constraints
+    if (!isVersionInRange(body.appVersion, release.min_app_version, release.max_app_version)) {
+      continue
+    }
+
+    // Skip if device is not in rollout bucket
+    if (!isInRollout(body.deviceId, release.rollout_percentage)) {
+      continue
+    }
+
+    // Skip if targeting rules exclude this device
+    const targetingRules = parseTargetingRules(release.targeting_rules)
+    if (targetingRules && !evaluateRules(targetingRules, deviceAttributes)) {
+      continue
+    }
+
+    // Found a matching release
+    return release
+  }
+
+  return null
 }

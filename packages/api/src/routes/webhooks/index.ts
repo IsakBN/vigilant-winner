@@ -1,7 +1,9 @@
 /**
  * Webhook CRUD Routes
  *
- * Manages outgoing webhook configurations for apps.
+ * @agent remediate-webhook-encryption
+ * @description Manages outgoing webhook configurations for apps.
+ *              Webhook secrets are encrypted at rest using AES-256-GCM.
  */
 
 import { Hono } from 'hono'
@@ -12,6 +14,7 @@ import { ERROR_CODES } from '@bundlenudge/shared'
 import { authMiddleware, type AuthUser } from '../../middleware/auth'
 import type { Env } from '../../types/env'
 import { sendWebhook, WEBHOOK_EVENTS } from '../../lib/webhooks'
+import { encrypt, decrypt } from '../../lib/crypto'
 
 // =============================================================================
 // Schemas
@@ -155,6 +158,9 @@ webhooksRouter.post(
     const webhookId = crypto.randomUUID()
     const now = Math.floor(Date.now() / 1000)
 
+    // Encrypt secret before storing
+    const encryptedSecret = await encrypt(secret, c.env.WEBHOOK_ENCRYPTION_KEY)
+
     await c.env.DB.prepare(`
       INSERT INTO webhooks (id, app_id, url, events, secret, is_active, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, 1, ?, ?)
@@ -163,7 +169,7 @@ webhooksRouter.post(
       appId,
       body.url,
       JSON.stringify(body.events),
-      secret,
+      encryptedSecret,
       now,
       now
     ).run()
@@ -309,6 +315,9 @@ webhooksRouter.post('/:appId/webhooks/:webhookId/test', async (c) => {
     return c.json({ error: ERROR_CODES.NOT_FOUND, message: 'Webhook not found' }, 404)
   }
 
+  // Decrypt secret (handles legacy plaintext secrets)
+  const secret = await decryptSecret(webhook.secret, c.env.WEBHOOK_ENCRYPTION_KEY)
+
   const testPayload = {
     event: WEBHOOK_EVENTS.TEST,
     timestamp: new Date().toISOString(),
@@ -319,7 +328,7 @@ webhooksRouter.post('/:appId/webhooks/:webhookId/test', async (c) => {
     },
   }
 
-  const result = await sendWebhook(webhook.url, webhook.secret, testPayload)
+  const result = await sendWebhook(webhook.url, secret, testPayload)
 
   return c.json({
     success: result.success,
@@ -367,6 +376,26 @@ webhooksRouter.get('/:appId/webhooks/:webhookId/events', async (c) => {
     events: events.results.map(formatWebhookEvent),
   })
 })
+
+// =============================================================================
+// Secret Decryption (with legacy fallback)
+// =============================================================================
+
+/**
+ * Decrypt a webhook secret, falling back to plaintext for legacy secrets
+ * @agent remediate-webhook-encryption
+ */
+async function decryptSecret(
+  encryptedOrPlaintext: string,
+  encryptionKey: string
+): Promise<string> {
+  try {
+    return await decrypt(encryptedOrPlaintext, encryptionKey)
+  } catch {
+    // Legacy unencrypted secret - return as-is
+    return encryptedOrPlaintext
+  }
+}
 
 // =============================================================================
 // Helpers

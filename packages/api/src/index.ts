@@ -6,6 +6,18 @@
  * @agent fix-validation
  * @modified 2026-01-25
  * @description Added body size limit middleware
+ *
+ * @agent remediate-auth-rate-limit
+ * @modified 2026-01-25
+ * @description Added rate limiting to auth routes
+ *
+ * @agent remediate-project-members
+ * @modified 2026-01-25
+ * @description Wired in apps routes with project members
+ *
+ * @agent wave5-admin
+ * @modified 2026-01-25
+ * @description Added admin authentication and management routes
  */
 
 /**
@@ -22,16 +34,21 @@ import { updatesRouter } from './routes/updates'
 import { devicesRouter } from './routes/devices'
 import { releasesRouter } from './routes/releases'
 import { telemetryRouter } from './routes/telemetry'
-import { appsRouter } from './routes/apps'
+import { appsRoutes } from './routes/apps/index'
+import { channelsRouter } from './routes/channels'
 import { subscriptionsRouter } from './routes/subscriptions'
 import { teamsRouter } from './routes/teams'
 import { integrationsRouter } from './routes/integrations'
 import { githubRouter } from './routes/github'
 import { githubWebhookRouter } from './routes/github/webhook'
+import { authRoutes, githubLinkRoutes } from './routes/auth'
+import { adminAuthRouter } from './routes/admin-auth'
+import { adminRouter } from './routes/admin'
 import {
   rateLimitUpdates,
   rateLimitDevices,
   rateLimitTelemetry,
+  rateLimitAuth,
 } from './middleware/rate-limit'
 import {
   bodySizeLimit,
@@ -59,17 +76,31 @@ app.use('/v1/updates/*', rateLimitUpdates)
 app.use('/v1/devices/*', rateLimitDevices)
 app.use('/v1/telemetry/*', rateLimitTelemetry)
 
+// Auth routes with rate limiting (prevents brute force, OTP guessing, OAuth abuse)
+app.use('/api/auth/*', rateLimitAuth)
+app.use('/v1/auth/github/*', rateLimitAuth)
+app.use('/v1/github/callback', rateLimitAuth)
+app.use('/v1/github/install', rateLimitAuth)
+app.route('/api/auth', authRoutes)
+app.route('/v1/auth/github', githubLinkRoutes)
+
 // API routes
 app.route('/v1/updates', updatesRouter)
 app.route('/v1/devices', devicesRouter)
 app.route('/v1/releases', releasesRouter)
 app.route('/v1/telemetry', telemetryRouter)
-app.route('/v1/apps', appsRouter)
+app.route('/v1/apps', appsRoutes)
+app.route('/v1/apps', channelsRouter)
 app.route('/v1/subscriptions', subscriptionsRouter)
 app.route('/v1/teams', teamsRouter)
 app.route('/v1/apps', integrationsRouter)
 app.route('/v1/github', githubRouter)
 app.route('/v1/github/webhook', githubWebhookRouter)
+
+// Admin routes (OTP-based auth, no rate limiting on auth routes themselves)
+app.use('/v1/admin-auth/*', rateLimitAuth)
+app.route('/v1/admin-auth', adminAuthRouter)
+app.route('/v1/admin', adminRouter)
 
 // 404 handler
 app.notFound((c) => c.json({ error: 'not_found', message: 'Route not found' }, 404))

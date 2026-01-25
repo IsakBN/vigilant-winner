@@ -31,6 +31,8 @@ export interface Env {
 
   // Encryption
   ENCRYPTION_KEY: string
+  WEBHOOK_ENCRYPTION_KEY: string
+  GITHUB_TOKEN_ENCRYPTION_KEY: string
 
   // GitHub App
   GITHUB_APP_ID: string

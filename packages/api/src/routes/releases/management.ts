@@ -1,7 +1,12 @@
 /**
  * Release Management Routes
  *
- * Handles release lifecycle operations: activate, pause, rollback
+ * Handles release lifecycle operations: activate, pause, rollback, promote
+ *
+ * @agent wave4-channels
+ * @agent wave4-fix-promote-validation
+ * @modified 2026-01-25
+ * @description Added promote endpoint for channel-based deployments
  */
 
 import { Hono } from 'hono'
@@ -20,10 +25,18 @@ const RELEASE_STATUS = {
 interface ReleaseRow {
   id: string
   app_id: string
+  channel_id: string | null
   version: string
   status: string
   rollout_percentage: number
   created_at: number
+  bundle_url: string | null
+}
+
+interface ChannelRow {
+  id: string
+  app_id: string
+  name: string
 }
 
 interface AuthVariables {
@@ -37,6 +50,10 @@ const activateReleaseSchema = z.object({
 
 const rollbackSchema = z.object({
   reason: z.string().max(500).optional(),
+})
+
+const promoteSchema = z.object({
+  channelId: z.string().uuid(),
 })
 
 export const releaseManagementRoutes = new Hono<{
@@ -252,3 +269,97 @@ releaseManagementRoutes.get('/:appId/history', async (c) => {
 
   return c.json({ releases: releases.results })
 })
+
+/**
+ * Promote release to a channel
+ * Sets the release as the active release for the target channel
+ *
+ * @agent wave4-channels
+ */
+releaseManagementRoutes.post(
+  '/:appId/:releaseId/promote',
+  zValidator('json', promoteSchema),
+  async (c) => {
+    const user = c.get('user')
+    const appId = c.req.param('appId')
+    const releaseId = c.req.param('releaseId')
+    const data = c.req.valid('json')
+
+    // Verify app ownership
+    const app = await c.env.DB.prepare(
+      'SELECT * FROM apps WHERE id = ? AND owner_id = ? AND deleted_at IS NULL'
+    ).bind(appId, user.id).first()
+
+    if (!app) {
+      return c.json(
+        { error: ERROR_CODES.APP_NOT_FOUND, message: 'App not found' },
+        404
+      )
+    }
+
+    // Verify release exists
+    const release = await c.env.DB.prepare(
+      'SELECT * FROM releases WHERE id = ? AND app_id = ?'
+    ).bind(releaseId, appId).first<ReleaseRow>()
+
+    if (!release) {
+      return c.json(
+        { error: ERROR_CODES.RELEASE_NOT_FOUND, message: 'Release not found' },
+        404
+      )
+    }
+
+    // Validate release is ready for promotion
+    if (release.status !== RELEASE_STATUS.ACTIVE) {
+      return c.json({
+        error: 'invalid_release_status',
+        message: 'Only active releases can be promoted to channels',
+      }, 400)
+    }
+
+    if (!release.bundle_url) {
+      return c.json({
+        error: 'missing_bundle',
+        message: 'Release must have a bundle before promotion',
+      }, 400)
+    }
+
+    // Verify channel exists and belongs to this app
+    const channel = await c.env.DB.prepare(
+      'SELECT * FROM channels WHERE id = ? AND app_id = ?'
+    ).bind(data.channelId, appId).first<ChannelRow>()
+
+    if (!channel) {
+      return c.json(
+        { error: ERROR_CODES.NOT_FOUND, message: 'Channel not found' },
+        404
+      )
+    }
+
+    const now = Math.floor(Date.now() / 1000)
+
+    // Update release with new channel
+    await c.env.DB.prepare(`
+      UPDATE releases
+      SET channel_id = ?, updated_at = ?
+      WHERE id = ?
+    `).bind(data.channelId, now, releaseId).run()
+
+    // Update channel's active release
+    await c.env.DB.prepare(`
+      UPDATE channels
+      SET active_release_id = ?
+      WHERE id = ?
+    `).bind(releaseId, data.channelId).run()
+
+    const updated = await c.env.DB.prepare(
+      'SELECT * FROM releases WHERE id = ?'
+    ).bind(releaseId).first<ReleaseRow>()
+
+    return c.json({
+      release: updated,
+      promoted: true,
+      channel: channel.name,
+    })
+  }
+)

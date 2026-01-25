@@ -60,10 +60,15 @@ export const devices = sqliteTable('devices', {
 /**
  * Releases table
  * Stores OTA update bundles and their metadata
+ *
+ * @agent wave4-channels
+ * @modified 2026-01-25
+ * @description Added channelId for channel-based deployments
  */
 export const releases = sqliteTable('releases', {
   id: text('id').primaryKey(),
   appId: text('app_id').notNull().references(() => apps.id),
+  channelId: text('channel_id').references(() => channels.id),
   version: text('version').notNull(),
   bundleUrl: text('bundle_url').notNull(),
   bundleSize: integer('bundle_size').notNull(),
@@ -79,6 +84,7 @@ export const releases = sqliteTable('releases', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 }, (table) => ({
   appIdx: index('releases_app_idx').on(table.appId),
+  channelIdx: index('releases_channel_idx').on(table.channelId),
   statusIdx: index('releases_status_idx').on(table.status),
   createdIdx: index('releases_created_idx').on(table.createdAt),
 }))
@@ -252,6 +258,27 @@ export const teamAuditLog = sqliteTable('team_audit_log', {
 }))
 
 /**
+ * API Keys table
+ * Stores hashed API keys for SDK/CI authentication
+ *
+ * @agent remediate-api-key-middleware
+ */
+export const apiKeys = sqliteTable('api_keys', {
+  id: text('id').primaryKey(),
+  appId: text('app_id').notNull().references(() => apps.id),
+  name: text('name').notNull(),
+  keyPrefix: text('key_prefix').notNull(), // 'bn_live_abc' first 12 chars
+  keyHash: text('key_hash').notNull(), // bcrypt hash
+  permissions: text('permissions', { mode: 'json' }).notNull(), // JSON array
+  lastUsedAt: integer('last_used_at', { mode: 'timestamp' }),
+  revokedAt: integer('revoked_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  appIdx: index('api_keys_app_idx').on(table.appId),
+  prefixIdx: index('api_keys_prefix_idx').on(table.keyPrefix),
+}))
+
+/**
  * Webhooks table
  * Outgoing webhook configurations for apps
  */
@@ -325,6 +352,23 @@ export const appRepos = sqliteTable('app_repos', {
 }))
 
 /**
+ * Channels table
+ * Release channels for environment-based deployments (production, staging, development)
+ *
+ * @agent wave4-channels
+ */
+export const channels = sqliteTable('channels', {
+  id: text('id').primaryKey(),
+  appId: text('app_id').notNull().references(() => apps.id),
+  name: text('name').notNull(),
+  activeReleaseId: text('active_release_id'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  appIdx: index('channels_app_idx').on(table.appId),
+  appNameIdx: index('channels_app_name_idx').on(table.appId, table.name),
+}))
+
+/**
  * Crash integrations table
  * Third-party integrations for crash reporting (Sentry, Slack, etc.)
  */
@@ -343,4 +387,93 @@ export const crashIntegrations = sqliteTable('crash_integrations', {
   appIdx: index('crash_integrations_app_idx').on(table.appId),
   providerIdx: index('crash_integrations_provider_idx').on(table.provider),
   activeIdx: index('crash_integrations_active_idx').on(table.isActive),
+}))
+
+// ============================================
+// Admin System Tables
+// ============================================
+
+/**
+ * Admin audit log table
+ * Tracks all admin actions for compliance and debugging
+ *
+ * @agent wave5-admin
+ */
+export const adminAuditLog = sqliteTable('admin_audit_log', {
+  id: text('id').primaryKey(),
+  adminId: text('admin_id').notNull(),
+  action: text('action').notNull(),
+  targetUserId: text('target_user_id'),
+  targetAppId: text('target_app_id'),
+  details: text('details', { mode: 'json' }),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  adminIdx: index('admin_audit_admin_idx').on(table.adminId),
+  actionIdx: index('admin_audit_action_idx').on(table.action),
+  targetUserIdx: index('admin_audit_target_user_idx').on(table.targetUserId),
+  targetAppIdx: index('admin_audit_target_app_idx').on(table.targetAppId),
+  createdIdx: index('admin_audit_created_idx').on(table.createdAt),
+}))
+
+/**
+ * User limit overrides table
+ * Admin-set custom limits that override plan defaults
+ *
+ * @agent wave5-admin
+ */
+export const userLimitOverrides = sqliteTable('user_limit_overrides', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().unique(),
+  mauLimit: integer('mau_limit'),
+  storageGb: integer('storage_gb'),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }),
+  reason: text('reason'),
+  createdBy: text('created_by').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  userIdx: index('user_limit_overrides_user_idx').on(table.userId),
+  expiresIdx: index('user_limit_overrides_expires_idx').on(table.expiresAt),
+}))
+
+/**
+ * User suspensions table
+ * Tracks user account suspensions by admins
+ *
+ * @agent wave5-admin
+ */
+export const userSuspensions = sqliteTable('user_suspensions', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  reason: text('reason').notNull(),
+  until: integer('until', { mode: 'timestamp' }),
+  suspendedBy: text('suspended_by').notNull(),
+  liftedAt: integer('lifted_at', { mode: 'timestamp' }),
+  liftedBy: text('lifted_by'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  userIdx: index('user_suspensions_user_idx').on(table.userId),
+  liftedIdx: index('user_suspensions_lifted_idx').on(table.liftedAt),
+  untilIdx: index('user_suspensions_until_idx').on(table.until),
+}))
+
+/**
+ * OTP attempts table
+ * Rate limiting for admin OTP authentication
+ *
+ * @agent wave5-admin
+ */
+export const otpAttempts = sqliteTable('otp_attempts', {
+  email: text('email').primaryKey(),
+  otpHash: text('otp_hash'),
+  otpExpiresAt: integer('otp_expires_at', { mode: 'timestamp' }),
+  sendCount: integer('send_count').default(0),
+  verifyAttempts: integer('verify_attempts').default(0),
+  failedAttempts: integer('failed_attempts').default(0),
+  lockedUntil: integer('locked_until', { mode: 'timestamp' }),
+  lastAttemptAt: integer('last_attempt_at', { mode: 'timestamp' }),
+}, (table) => ({
+  lockedIdx: index('otp_attempts_locked_idx').on(table.lockedUntil),
 }))

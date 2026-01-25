@@ -303,9 +303,9 @@ describe('subscription routes logic', () => {
 
     it('plans are sorted by price', () => {
       const sorted = [...plans].sort((a, b) => a.priceCents - b.priceCents)
-      expect(sorted[0].name).toBe('free')
-      expect(sorted[1].name).toBe('pro')
-      expect(sorted[2].name).toBe('team')
+      expect(sorted[0]?.name).toBe('free')
+      expect(sorted[1]?.name).toBe('pro')
+      expect(sorted[2]?.name).toBe('team')
     })
   })
 })

@@ -97,6 +97,11 @@ export const targetingRulesSchema = z.object({
 // Update Check
 // =============================================================================
 
+/**
+ * @agent wave4-channels
+ * @modified 2026-01-25
+ * @description Added optional channel field for channel-based deployments
+ */
 export const updateCheckRequestSchema = z.object({
   appId: z.string().uuid(),
   deviceId: z.string().min(1).max(100),
@@ -104,6 +109,7 @@ export const updateCheckRequestSchema = z.object({
   appVersion: z.string().min(1).max(50),
   currentBundleVersion: z.string().optional(),
   currentBundleHash: z.string().optional(),
+  channel: z.string().min(1).max(50).optional(),
   deviceInfo: z
     .object({
       osVersion: z.string().optional(),
@@ -227,3 +233,131 @@ export type DeviceRegisterRequestSchema = z.infer<typeof deviceRegisterRequestSc
 export type DeviceRegisterResponseSchema = z.infer<typeof deviceRegisterResponseSchema>
 export type TelemetryEventSchema = z.infer<typeof telemetryEventSchema>
 export type SDKMetadataSchema = z.infer<typeof sdkMetadataSchema>
+
+// =============================================================================
+// Billing & Subscriptions
+// =============================================================================
+
+export const planIdSchema = z.enum(['free', 'pro', 'team', 'enterprise'])
+// Note: PlanId type is exported from constants.ts (keyof typeof PLAN_LIMITS)
+
+export const subscriptionStatusSchema = z.enum([
+  'active',
+  'past_due',
+  'canceled',
+  'expired',
+  'trialing',
+])
+export type SubscriptionStatus = z.infer<typeof subscriptionStatusSchema>
+
+export const createCheckoutSchema = z.object({
+  planId: planIdSchema.exclude(['free']),
+  successUrl: z.string().url(),
+  cancelUrl: z.string().url(),
+})
+export type CreateCheckoutInput = z.infer<typeof createCheckoutSchema>
+
+export const createPortalSessionSchema = z.object({
+  returnUrl: z.string().url(),
+})
+export type CreatePortalSessionInput = z.infer<typeof createPortalSessionSchema>
+
+export const stripeEventTypeSchema = z.enum([
+  'checkout.session.completed',
+  'customer.subscription.updated',
+  'customer.subscription.deleted',
+  'invoice.payment_failed',
+  'invoice.paid',
+])
+export type StripeEventType = z.infer<typeof stripeEventTypeSchema>
+
+export const stripeWebhookHeaderSchema = z.object({
+  'stripe-signature': z.string(),
+})
+
+export const subscriptionSchema = z.object({
+  id: z.string(),
+  planId: planIdSchema,
+  status: subscriptionStatusSchema,
+  currentPeriodStart: z.number(),
+  currentPeriodEnd: z.number(),
+  cancelAtPeriodEnd: z.boolean(),
+})
+export type Subscription = z.infer<typeof subscriptionSchema>
+
+export const usageStatsSchema = z.object({
+  mau: z.object({
+    current: z.number(),
+    limit: z.number(),
+    percentage: z.number(),
+  }),
+  storage: z.object({
+    currentGb: z.number(),
+    limitGb: z.number(),
+    percentage: z.number(),
+  }),
+  apps: z.object({
+    current: z.number(),
+    limit: z.number(),
+  }),
+})
+export type UsageStats = z.infer<typeof usageStatsSchema>
+
+// =============================================================================
+// Authentication
+// =============================================================================
+
+/**
+ * Password schema: 8-72 characters (72 is bcrypt max)
+ */
+export const passwordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .max(72, 'Password must be at most 72 characters')
+
+export const signUpSchema = z.object({
+  email: z.string().email('Invalid email'),
+  password: passwordSchema,
+  name: z.string().min(1).max(100).optional(),
+})
+export type SignUpInput = z.infer<typeof signUpSchema>
+
+export const signInSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+})
+export type SignInInput = z.infer<typeof signInSchema>
+
+export const emailVerificationSchema = z.object({
+  email: z.string().email(),
+  otp: z.string().regex(/^\d{6}$/, 'OTP must be 6 digits'),
+})
+export type EmailVerificationInput = z.infer<typeof emailVerificationSchema>
+
+export const adminOtpRequestSchema = z.object({
+  email: z
+    .string()
+    .email()
+    .refine(
+      (email) => email.toLowerCase().endsWith('@bundlenudge.com'),
+      'Admin access requires @bundlenudge.com email'
+    ),
+})
+export type AdminOtpRequestInput = z.infer<typeof adminOtpRequestSchema>
+
+export const adminOtpVerifySchema = z.object({
+  email: z.string().email(),
+  otp: z.string().regex(/^\d{6}$/, 'OTP must be 6 digits'),
+})
+export type AdminOtpVerifyInput = z.infer<typeof adminOtpVerifySchema>
+
+export const passwordResetRequestSchema = z.object({
+  email: z.string().email(),
+})
+export type PasswordResetRequestInput = z.infer<typeof passwordResetRequestSchema>
+
+export const passwordResetSchema = z.object({
+  token: z.string().min(1),
+  newPassword: passwordSchema,
+})
+export type PasswordResetInput = z.infer<typeof passwordResetSchema>

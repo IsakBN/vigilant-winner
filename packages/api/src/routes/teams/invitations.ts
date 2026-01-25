@@ -2,11 +2,14 @@
  * Team Invitations Routes
  *
  * Handles team invitation flow with OTP email verification.
+ *
+ * @agent remediate-otp-bcrypt
  */
 
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
+import * as bcrypt from 'bcryptjs'
 import type { Env } from '../../types/env'
 import { sendEmail } from '../../lib/email'
 
@@ -16,6 +19,8 @@ import { sendEmail } from '../../lib/email'
 
 const OTP_EXPIRY_MS = 30 * 60 * 1000 // 30 minutes
 const OTP_LENGTH = 6
+const BCRYPT_ROUNDS = 10
+const BCRYPT_PREFIX = '$2'
 
 // =============================================================================
 // Schemas
@@ -358,27 +363,47 @@ invitationsRouter.post(
 export function generateOTP(): string {
   const array = new Uint32Array(1)
   crypto.getRandomValues(array)
-  return (array[0] % 1000000).toString().padStart(OTP_LENGTH, '0')
+  const value = array[0] ?? 0
+  return (value % 1000000).toString().padStart(OTP_LENGTH, '0')
 }
 
 /**
- * Hash OTP using SHA-256 (suitable for short-lived tokens)
+ * Hash OTP using bcrypt (10 rounds).
+ * bcrypt is slow and salted, making brute-force attacks impractical
+ * even for 6-digit OTPs (1M possibilities).
  */
 async function hashOTP(otp: string): Promise<string> {
+  return bcrypt.hash(otp, BCRYPT_ROUNDS)
+}
+
+/**
+ * Verify OTP against stored hash.
+ * Supports both bcrypt (new) and SHA-256 (legacy) hashes for migration.
+ */
+async function verifyOTP(otp: string, storedHash: string): Promise<boolean> {
+  // bcrypt hashes start with $2a$, $2b$, or $2y$
+  if (storedHash.startsWith(BCRYPT_PREFIX)) {
+    return bcrypt.compare(otp, storedHash)
+  }
+
+  // Legacy SHA-256 hash - log warning for monitoring
+  // TODO: Remove legacy support after migration period
+  console.warn('[OTP] Legacy SHA-256 hash detected - consider re-sending invitation')
+  return verifyOTPLegacy(otp, storedHash)
+}
+
+/**
+ * Legacy SHA-256 verification for backwards compatibility.
+ * @deprecated Use bcrypt hashes for new invitations
+ */
+async function verifyOTPLegacy(otp: string, storedHash: string): Promise<boolean> {
   const encoder = new TextEncoder()
   const data = encoder.encode(otp)
   const hashBuffer = await crypto.subtle.digest('SHA-256', data)
   const hashArray = new Uint8Array(hashBuffer)
-  return Array.from(hashArray)
+  const inputHash = Array.from(hashArray)
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('')
-}
-
-/**
- * Verify OTP against stored hash
- */
-async function verifyOTP(otp: string, storedHash: string): Promise<boolean> {
-  const inputHash = await hashOTP(otp)
   return inputHash === storedHash
 }
 

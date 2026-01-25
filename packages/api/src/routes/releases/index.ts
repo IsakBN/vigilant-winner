@@ -4,6 +4,7 @@
  * Handles release creation, management, and bundle uploads
  *
  * @agent fix-subscription-enforcement
+ * @agent remediate-pagination
  * @modified 2026-01-25
  */
 
@@ -54,11 +55,13 @@ export const releasesRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables
 releasesRoutes.use('*', authMiddleware)
 
 /**
- * List releases for an app
+ * List releases for an app with pagination
  */
 releasesRoutes.get('/:appId', async (c) => {
   const user = c.get('user')
   const appId = c.req.param('appId')
+  const limit = Math.min(Number(c.req.query('limit')) || 20, 100)
+  const offset = Number(c.req.query('offset')) || 0
 
   // Verify app ownership
   const app = await c.env.DB.prepare(
@@ -72,13 +75,29 @@ releasesRoutes.get('/:appId', async (c) => {
     )
   }
 
+  // Get total count
+  const countResult = await c.env.DB.prepare(
+    'SELECT COUNT(*) as total FROM releases WHERE app_id = ?'
+  ).bind(appId).first<{ total: number }>()
+  const total = countResult?.total ?? 0
+
+  // Get paginated results
   const results = await c.env.DB.prepare(`
     SELECT * FROM releases
     WHERE app_id = ?
     ORDER BY created_at DESC
-  `).bind(appId).all<ReleaseRow>()
+    LIMIT ? OFFSET ?
+  `).bind(appId, limit, offset).all<ReleaseRow>()
 
-  return c.json({ releases: results.results })
+  return c.json({
+    data: results.results,
+    pagination: {
+      total,
+      limit,
+      offset,
+      hasMore: offset + results.results.length < total,
+    },
+  })
 })
 
 /**

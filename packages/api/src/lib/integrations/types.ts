@@ -70,8 +70,8 @@ export interface SlackMessage {
 export interface SlackBlock {
   type: string
   text?: { type: string; text: string }
-  fields?: Array<{ type: string; text: string }>
-  elements?: Array<{ type: string; text: string }>
+  fields?: { type: string; text: string }[]
+  elements?: { type: string; text: string }[]
 }
 
 export interface DiscordMessage {
@@ -83,7 +83,7 @@ export interface DiscordEmbed {
   title?: string
   description?: string
   color?: number
-  fields?: Array<{ name: string; value: string; inline?: boolean }>
+  fields?: { name: string; value: string; inline?: boolean }[]
   timestamp?: string
 }
 

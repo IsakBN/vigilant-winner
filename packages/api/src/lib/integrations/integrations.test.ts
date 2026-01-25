@@ -203,7 +203,7 @@ describe('integrations', () => {
     })
 
     it('platform is ios or android', () => {
-      const platforms: Array<'ios' | 'android'> = ['ios', 'android']
+      const platforms: ('ios' | 'android')[] = ['ios', 'android']
 
       for (const platform of platforms) {
         const crash: CrashReport = {

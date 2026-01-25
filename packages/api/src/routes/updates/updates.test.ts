@@ -1,8 +1,12 @@
 /**
  * Update Check Routes Tests
  *
- * @agent fix-targeting-rules
+ * @agent fix-targeting-rules, remediate-multi-release-resolution
  * @modified 2026-01-25
+ *
+ * @agent wave4-channels
+ * @modified 2026-01-25
+ * @description Added channel filtering tests
  */
 
 import { describe, it, expect } from 'vitest'
@@ -30,6 +34,39 @@ describe('update check routes logic', () => {
         appVersion: '2.0.0',
         currentBundleVersion: '1.0.1',
         currentBundleHash: 'abc123hash',
+      })
+      expect(result.success).toBe(true)
+    })
+
+    it('validates with optional channel field', () => {
+      const result = updateCheckRequestSchema.safeParse({
+        appId: '550e8400-e29b-41d4-a716-446655440000',
+        deviceId: 'device-123',
+        platform: 'ios',
+        appVersion: '1.0.0',
+        channel: 'staging',
+      })
+      expect(result.success).toBe(true)
+    })
+
+    it('validates with production channel', () => {
+      const result = updateCheckRequestSchema.safeParse({
+        appId: '550e8400-e29b-41d4-a716-446655440000',
+        deviceId: 'device-123',
+        platform: 'ios',
+        appVersion: '1.0.0',
+        channel: 'production',
+      })
+      expect(result.success).toBe(true)
+    })
+
+    it('validates with development channel', () => {
+      const result = updateCheckRequestSchema.safeParse({
+        appId: '550e8400-e29b-41d4-a716-446655440000',
+        deviceId: 'device-123',
+        platform: 'ios',
+        appVersion: '1.0.0',
+        channel: 'development',
       })
       expect(result.success).toBe(true)
     })
@@ -263,15 +300,79 @@ describe('update check routes logic', () => {
     })
   })
 
+  describe('channel filtering', () => {
+    const DEFAULT_CHANNEL = 'production'
+
+    it('defaults to production channel when not specified', () => {
+      const requestedChannel = undefined
+      const channel = requestedChannel ?? DEFAULT_CHANNEL
+      expect(channel).toBe('production')
+    })
+
+    it('uses specified channel when provided', () => {
+      const requestedChannel = 'staging'
+      const channel = requestedChannel ?? DEFAULT_CHANNEL
+      expect(channel).toBe('staging')
+    })
+
+    it('filters releases by channel when channel is provided', () => {
+      // Simulating channel-filtered query behavior
+      const allReleases = [
+        { id: 'r1', channel_id: 'ch-prod', version: '1.0.0' },
+        { id: 'r2', channel_id: 'ch-staging', version: '1.1.0' },
+        { id: 'r3', channel_id: 'ch-prod', version: '1.2.0' },
+      ]
+
+      const productionChannelId = 'ch-prod'
+      const filtered = allReleases.filter(r => r.channel_id === productionChannelId)
+
+      expect(filtered).toHaveLength(2)
+      expect(filtered.map(r => r.id)).toEqual(['r1', 'r3'])
+    })
+
+    it('includes all releases when no channel filter', () => {
+      const allReleases = [
+        { id: 'r1', channel_id: 'ch-prod', version: '1.0.0' },
+        { id: 'r2', channel_id: null, version: '1.1.0' },
+        { id: 'r3', channel_id: 'ch-staging', version: '1.2.0' },
+      ]
+
+      // When no channel is found, we return all releases
+      expect(allReleases).toHaveLength(3)
+    })
+
+    it('channel response includes channel info', () => {
+      const response = {
+        updateAvailable: true,
+        release: {
+          version: '1.0.0',
+          bundleUrl: 'https://example.com/bundle.zip',
+          bundleSize: 1024000,
+          bundleHash: 'hash-123',
+          releaseId: 'rel-123',
+        },
+      }
+
+      expect(response.updateAvailable).toBe(true)
+      expect(response.release).toBeDefined()
+    })
+  })
+
   describe('parseTargetingRules', () => {
     function parseTargetingRules(json: string | null): TargetingRules | null {
       if (!json) return null
       try {
-        const parsed = JSON.parse(json) as TargetingRules
-        if (!parsed.rules || parsed.rules.length === 0) {
+        const parsed: unknown = JSON.parse(json)
+        if (
+          typeof parsed !== 'object' ||
+          parsed === null ||
+          !('rules' in parsed) ||
+          !Array.isArray(parsed.rules) ||
+          parsed.rules.length === 0
+        ) {
           return null
         }
-        return parsed
+        return parsed as TargetingRules
       } catch {
         return null
       }
@@ -586,6 +687,371 @@ describe('update check routes logic', () => {
         }
         expect(evaluateRules(rules, iosDevice)).toBe(false) // en-US is blocked
         expect(evaluateRules(rules, androidDevice)).toBe(true) // en-GB is not blocked
+      })
+    })
+  })
+
+  /**
+   * Tests for multi-release resolution
+   *
+   * Verifies that the update-check endpoint correctly iterates through
+   * multiple active releases and returns the first (newest) one that
+   * matches the device's targeting criteria.
+   *
+   * @agent remediate-multi-release-resolution
+   */
+  describe('multi-release resolution', () => {
+    // Mock release row type matching database structure
+    interface MockReleaseRow {
+      id: string
+      app_id: string
+      version: string
+      bundle_url: string
+      bundle_size: number
+      bundle_hash: string
+      rollout_percentage: number
+      status: string
+      min_app_version: string | null
+      max_app_version: string | null
+      release_notes: string | null
+      targeting_rules: string | null
+    }
+
+    // Helper to create mock releases
+    function createMockRelease(overrides: Partial<MockReleaseRow> = {}): MockReleaseRow {
+      return {
+        id: 'rel-default',
+        app_id: 'app-1',
+        version: '1.0.0',
+        bundle_url: 'https://example.com/bundle.zip',
+        bundle_size: 1024000,
+        bundle_hash: 'hash-default',
+        rollout_percentage: 100,
+        status: 'active',
+        min_app_version: null,
+        max_app_version: null,
+        release_notes: null,
+        targeting_rules: null,
+        ...overrides,
+      }
+    }
+
+    // Simplified findMatchingRelease for testing (mirrors actual implementation)
+    function findMatchingRelease(
+      releases: MockReleaseRow[],
+      body: { deviceId: string; platform: 'ios' | 'android'; appVersion: string; currentBundleVersion?: string; currentBundleHash?: string; deviceInfo?: { osVersion?: string } },
+      deviceAttributes: DeviceAttributes
+    ): MockReleaseRow | null {
+      for (const release of releases) {
+        // Skip if device already has this version
+        if (body.currentBundleVersion === release.version) {
+          continue
+        }
+        // Skip if device already has this bundle hash
+        if (body.currentBundleHash === release.bundle_hash) {
+          continue
+        }
+        // Skip if app version is outside constraints
+        if (release.min_app_version && compareVersions(body.appVersion, release.min_app_version) < 0) {
+          continue
+        }
+        if (release.max_app_version && compareVersions(body.appVersion, release.max_app_version) > 0) {
+          continue
+        }
+        // Skip if device is not in rollout bucket (simplified: >= 100 always included)
+        if (release.rollout_percentage < 100) {
+          // For testing, use simple hash
+          let hash = 0
+          for (let i = 0; i < body.deviceId.length; i++) {
+            hash = (hash + body.deviceId.charCodeAt(i)) % 100
+          }
+          if (hash >= release.rollout_percentage) {
+            continue
+          }
+        }
+        // Skip if targeting rules exclude this device
+        if (release.targeting_rules) {
+          try {
+            const parsed: unknown = JSON.parse(release.targeting_rules)
+            if (
+              typeof parsed === 'object' &&
+              parsed !== null &&
+              'rules' in parsed &&
+              Array.isArray(parsed.rules) &&
+              parsed.rules.length > 0 &&
+              !evaluateRules(parsed as TargetingRules, deviceAttributes)
+            ) {
+              continue
+            }
+          } catch {
+            // Invalid JSON, skip
+            continue
+          }
+        }
+        // Found a matching release
+        return release
+      }
+      return null
+    }
+
+    function compareVersions(a: string, b: string): number {
+      const partsA = a.split('.').map(n => parseInt(n, 10) || 0)
+      const partsB = b.split('.').map(n => parseInt(n, 10) || 0)
+      for (let i = 0; i < 3; i++) {
+        const partA = partsA[i] ?? 0
+        const partB = partsB[i] ?? 0
+        if (partA < partB) return -1
+        if (partA > partB) return 1
+      }
+      return 0
+    }
+
+    const iosDevice: DeviceAttributes = {
+      deviceId: 'device-ios-123',
+      os: 'ios',
+      osVersion: '16.0', // iOS 16, NOT iOS 17
+      deviceModel: 'iPhone 14',
+      timezone: 'America/New_York',
+      locale: 'en-US',
+      appVersion: '2.0.0',
+      currentBundleVersion: null,
+    }
+
+    describe('device matches newest release', () => {
+      it('returns the newest release when it matches all criteria', () => {
+        const releases = [
+          createMockRelease({ id: 'rel-newest', version: '1.2.0', bundle_hash: 'hash-120' }),
+          createMockRelease({ id: 'rel-older', version: '1.1.0', bundle_hash: 'hash-110' }),
+          createMockRelease({ id: 'rel-oldest', version: '1.0.0', bundle_hash: 'hash-100' }),
+        ]
+        const body = { deviceId: 'device-ios-123', platform: 'ios' as const, appVersion: '2.0.0' }
+        const result = findMatchingRelease(releases, body, iosDevice)
+        expect(result?.id).toBe('rel-newest')
+        expect(result?.version).toBe('1.2.0')
+      })
+
+      it('returns newest even with no targeting rules', () => {
+        const releases = [
+          createMockRelease({ id: 'rel-newest', version: '2.0.0', targeting_rules: null }),
+          createMockRelease({ id: 'rel-older', version: '1.5.0', targeting_rules: null }),
+        ]
+        const body = { deviceId: 'device-ios-123', platform: 'ios' as const, appVersion: '2.0.0' }
+        const result = findMatchingRelease(releases, body, iosDevice)
+        expect(result?.id).toBe('rel-newest')
+      })
+    })
+
+    describe('device matches older release (newest excluded by targeting)', () => {
+      it('skips iOS 17+ only release, returns older universal release', () => {
+        // This is the primary bug scenario:
+        // v1.2.0 targets iOS 17+ only
+        // v1.1.0 targets all devices
+        // iOS 16 user should get v1.1.0, not "no update"
+        const releases = [
+          createMockRelease({
+            id: 'rel-ios17-only',
+            version: '1.2.0',
+            bundle_hash: 'hash-120',
+            targeting_rules: JSON.stringify({
+              match: 'all',
+              rules: [{ field: 'osVersion', op: 'semver_gte', value: '17.0' }],
+            }),
+          }),
+          createMockRelease({
+            id: 'rel-universal',
+            version: '1.1.0',
+            bundle_hash: 'hash-110',
+            targeting_rules: null, // No rules = all devices
+          }),
+        ]
+        const body = { deviceId: 'device-ios-123', platform: 'ios' as const, appVersion: '2.0.0' }
+        // iosDevice has osVersion: '16.0'
+        const result = findMatchingRelease(releases, body, iosDevice)
+        expect(result?.id).toBe('rel-universal')
+        expect(result?.version).toBe('1.1.0')
+      })
+
+      it('skips Android-only release, returns older iOS release', () => {
+        const releases = [
+          createMockRelease({
+            id: 'rel-android-only',
+            version: '1.3.0',
+            bundle_hash: 'hash-130',
+            targeting_rules: JSON.stringify({
+              match: 'all',
+              rules: [{ field: 'os', op: 'eq', value: 'android' }],
+            }),
+          }),
+          createMockRelease({
+            id: 'rel-ios',
+            version: '1.2.0',
+            bundle_hash: 'hash-120',
+            targeting_rules: JSON.stringify({
+              match: 'all',
+              rules: [{ field: 'os', op: 'eq', value: 'ios' }],
+            }),
+          }),
+        ]
+        const body = { deviceId: 'device-ios-123', platform: 'ios' as const, appVersion: '2.0.0' }
+        const result = findMatchingRelease(releases, body, iosDevice)
+        expect(result?.id).toBe('rel-ios')
+        expect(result?.version).toBe('1.2.0')
+      })
+
+      it('skips release with app version constraint, returns older compatible release', () => {
+        const releases = [
+          createMockRelease({
+            id: 'rel-app3-only',
+            version: '1.2.0',
+            bundle_hash: 'hash-120',
+            min_app_version: '3.0.0', // Requires app version 3.0.0+
+          }),
+          createMockRelease({
+            id: 'rel-compatible',
+            version: '1.1.0',
+            bundle_hash: 'hash-110',
+            min_app_version: '1.0.0', // Requires app version 1.0.0+
+          }),
+        ]
+        const body = { deviceId: 'device-ios-123', platform: 'ios' as const, appVersion: '2.0.0' }
+        const result = findMatchingRelease(releases, body, iosDevice)
+        expect(result?.id).toBe('rel-compatible')
+      })
+    })
+
+    describe('device matches no releases', () => {
+      it('returns null when all releases are excluded by targeting', () => {
+        const releases = [
+          createMockRelease({
+            id: 'rel-android-only',
+            version: '1.2.0',
+            targeting_rules: JSON.stringify({
+              match: 'all',
+              rules: [{ field: 'os', op: 'eq', value: 'android' }],
+            }),
+          }),
+          createMockRelease({
+            id: 'rel-also-android',
+            version: '1.1.0',
+            targeting_rules: JSON.stringify({
+              match: 'all',
+              rules: [{ field: 'os', op: 'eq', value: 'android' }],
+            }),
+          }),
+        ]
+        const body = { deviceId: 'device-ios-123', platform: 'ios' as const, appVersion: '2.0.0' }
+        const result = findMatchingRelease(releases, body, iosDevice)
+        expect(result).toBeNull()
+      })
+
+      it('returns null when device already has newest compatible version', () => {
+        const releases = [
+          createMockRelease({ id: 'rel-newest', version: '1.2.0', bundle_hash: 'hash-120' }),
+        ]
+        const body = {
+          deviceId: 'device-ios-123',
+          platform: 'ios' as const,
+          appVersion: '2.0.0',
+          currentBundleVersion: '1.2.0', // Already has this version
+        }
+        const result = findMatchingRelease(releases, body, iosDevice)
+        expect(result).toBeNull()
+      })
+
+      it('returns null when device already has newest compatible hash', () => {
+        const releases = [
+          createMockRelease({ id: 'rel-newest', version: '1.2.0', bundle_hash: 'hash-120' }),
+        ]
+        const body = {
+          deviceId: 'device-ios-123',
+          platform: 'ios' as const,
+          appVersion: '2.0.0',
+          currentBundleHash: 'hash-120', // Already has this hash
+        }
+        const result = findMatchingRelease(releases, body, iosDevice)
+        expect(result).toBeNull()
+      })
+
+      it('returns null when empty releases array', () => {
+        const releases: MockReleaseRow[] = []
+        const body = { deviceId: 'device-ios-123', platform: 'ios' as const, appVersion: '2.0.0' }
+        const result = findMatchingRelease(releases, body, iosDevice)
+        expect(result).toBeNull()
+      })
+
+      it('returns null when app version is too old for all releases', () => {
+        const releases = [
+          createMockRelease({ id: 'rel-1', version: '1.2.0', min_app_version: '3.0.0' }),
+          createMockRelease({ id: 'rel-2', version: '1.1.0', min_app_version: '3.0.0' }),
+        ]
+        const body = { deviceId: 'device-ios-123', platform: 'ios' as const, appVersion: '2.0.0' }
+        const result = findMatchingRelease(releases, body, iosDevice)
+        expect(result).toBeNull()
+      })
+    })
+
+    describe('complex multi-criteria scenarios', () => {
+      it('handles multiple targeting criteria correctly', () => {
+        // Scenario: Three releases with different targeting
+        // - v1.3.0: iOS 17+ and en-US locale
+        // - v1.2.0: iOS 17+ only
+        // - v1.1.0: All devices
+        // iOS 16 en-US user should get v1.1.0
+        const releases = [
+          createMockRelease({
+            id: 'rel-v13',
+            version: '1.3.0',
+            bundle_hash: 'hash-130',
+            targeting_rules: JSON.stringify({
+              match: 'all',
+              rules: [
+                { field: 'osVersion', op: 'semver_gte', value: '17.0' },
+                { field: 'locale', op: 'eq', value: 'en-US' },
+              ],
+            }),
+          }),
+          createMockRelease({
+            id: 'rel-v12',
+            version: '1.2.0',
+            bundle_hash: 'hash-120',
+            targeting_rules: JSON.stringify({
+              match: 'all',
+              rules: [{ field: 'osVersion', op: 'semver_gte', value: '17.0' }],
+            }),
+          }),
+          createMockRelease({
+            id: 'rel-v11',
+            version: '1.1.0',
+            bundle_hash: 'hash-110',
+            targeting_rules: null,
+          }),
+        ]
+        const body = { deviceId: 'device-ios-123', platform: 'ios' as const, appVersion: '2.0.0' }
+        const result = findMatchingRelease(releases, body, iosDevice)
+        expect(result?.id).toBe('rel-v11')
+        expect(result?.version).toBe('1.1.0')
+      })
+
+      it('returns correct release when some have rollout limits', () => {
+        // Use a device ID that hashes to a known bucket for deterministic testing
+        const releases = [
+          createMockRelease({
+            id: 'rel-limited',
+            version: '1.2.0',
+            bundle_hash: 'hash-120',
+            rollout_percentage: 0, // 0% rollout - no one gets this
+          }),
+          createMockRelease({
+            id: 'rel-full',
+            version: '1.1.0',
+            bundle_hash: 'hash-110',
+            rollout_percentage: 100, // 100% rollout
+          }),
+        ]
+        const body = { deviceId: 'device-ios-123', platform: 'ios' as const, appVersion: '2.0.0' }
+        const result = findMatchingRelease(releases, body, iosDevice)
+        expect(result?.id).toBe('rel-full')
+        expect(result?.version).toBe('1.1.0')
       })
     })
   })

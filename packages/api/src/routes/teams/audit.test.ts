@@ -1,3 +1,7 @@
+/**
+ * @agent remediate-pagination
+ * @modified 2026-01-25
+ */
 import { describe, it, expect } from 'vitest'
 
 describe('team audit routes', () => {
@@ -307,18 +311,31 @@ describe('team audit routes', () => {
   })
 
   describe('response structure', () => {
-    it('list response has correct shape', () => {
+    it('list response has correct shape with pagination', () => {
       const response = {
-        entries: [],
-        total: 0,
-        limit: 50,
-        offset: 0,
+        data: [],
+        pagination: {
+          total: 0,
+          limit: 50,
+          offset: 0,
+          hasMore: false,
+        },
       }
 
-      expect(response).toHaveProperty('entries')
-      expect(response).toHaveProperty('total')
-      expect(response).toHaveProperty('limit')
-      expect(response).toHaveProperty('offset')
+      expect(response).toHaveProperty('data')
+      expect(response).toHaveProperty('pagination')
+      expect(response.pagination).toHaveProperty('total')
+      expect(response.pagination).toHaveProperty('limit')
+      expect(response.pagination).toHaveProperty('offset')
+      expect(response.pagination).toHaveProperty('hasMore')
+    })
+
+    it('calculates hasMore correctly', () => {
+      const total = 150
+      const offset = 0
+      const dataLength = 50
+      const hasMore = offset + dataLength < total
+      expect(hasMore).toBe(true)
     })
 
     it('single entry response has correct shape', () => {

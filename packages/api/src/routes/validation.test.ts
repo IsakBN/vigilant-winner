@@ -38,7 +38,7 @@ describe('API validation', () => {
       })
 
       expect(res.status).toBe(413)
-      const body = await res.json()
+      const body = (await res.json())
       expect(body.error).toBe('PAYLOAD_TOO_LARGE')
     })
 
@@ -98,7 +98,7 @@ describe('API validation', () => {
       })
 
       expect(res.status).toBe(413)
-      const body = await res.json()
+      const body = (await res.json())
       expect(body.error).toBe('PAYLOAD_TOO_LARGE')
       expect(body.maxBytes).toBe(BUNDLE_UPLOAD_SIZE_LIMIT)
     })
@@ -245,7 +245,7 @@ describe('API validation', () => {
       })
 
       expect(res.status).toBe(400)
-      const body = await res.json()
+      const body = (await res.json())
       expect(body.success).toBe(false)
     })
   })

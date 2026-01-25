@@ -43,7 +43,7 @@ describe('body size middleware', () => {
       })
 
       expect(res.status).toBe(200)
-      const body = await res.json()
+      const body = (await res.json())
       expect(body.success).toBe(true)
     })
 
@@ -62,7 +62,7 @@ describe('body size middleware', () => {
       })
 
       expect(res.status).toBe(413)
-      const body = await res.json()
+      const body = (await res.json())
       expect(body.error).toBe('PAYLOAD_TOO_LARGE')
       expect(body.maxBytes).toBe(100)
     })

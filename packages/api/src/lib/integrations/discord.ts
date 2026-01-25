@@ -12,7 +12,7 @@ const REQUEST_TIMEOUT_MS = 10000
 export async function testDiscord(config: DiscordConfig): Promise<IntegrationTestResult> {
   try {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    const timeoutId = setTimeout(() => { controller.abort(); }, REQUEST_TIMEOUT_MS)
 
     const response = await fetch(config.webhookUrl, {
       method: 'POST',

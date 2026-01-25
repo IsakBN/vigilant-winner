@@ -1,5 +1,9 @@
+/**
+ * @agent remediate-webhook-encryption
+ */
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
+import { encrypt, decrypt, generateKey } from '../../lib/crypto'
 
 // Schema definitions (matching the routes)
 const createWebhookSchema = z.object({
@@ -377,6 +381,90 @@ describe('webhook routes', () => {
     it('secret has minimum length', () => {
       const secret = 'whsec_' + 'x'.repeat(32)
       expect(secret.length).toBeGreaterThanOrEqual(38)
+    })
+  })
+
+  /**
+   * @agent remediate-webhook-encryption
+   */
+  describe('secret encryption', () => {
+    const encryptionKey = generateKey()
+
+    it('encrypts webhook secret before storage', async () => {
+      const secret = 'whsec_abc123xyz789def456uvw012'
+      const encrypted = await encrypt(secret, encryptionKey)
+
+      // Encrypted value should be different from plaintext
+      expect(encrypted).not.toBe(secret)
+      // Should be base64 encoded
+      expect(encrypted).toMatch(/^[A-Za-z0-9+/=]+$/)
+    })
+
+    it('decrypts webhook secret correctly', async () => {
+      const secret = 'whsec_my_secret_key_for_webhooks'
+      const encrypted = await encrypt(secret, encryptionKey)
+      const decrypted = await decrypt(encrypted, encryptionKey)
+
+      expect(decrypted).toBe(secret)
+    })
+
+    it('roundtrip preserves webhook secret format', async () => {
+      const secret = 'whsec_' + 'x'.repeat(32)
+      const encrypted = await encrypt(secret, encryptionKey)
+      const decrypted = await decrypt(encrypted, encryptionKey)
+
+      expect(decrypted).toMatch(/^whsec_[a-zA-Z0-9_-]+$/)
+    })
+
+    it('handles legacy plaintext secrets gracefully', async () => {
+      const plaintextSecret = 'whsec_legacy_unencrypted_secret'
+
+      // When decryption fails (not valid ciphertext), we should fall back
+      // to treating it as plaintext
+      const decryptWithFallback = async (
+        value: string,
+        key: string
+      ): Promise<string> => {
+        try {
+          return await decrypt(value, key)
+        } catch {
+          return value
+        }
+      }
+
+      const result = await decryptWithFallback(plaintextSecret, encryptionKey)
+      expect(result).toBe(plaintextSecret)
+    })
+
+    it('different encryptions of same secret produce different ciphertext', async () => {
+      const secret = 'whsec_same_secret_each_time'
+
+      const encrypted1 = await encrypt(secret, encryptionKey)
+      const encrypted2 = await encrypt(secret, encryptionKey)
+
+      expect(encrypted1).not.toBe(encrypted2)
+    })
+
+    it('encrypted secrets can be used for HMAC after decryption', async () => {
+      const secret = 'whsec_signature_test_key'
+      const encrypted = await encrypt(secret, encryptionKey)
+      const decrypted = await decrypt(encrypted, encryptionKey)
+
+      // Verify we can use decrypted secret for HMAC
+      const encoder = new TextEncoder()
+      const keyData = encoder.encode(decrypted)
+      const messageData = encoder.encode('test message')
+
+      const key = await crypto.subtle.importKey(
+        'raw',
+        keyData,
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      )
+
+      const signature = await crypto.subtle.sign('HMAC', key, messageData)
+      expect(signature.byteLength).toBe(32) // SHA-256 produces 32 bytes
     })
   })
 })

@@ -2,6 +2,10 @@
  * @agent fix-rate-limiting
  * @created 2026-01-25
  * @description Tests for rate limiting middleware
+ *
+ * @agent remediate-auth-rate-limit
+ * @modified 2026-01-25
+ * @description Added tests for auth rate limiting
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -98,15 +102,15 @@ describe('createRateLimitMiddleware', () => {
     mockEnv = { RATE_LIMIT: mockKV } as Env
   })
 
-  function createApp(type: 'updates' | 'devices' | 'telemetry'): Hono<{ Bindings: Env }> {
+  function createApp(type: 'updates' | 'devices' | 'telemetry' | 'auth'): Hono<{ Bindings: Env }> {
     const app = new Hono<{ Bindings: Env }>()
     app.use('*', createRateLimitMiddleware(type))
     app.get('/test', (c) => c.json({ success: true }))
     return app
   }
 
-  function makeRequest(app: Hono<{ Bindings: Env }>, deviceId: string): Promise<Response> {
-    return app.request('/test', { headers: { 'X-Device-ID': deviceId } }, mockEnv)
+  async function makeRequest(app: Hono<{ Bindings: Env }>, deviceId: string): Promise<Response> {
+    return await app.request('/test', { headers: { 'X-Device-ID': deviceId } }, mockEnv)
   }
 
   it('allows requests under limit', async () => {
@@ -179,5 +183,73 @@ describe('RATE_LIMITS config', () => {
     expect(RATE_LIMITS.updates).toEqual({ limit: 60, windowSeconds: 60 })
     expect(RATE_LIMITS.telemetry).toEqual({ limit: 100, windowSeconds: 60 })
     expect(RATE_LIMITS.devices).toEqual({ limit: 10, windowSeconds: 60 })
+    expect(RATE_LIMITS.auth).toEqual({ limit: 10, windowSeconds: 60 })
+  })
+})
+
+describe('auth rate limiting', () => {
+  let mockKV: KVNamespace
+  let mockEnv: Env
+
+  beforeEach(() => {
+    mockKV = createMockKV()
+    mockEnv = { RATE_LIMIT: mockKV } as Env
+  })
+
+  function createAuthApp(): Hono<{ Bindings: Env }> {
+    const app = new Hono<{ Bindings: Env }>()
+    app.use('*', createRateLimitMiddleware('auth'))
+    app.post('/login', (c) => c.json({ success: true }))
+    return app
+  }
+
+  it('enforces strict 10 req/min limit for auth routes', async () => {
+    const app = createAuthApp()
+
+    // Should allow first 10 requests
+    for (let i = 0; i < 10; i++) {
+      const res = await app.request('/login', {
+        method: 'POST',
+        headers: { 'CF-Connecting-IP': '192.168.1.1' },
+      }, mockEnv)
+      expect(res.status).toBe(200)
+    }
+
+    // 11th request should be blocked
+    const blockedRes = await app.request('/login', {
+      method: 'POST',
+      headers: { 'CF-Connecting-IP': '192.168.1.1' },
+    }, mockEnv)
+    expect(blockedRes.status).toBe(429)
+  })
+
+  it('uses IP-based identification for auth routes', async () => {
+    const app = createAuthApp()
+
+    // Exhaust rate limit for IP 1
+    for (let i = 0; i < 10; i++) {
+      await app.request('/login', {
+        method: 'POST',
+        headers: { 'CF-Connecting-IP': '192.168.1.1' },
+      }, mockEnv)
+    }
+
+    // Different IP should still be allowed
+    const res = await app.request('/login', {
+      method: 'POST',
+      headers: { 'CF-Connecting-IP': '192.168.1.2' },
+    }, mockEnv)
+    expect(res.status).toBe(200)
+  })
+
+  it('sets correct rate limit headers', async () => {
+    const app = createAuthApp()
+    const res = await app.request('/login', {
+      method: 'POST',
+      headers: { 'CF-Connecting-IP': '192.168.1.1' },
+    }, mockEnv)
+
+    expect(res.headers.get('X-RateLimit-Limit')).toBe('10')
+    expect(res.headers.get('X-RateLimit-Remaining')).toBe('9')
   })
 })

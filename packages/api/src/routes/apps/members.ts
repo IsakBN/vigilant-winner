@@ -2,6 +2,10 @@
  * Project Members Routes
  *
  * Manages per-project access control beyond organization membership.
+ *
+ * @agent remediate-project-members
+ * @modified 2026-01-25
+ * @description Implemented project member CRUD with proper response formats
  */
 
 import { Hono } from 'hono'
@@ -18,7 +22,7 @@ import type { ProjectRole } from '../../lib/permissions'
 // =============================================================================
 
 const addMemberSchema = z.object({
-  email: z.string().email(),
+  userId: z.string().uuid(),
   role: z.enum(['admin', 'developer', 'viewer']),
 })
 
@@ -36,8 +40,11 @@ interface MemberRow {
   user_id: string
   role: ProjectRole
   created_at: number
-  email?: string
-  name?: string
+}
+
+interface MemberWithUserRow extends MemberRow {
+  user_name: string | null
+  user_email: string
 }
 
 interface ProjectMemberVariables {
@@ -49,14 +56,17 @@ interface ProjectMemberVariables {
 // Router
 // =============================================================================
 
-export const projectMembersRouter = new Hono<{ Bindings: Env; Variables: ProjectMemberVariables }>()
+export const projectMembersRouter = new Hono<{
+  Bindings: Env
+  Variables: ProjectMemberVariables
+}>()
 
 // All routes require authentication
 projectMembersRouter.use('*', authMiddleware)
 
 /**
  * GET /v1/apps/:appId/members
- * List project members
+ * List project members with user info
  */
 projectMembersRouter.get(
   '/:appId/members',
@@ -70,14 +80,17 @@ projectMembersRouter.get(
         pm.app_id,
         pm.user_id,
         pm.role,
-        pm.created_at
+        pm.created_at,
+        u.name as user_name,
+        u.email as user_email
       FROM project_members pm
+      LEFT JOIN users u ON pm.user_id = u.id
       WHERE pm.app_id = ?
       ORDER BY pm.created_at ASC
-    `).bind(appId).all<MemberRow>()
+    `).bind(appId).all<MemberWithUserRow>()
 
     return c.json({
-      members: results.results.map(formatMember),
+      data: results.results.map(formatMemberWithUser),
     })
   }
 )
@@ -94,10 +107,10 @@ projectMembersRouter.post(
     const appId = c.req.param('appId')
     const body = c.req.valid('json')
 
-    // Find user by email
+    // Verify user exists
     const targetUser = await c.env.DB.prepare(
-      'SELECT id FROM users WHERE email = ?'
-    ).bind(body.email).first<{ id: string }>()
+      'SELECT id FROM users WHERE id = ?'
+    ).bind(body.userId).first<{ id: string }>()
 
     if (!targetUser) {
       return c.json(
@@ -109,7 +122,7 @@ projectMembersRouter.post(
     // Check if already a member
     const existing = await c.env.DB.prepare(
       'SELECT id FROM project_members WHERE app_id = ? AND user_id = ?'
-    ).bind(appId, targetUser.id).first()
+    ).bind(appId, body.userId).first()
 
     if (existing) {
       return c.json(
@@ -124,9 +137,14 @@ projectMembersRouter.post(
     await c.env.DB.prepare(`
       INSERT INTO project_members (id, app_id, user_id, role, created_at)
       VALUES (?, ?, ?, ?, ?)
-    `).bind(memberId, appId, targetUser.id, body.role, now).run()
+    `).bind(memberId, appId, body.userId, body.role, now).run()
 
-    return c.json({ success: true, memberId }, 201)
+    return c.json({
+      id: memberId,
+      userId: body.userId,
+      role: body.role,
+      createdAt: now,
+    }, 201)
   }
 )
 
@@ -158,7 +176,11 @@ projectMembersRouter.patch(
       'UPDATE project_members SET role = ? WHERE id = ?'
     ).bind(body.role, memberId).run()
 
-    return c.json({ success: true })
+    return c.json({
+      id: memberId,
+      userId: existing.user_id,
+      role: body.role,
+    })
   }
 )
 
@@ -184,7 +206,7 @@ projectMembersRouter.delete(
       )
     }
 
-    return c.json({ success: true })
+    return c.body(null, 204)
   }
 )
 
@@ -194,17 +216,20 @@ projectMembersRouter.delete(
 
 interface FormattedMember {
   id: string
-  appId: string
   userId: string
+  user: { name: string | null; email: string }
   role: ProjectRole
   createdAt: number
 }
 
-function formatMember(member: MemberRow): FormattedMember {
+function formatMemberWithUser(member: MemberWithUserRow): FormattedMember {
   return {
     id: member.id,
-    appId: member.app_id,
     userId: member.user_id,
+    user: {
+      name: member.user_name,
+      email: member.user_email,
+    },
     role: member.role,
     createdAt: member.created_at,
   }
