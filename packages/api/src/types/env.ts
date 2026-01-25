@@ -29,6 +29,9 @@ export interface Env {
   STRIPE_SECRET_KEY: string
   STRIPE_WEBHOOK_SECRET: string
 
+  // Encryption
+  ENCRYPTION_KEY: string
+
   // URLs
   DASHBOARD_URL: string
   API_URL: string

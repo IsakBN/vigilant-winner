@@ -1,7 +1,7 @@
 {
   "phase": "ready",
   "currentPackage": "api",
-  "currentFeature": "crash-integrations",
+  "currentFeature": "github-app",
   "completedPackages": [],
   "completedFeatures": [
     "setup:setup",
@@ -24,7 +24,8 @@
     "api:teams-invitations",
     "api:teams-rbac",
     "api:teams-audit",
-    "api:webhooks-outgoing"
+    "api:webhooks-outgoing",
+    "api:crash-integrations"
   ],
   "failedAttempts": [
     {

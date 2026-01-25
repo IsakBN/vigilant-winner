@@ -288,3 +288,24 @@ export const webhookEvents = sqliteTable('webhook_events', {
   statusIdx: index('webhook_events_status_idx').on(table.status),
   createdIdx: index('webhook_events_created_idx').on(table.createdAt),
 }))
+
+/**
+ * Crash integrations table
+ * Third-party integrations for crash reporting (Sentry, Slack, etc.)
+ */
+export const crashIntegrations = sqliteTable('crash_integrations', {
+  id: text('id').primaryKey(),
+  appId: text('app_id').notNull().references(() => apps.id),
+  provider: text('provider', {
+    enum: ['sentry', 'bugsnag', 'crashlytics', 'slack', 'discord'],
+  }).notNull(),
+  config: text('config').notNull(), // Encrypted JSON
+  isActive: integer('is_active', { mode: 'boolean' }).default(true),
+  lastTriggeredAt: integer('last_triggered_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  appIdx: index('crash_integrations_app_idx').on(table.appId),
+  providerIdx: index('crash_integrations_provider_idx').on(table.provider),
+  activeIdx: index('crash_integrations_active_idx').on(table.isActive),
+}))

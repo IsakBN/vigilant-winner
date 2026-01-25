@@ -6,10 +6,10 @@
 
 ---
 
-## Loop Progress: 21/50 features (42%)
+## Loop Progress: 22/50 features (44%)
 
 ```
-[█████████████░░░░░░░░░░░░░░░░░] 42%
+[██████████████░░░░░░░░░░░░░░░░] 44%
 ```
 
 ### Completed Features
@@ -34,9 +34,10 @@
 - ✅ api:teams-rbac
 - ✅ api:teams-audit
 - ✅ api:webhooks-outgoing
+- ✅ api:crash-integrations
 
 ### Next Up
-- 🔄 api:crash-integrations (Phase 5 - Integrations)
+- 🔄 api:github-app (Phase 5 - Integrations)
 
 ---
 
