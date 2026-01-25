@@ -6,10 +6,10 @@
 
 ---
 
-## Current Status: Wave 4 Complete
+## Current Status: Wave 5 Complete
 
-**Route Coverage:** 105/116 routes (90%)
-**Test Count:** 1,411 tests
+**Route Coverage:** 119/124 routes (96%)
+**Test Count:** 1,354 tests
 **Agent Structure:** Hierarchical (Launch PM → Coordinators → Executors → Auditors)
 
 ---
@@ -53,22 +53,21 @@
 | Device management | 7 | 35 |
 | Upload status | 2 | 20 |
 
+### Wave 5: Admin System ✅
+| Task | Routes | Tests |
+|------|--------|-------|
+| Admin Auth | 3 | 15 |
+| Admin Users | 4 | 24 |
+| Admin Dashboard | 3 | 45 |
+| Admin Subscriptions | 4 | 20 |
+
 ---
 
-## Next Phase: Wave 5 - Admin System 🔄
+## Next Phase: Wave 6 - Build System 🔄
 
-**Focus:** Admin authentication and management
+**Focus:** iOS/Android build management
 
-### Wave 5 Tasks
-| Task | Routes | Prompt |
-|------|--------|--------|
-| Admin Auth | 3 | api-admin-auth.md |
-| Admin Users | 4 | api-admin-users.md |
-| Admin Dashboard | 3 | api-admin-dashboard.md |
-| Admin Subscriptions | 4 | api-admin-subscriptions.md |
-
-### Remaining Gaps (11 routes)
-- Admin system (14 routes) - Wave 5
+### Remaining Gaps (5 routes)
 - Build system stubs (8 routes) - Wave 6
 
 ---
@@ -93,9 +92,9 @@
 | Metrics | 4 | 4 | 100% ✅ |
 | Bundles | 2 | 2 | 100% ✅ |
 | Uploads | 2 | 2 | 100% ✅ |
-| **Admin** | 14 | 0 | 0% ❌ |
+| Admin | 14 | 14 | 100% ✅ |
 | **Builds** | 8 | 0 | 0% ❌ |
-| **Total** | 116 | 105 | 90% |
+| **Total** | 124 | 119 | 96% |
 
 ---
 
@@ -103,10 +102,10 @@
 
 | Package | Tests | Status |
 |---------|-------|--------|
-| API | 1,267 | ✅ |
+| API | 1,354 | ✅ |
 | Shared | 144 | ✅ |
 | SDK | ~20 | 🟡 |
-| **Total** | 1,411+ | Growing |
+| **Total** | 1,518+ | Growing |
 
 ---
 
@@ -120,8 +119,8 @@
 | Broken hash | Yes | Fixed ✅ |
 | Missing schemas | 3 categories | 0 ✅ |
 | Missing constants | 2 categories | 0 ✅ |
-| Route coverage | 70% | 90% ✅ |
-| Test count | 1,012 | 1,411 ✅ |
+| Route coverage | 70% | 96% ✅ |
+| Test count | 1,012 | 1,518 ✅ |
 
 ---
 
@@ -129,9 +128,9 @@
 
 1. ✅ Phase 0-5 features (24 features) - DONE
 2. ✅ Wave 1-3 Remediation - DONE
-3. ✅ **Wave 4: Feature Completion** - DONE
-4. 🔄 **Wave 5: Admin System** ← NEXT
-5. ⏳ Wave 6: Build System
+3. ✅ Wave 4: Feature Completion - DONE
+4. ✅ **Wave 5: Admin System** - DONE
+5. 🔄 **Wave 6: Build System** ← NEXT
 6. ⏳ Wave 7: Dashboard + SDK
 
 ---
