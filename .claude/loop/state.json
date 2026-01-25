@@ -1,7 +1,7 @@
 {
   "phase": "ready",
   "currentPackage": "api",
-  "currentFeature": "github-app",
+  "currentFeature": "email-service",
   "completedPackages": [],
   "completedFeatures": [
     "setup:setup",
@@ -25,7 +25,8 @@
     "api:teams-rbac",
     "api:teams-audit",
     "api:webhooks-outgoing",
-    "api:crash-integrations"
+    "api:crash-integrations",
+    "api:github-app"
   ],
   "failedAttempts": [
     {
@@ -188,6 +189,27 @@
       "description": "Dashboard migration and adaptation",
       "features": [
         "adapt"
+      ]
+    },
+    {
+      "package": "api",
+      "phase": 13,
+      "description": "Advanced optimization (bundle size, uploads)",
+      "features": [
+        "bundle-size",
+        "uploads",
+        "metrics-advanced",
+        "health-reports"
+      ]
+    },
+    {
+      "package": "api",
+      "phase": 14,
+      "description": "Realtime and edge features",
+      "features": [
+        "websocket",
+        "edge-nodes",
+        "onboarding"
       ]
     }
   ],

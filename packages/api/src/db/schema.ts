@@ -290,6 +290,41 @@ export const webhookEvents = sqliteTable('webhook_events', {
 }))
 
 /**
+ * GitHub installations table
+ * Stores GitHub App installation records for users
+ */
+export const githubInstallations = sqliteTable('github_installations', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  installationId: text('installation_id').notNull(),
+  accountType: text('account_type', { enum: ['user', 'organization'] }),
+  accountLogin: text('account_login'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  userIdx: index('github_installations_user_idx').on(table.userId),
+  installationIdx: index('github_installations_installation_idx').on(table.installationId),
+}))
+
+/**
+ * App repositories table
+ * Links apps to GitHub repositories for automated builds
+ */
+export const appRepos = sqliteTable('app_repos', {
+  id: text('id').primaryKey(),
+  appId: text('app_id').notNull().references(() => apps.id),
+  repoFullName: text('repo_full_name').notNull(),
+  repoBranch: text('repo_branch').default('main'),
+  installationId: text('installation_id').notNull(),
+  autoPublish: integer('auto_publish', { mode: 'boolean' }).default(false),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  appIdx: index('app_repos_app_idx').on(table.appId),
+  repoIdx: index('app_repos_repo_idx').on(table.repoFullName),
+}))
+
+/**
  * Crash integrations table
  * Third-party integrations for crash reporting (Sentry, Slack, etc.)
  */

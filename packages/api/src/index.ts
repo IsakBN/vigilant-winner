@@ -15,6 +15,9 @@ import { telemetryRouter } from './routes/telemetry'
 import { appsRouter } from './routes/apps'
 import { subscriptionsRouter } from './routes/subscriptions'
 import { teamsRouter } from './routes/teams'
+import { integrationsRouter } from './routes/integrations'
+import { githubRouter } from './routes/github'
+import { githubWebhookRouter } from './routes/github/webhook'
 
 import type { Env } from './types/env'
 
@@ -36,6 +39,9 @@ app.route('/v1/telemetry', telemetryRouter)
 app.route('/v1/apps', appsRouter)
 app.route('/v1/subscriptions', subscriptionsRouter)
 app.route('/v1/teams', teamsRouter)
+app.route('/v1/apps', integrationsRouter)
+app.route('/v1/github', githubRouter)
+app.route('/v1/github/webhook', githubWebhookRouter)
 
 // 404 handler
 app.notFound((c) => c.json({ error: 'not_found', message: 'Route not found' }, 404))

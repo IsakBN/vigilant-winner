@@ -20,7 +20,6 @@ interface EncryptedData {
 // =============================================================================
 
 const ALGORITHM = 'AES-GCM'
-const KEY_LENGTH = 256
 const IV_LENGTH = 12
 const TAG_LENGTH = 128
 

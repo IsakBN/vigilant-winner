@@ -71,6 +71,7 @@ export interface SlackBlock {
   type: string
   text?: { type: string; text: string }
   fields?: Array<{ type: string; text: string }>
+  elements?: Array<{ type: string; text: string }>
 }
 
 export interface DiscordMessage {

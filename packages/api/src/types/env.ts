@@ -32,6 +32,12 @@ export interface Env {
   // Encryption
   ENCRYPTION_KEY: string
 
+  // GitHub App
+  GITHUB_APP_ID: string
+  GITHUB_APP_NAME: string
+  GITHUB_PRIVATE_KEY: string
+  GITHUB_WEBHOOK_SECRET: string
+
   // URLs
   DASHBOARD_URL: string
   API_URL: string

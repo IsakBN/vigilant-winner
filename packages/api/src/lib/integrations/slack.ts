@@ -84,8 +84,6 @@ export async function sendToSlack(
  * Format crash report for Slack
  */
 export function formatCrashForSlack(crash: CrashReport): SlackMessage {
-  const color = '#FF0000' // Red for crashes
-
   return {
     text: `Crash detected in ${crash.appName}`,
     blocks: [
