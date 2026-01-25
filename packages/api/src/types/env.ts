@@ -15,4 +15,17 @@ export interface Env {
   // Environment variables
   ENVIRONMENT: 'development' | 'staging' | 'production'
   JWT_SECRET?: string
+
+  // Auth (Better Auth + OAuth)
+  DATABASE_URL: string
+  BETTER_AUTH_SECRET: string
+  GITHUB_CLIENT_ID: string
+  GITHUB_CLIENT_SECRET: string
+
+  // Email
+  RESEND_API_KEY: string
+
+  // URLs
+  DASHBOARD_URL: string
+  API_URL: string
 }

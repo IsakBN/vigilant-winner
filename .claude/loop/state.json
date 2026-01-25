@@ -3,7 +3,7 @@
   "currentPackage": null,
   "currentFeature": null,
   "completedPackages": [],
-  "completedFeatures": ["shared:types", "shared:schemas", "shared:constants", "api:database-schema"],
+  "completedFeatures": ["shared:types", "shared:schemas", "shared:constants", "api:database-schema", "api:better-auth-setup"],
   "failedAttempts": [],
   "lastCheckpoint": null,
   "startedAt": null,
