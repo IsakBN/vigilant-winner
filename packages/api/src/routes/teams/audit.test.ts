@@ -235,7 +235,7 @@ describe('team audit routes', () => {
 
     it('adds event filter', () => {
       const conditions: string[] = ['organization_id = ?']
-      const eventFilter = 'team.created'
+      const eventFilter: string | undefined = 'team.created'
       if (eventFilter) {
         conditions.push('event = ?')
       }
@@ -245,7 +245,7 @@ describe('team audit routes', () => {
 
     it('adds user filter', () => {
       const conditions: string[] = ['organization_id = ?']
-      const userFilter = 'user-123'
+      const userFilter: string | undefined = 'user-123'
       if (userFilter) {
         conditions.push('user_id = ?')
       }

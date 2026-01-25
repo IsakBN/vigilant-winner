@@ -44,8 +44,8 @@ describe('integrations', () => {
 
     it('includes error message', () => {
       const message = formatCrashForSlack(mockCrash)
-      const errorBlock = message.blocks?.find(
-        (b) => b.type === 'section' && b.text?.text?.includes('TypeError')
+      const errorBlock = message.blocks.find(
+        (b) => b.type === 'section' && b.text?.text.includes('TypeError')
       )
 
       expect(errorBlock).toBeDefined()
@@ -53,8 +53,8 @@ describe('integrations', () => {
 
     it('includes stack trace when present', () => {
       const message = formatCrashForSlack(mockCrash)
-      const stackBlock = message.blocks?.find(
-        (b) => b.type === 'section' && b.text?.text?.includes('Stack Trace')
+      const stackBlock = message.blocks.find(
+        (b) => b.type === 'section' && b.text?.text.includes('Stack Trace')
       )
 
       expect(stackBlock).toBeDefined()
@@ -74,8 +74,8 @@ describe('integrations', () => {
         stackTrace: 'A'.repeat(2000),
       }
       const message = formatCrashForSlack(crashLongStack)
-      const stackBlock = message.blocks?.find(
-        (b) => b.type === 'section' && b.text?.text?.includes('...')
+      const stackBlock = message.blocks.find(
+        (b) => b.type === 'section' && b.text?.text.includes('...')
       )
 
       expect(stackBlock).toBeDefined()

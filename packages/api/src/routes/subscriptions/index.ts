@@ -49,7 +49,7 @@ subscriptionsRouter.get('/plans', async (c) => {
   `).all()
 
   return c.json({
-    plans: plans.results?.map(formatPlan) ?? [],
+    plans: plans.results.map(formatPlan),
   })
 })
 
@@ -245,7 +245,7 @@ subscriptionsRouter.post('/webhook', async (c) => {
     return c.json({ error: 'invalid_signature' }, 400)
   }
 
-  const event: StripeEvent = JSON.parse(payload)
+  const event = JSON.parse(payload) as StripeEvent
 
   // Handle event
   await handleStripeEvent(c.env.DB, event)
@@ -340,7 +340,36 @@ async function handleStripeEvent(db: D1Database, event: StripeEvent): Promise<vo
 // Helpers
 // =============================================================================
 
-function formatPlan(plan: Record<string, unknown>) {
+interface PlanRecord {
+  id: string
+  name: string
+  display_name: string
+  price_cents: number
+  mau_limit: number
+  storage_gb: number
+  bundle_retention: number
+  features: string | null
+}
+
+interface SubscriptionRecord {
+  id: string
+  plan_id: string
+  status: string
+  current_period_start: number
+  current_period_end: number
+  cancel_at_period_end: number
+}
+
+function formatPlan(plan: PlanRecord): {
+  id: string
+  name: string
+  displayName: string
+  priceCents: number
+  mauLimit: number
+  storageGb: number
+  bundleRetention: number
+  features: unknown[]
+} {
   return {
     id: plan.id,
     name: plan.name,
@@ -349,11 +378,18 @@ function formatPlan(plan: Record<string, unknown>) {
     mauLimit: plan.mau_limit,
     storageGb: plan.storage_gb,
     bundleRetention: plan.bundle_retention,
-    features: plan.features ? JSON.parse(plan.features as string) : [],
+    features: plan.features ? (JSON.parse(plan.features) as unknown[]) : [],
   }
 }
 
-function formatSubscription(sub: Record<string, unknown>) {
+function formatSubscription(sub: SubscriptionRecord): {
+  id: string
+  planId: string
+  status: string
+  currentPeriodStart: number
+  currentPeriodEnd: number
+  cancelAtPeriodEnd: boolean
+} {
   return {
     id: sub.id,
     planId: sub.plan_id,
@@ -374,7 +410,15 @@ function mapStripeStatus(status: string): string {
   }
 }
 
-function getDefaultFreePlan() {
+function getDefaultFreePlan(): {
+  id: string
+  name: string
+  displayName: string
+  priceCents: number
+  mauLimit: number
+  storageGb: number
+  bundleRetention: number
+} {
   return {
     id: 'plan_free',
     name: 'free',

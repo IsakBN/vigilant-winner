@@ -103,10 +103,45 @@ async function generateAppJwt(appId: string, privateKey: string): Promise<string
 // GitHub App Client
 // =============================================================================
 
+interface InstallationTokenResponse {
+  token: string
+  expires_at: string
+}
+
+interface RepoData {
+  id: number
+  name: string
+  full_name: string
+  private: boolean
+  default_branch: string
+  owner: { login: string; type: string }
+}
+
+interface ReposResponse {
+  repositories: RepoData[]
+}
+
+interface ContentData {
+  name: string
+  path: string
+  type: 'file' | 'dir'
+  content?: string
+  size?: number
+}
+
 /**
  * Create a GitHub App API client
  */
-export function createGitHubApp(env: Env) {
+export function createGitHubApp(env: Env): {
+  getInstallationToken: (installationId: number) => Promise<GitHubInstallationToken>
+  listInstallationRepos: (installationId: number) => Promise<GitHubRepo[]>
+  getRepoContents: (
+    installationId: number,
+    owner: string,
+    repo: string,
+    path: string
+  ) => Promise<GitHubContent | GitHubContent[]>
+} {
   const baseUrl = 'https://api.github.com'
 
   return {
@@ -130,11 +165,11 @@ export function createGitHubApp(env: Env) {
       )
 
       if (!response.ok) {
-        const error = await response.text()
-        throw new Error(`Failed to get installation token: ${error}`)
+        const errorText = await response.text()
+        throw new Error(`Failed to get installation token: ${errorText}`)
       }
 
-      const data = (await response.json())
+      const data: InstallationTokenResponse = await response.json()
       return {
         token: data.token,
         expiresAt: data.expires_at,
@@ -157,22 +192,13 @@ export function createGitHubApp(env: Env) {
       })
 
       if (!response.ok) {
-        const error = await response.text()
-        throw new Error(`Failed to list repos: ${error}`)
+        const errorText = await response.text()
+        throw new Error(`Failed to list repos: ${errorText}`)
       }
 
-      interface RepoData {
-        id: number
-        name: string
-        full_name: string
-        private: boolean
-        default_branch: string
-        owner: { login: string; type: string }
-      }
+      const data: ReposResponse = await response.json()
 
-      const data = (await response.json())
-
-      return data.repositories.map((repo) => ({
+      return data.repositories.map((repo: RepoData) => ({
         id: repo.id,
         name: repo.name,
         fullName: repo.full_name,
@@ -212,22 +238,14 @@ export function createGitHubApp(env: Env) {
         if (response.status === 404) {
           throw new Error('NOT_FOUND')
         }
-        const error = await response.text()
-        throw new Error(`Failed to get contents: ${error}`)
+        const errorText = await response.text()
+        throw new Error(`Failed to get contents: ${errorText}`)
       }
 
-      interface ContentData {
-        name: string
-        path: string
-        type: 'file' | 'dir'
-        content?: string
-        size?: number
-      }
-
-      const data = (await response.json())
+      const data: ContentData | ContentData[] = await response.json()
 
       if (Array.isArray(data)) {
-        return data.map((item) => ({
+        return data.map((item: ContentData) => ({
           name: item.name,
           path: item.path,
           type: item.type,

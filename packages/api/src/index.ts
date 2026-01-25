@@ -111,4 +111,5 @@ app.onError((err, c) => {
   return c.json({ error: 'internal_error', message: 'Internal server error' }, 500)
 })
 
+// eslint-disable-next-line no-restricted-syntax
 export default app

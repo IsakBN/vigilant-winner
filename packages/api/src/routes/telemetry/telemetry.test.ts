@@ -146,7 +146,7 @@ describe('telemetry routes logic', () => {
 
     it('rejects batch exceeding 100 events', () => {
       const events = Array(101).fill(null).map((_, i) => ({
-        deviceId: `device-${i}`,
+        deviceId: `device-${String(i)}`,
         appId: '550e8400-e29b-41d4-a716-446655440000',
         eventType: 'update_check' as const,
         timestamp: Date.now(),

@@ -106,7 +106,7 @@ adminUsersRouter.get('/', zValidator('query', listUsersSchema), async (c) => {
   }>()
 
   // Filter by suspension status if requested
-  let users = results.results ?? []
+  let users = results.results
   if (status === 'suspended') {
     users = users.filter(u => u.is_suspended === 1)
   } else if (status === 'active') {
@@ -207,7 +207,7 @@ adminUsersRouter.get('/:userId', zValidator('param', userIdSchema), async (c) =>
       plan: { name: user.plan_name, display: user.plan_display,
               mauLimit: user.plan_mau_limit, storageGb: user.plan_storage_gb },
     } : null,
-    apps: apps.results ?? [],
+    apps: apps.results,
     overrides: overrides ? {
       mauLimit: overrides.mau_limit,
       storageGb: overrides.storage_gb,

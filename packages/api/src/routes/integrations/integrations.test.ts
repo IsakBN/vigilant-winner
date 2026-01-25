@@ -234,7 +234,7 @@ describe('integration routes', () => {
       const encryptedExample = '{"iv":"...", "data":"...", "tag":"..."}'
 
       // The encrypted format should be JSON with iv, data, tag
-      expect(() => JSON.parse(encryptedExample)).not.toThrow()
+      expect(() => JSON.parse(encryptedExample) as unknown).not.toThrow()
     })
   })
 

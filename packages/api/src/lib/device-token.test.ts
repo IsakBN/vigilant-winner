@@ -104,7 +104,7 @@ describe('device-token', () => {
   })
 
   describe('shouldRefreshToken', () => {
-    it('returns false when token has more than 7 days left', async () => {
+    it('returns false when token has more than 7 days left', () => {
       const payload = {
         deviceId: 'device-123',
         appId: 'app-456',
@@ -117,7 +117,7 @@ describe('device-token', () => {
       expect(shouldRefreshToken(payload)).toBe(false)
     })
 
-    it('returns true when token has less than 7 days left', async () => {
+    it('returns true when token has less than 7 days left', () => {
       const payload = {
         deviceId: 'device-123',
         appId: 'app-456',

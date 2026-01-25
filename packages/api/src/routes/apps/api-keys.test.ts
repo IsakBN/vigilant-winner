@@ -116,10 +116,11 @@ function createTestApp() {
         'SELECT * FROM api_keys WHERE app_id = ? ORDER BY created_at DESC'
       ).bind(appId).all()
 
-      const apiKeys = (keys.results ?? []).map((k: Record<string, unknown>) => ({
+      const apiKeys = keys.results.map((k: Record<string, unknown>) => ({
         id: k.id,
         name: k.name,
         keyPrefix: k.key_prefix,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         permissions: JSON.parse(k.permissions as string),
         createdAt: k.created_at,
         lastUsedAt: k.last_used_at,
@@ -245,7 +246,7 @@ describe('API Keys routes', () => {
       const res = await app.request(`/apps/${appId}/keys`, {}, env)
       expect(res.status).toBe(200)
 
-      const body = (await res.json())
+      const body: { apiKeys: { name: string; permissions: string[] }[] } = await res.json()
       expect(body.apiKeys).toHaveLength(1)
       expect(body.apiKeys[0]?.name).toBe('CI Key')
       expect(body.apiKeys[0]?.permissions).toEqual(['release:create', 'release:read'])

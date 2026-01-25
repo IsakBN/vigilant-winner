@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /**
  * Admin app management route tests
  *
@@ -71,7 +72,8 @@ describe('Admin App Management Routes', () => {
       const res = await app.request('/admin/apps?limit=20&offset=0')
 
       expect(res.status).toBe(200)
-      const data = (await res.json())
+       
+      const data = await res.json()
       expect(data.apps).toHaveLength(1)
       expect(data.apps[0]?.name).toBe('Test App')
       expect(data.pagination.total).toBe(50)
@@ -131,7 +133,8 @@ describe('Admin App Management Routes', () => {
       const res = await app.request('/admin/apps/550e8400-e29b-41d4-a716-446655440000')
 
       expect(res.status).toBe(200)
-      const data = (await res.json())
+       
+      const data = await res.json()
       expect(data.app.name).toBe('Test App')
       expect(data.owner.email).toBe('user@test.com')
       expect(data.stats.releases).toBe(10)

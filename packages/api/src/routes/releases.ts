@@ -15,7 +15,7 @@ export const releasesRouter = new Hono<{ Bindings: Env }>()
  *
  * List releases for an app.
  */
-releasesRouter.get('/', async (c) => {
+releasesRouter.get('/', (c) => {
   const appId = c.req.query('appId')
 
   if (!appId) {
@@ -42,7 +42,7 @@ releasesRouter.get('/', async (c) => {
  *
  * Create a new release.
  */
-releasesRouter.post('/', async (c) => {
+releasesRouter.post('/', (c) => {
   // TODO: Implement release creation
   // 1. Validate request body
   // 2. Upload bundle to R2
@@ -60,7 +60,7 @@ releasesRouter.post('/', async (c) => {
  *
  * Get a specific release.
  */
-releasesRouter.get('/:id', async (c) => {
+releasesRouter.get('/:id', (c) => {
   const id = c.req.param('id')
 
   // TODO: Implement release fetching
@@ -79,7 +79,7 @@ releasesRouter.get('/:id', async (c) => {
  *
  * Update release (status, targeting rules, etc).
  */
-releasesRouter.patch('/:id', async (c) => {
+releasesRouter.patch('/:id', (c) => {
   const id = c.req.param('id')
 
   // TODO: Implement release updates
@@ -98,7 +98,7 @@ releasesRouter.patch('/:id', async (c) => {
  *
  * Rollback a release (mark as inactive).
  */
-releasesRouter.post('/:id/rollback', async (c) => {
+releasesRouter.post('/:id/rollback', (c) => {
   const id = c.req.param('id')
 
   // TODO: Implement rollback

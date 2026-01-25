@@ -195,6 +195,7 @@ describe('team invitations logic', () => {
       })
 
       it('logs warning for legacy hash verification', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
         const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
         const legacyHash = await hashOTPLegacy('123456')
 

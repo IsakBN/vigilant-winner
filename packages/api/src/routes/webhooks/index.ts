@@ -178,9 +178,12 @@ webhooksRouter.post(
       'SELECT * FROM webhooks WHERE id = ?'
     ).bind(webhookId).first<WebhookRow>()
 
+    if (!webhook) {
+      return c.json({ error: 'server_error' as const, message: 'Failed to create webhook' }, 500)
+    }
     return c.json({
       webhook: {
-        ...formatWebhook(webhook!),
+        ...formatWebhook(webhook),
         secret, // Only return secret on creation
       },
     }, 201)
@@ -251,7 +254,10 @@ webhooksRouter.patch(
       'SELECT id, app_id, url, events, is_active, last_triggered_at, created_at, updated_at FROM webhooks WHERE id = ?'
     ).bind(webhookId).first<WebhookRow>()
 
-    return c.json({ webhook: formatWebhook(webhook!) })
+    if (!webhook) {
+      return c.json({ error: ERROR_CODES.NOT_FOUND, message: 'Webhook not found' }, 404)
+    }
+    return c.json({ webhook: formatWebhook(webhook) })
   }
 )
 

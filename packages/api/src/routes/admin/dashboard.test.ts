@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
 /**
  * Admin dashboard route tests
  *
@@ -78,7 +79,7 @@ describe('Admin Dashboard Routes', () => {
       const res = await app.request('/admin/dashboard/overview')
 
       expect(res.status).toBe(200)
-      interface OverviewData {
+      interface _OverviewData {
         users: { total: number; new7d: number }
         apps: { total: number }
         releases: { total: number }
@@ -87,7 +88,7 @@ describe('Admin Dashboard Routes', () => {
         plans: { pro: number }
         generatedAt?: number
       }
-      const data = (await res.json())
+      const data = await res.json()
       expect(data.users.total).toBe(1000)
       expect(data.users.new7d).toBe(50)
       expect(data.apps.total).toBe(500)
@@ -105,7 +106,7 @@ describe('Admin Dashboard Routes', () => {
       const res = await app.request('/admin/dashboard/overview')
 
       expect(res.status).toBe(200)
-      const data = (await res.json())
+      const data = await res.json()
       expect(data.users.total).toBe(0)
       expect(data.apps.total).toBe(0)
     })
@@ -145,7 +146,7 @@ describe('Admin Dashboard Routes', () => {
       const res = await app.request('/admin/dashboard/audit-log')
 
       expect(res.status).toBe(200)
-      const data = (await res.json())
+      const data = await res.json()
       expect(data.entries).toHaveLength(1)
       expect(data.entries[0]?.action).toBe('suspend_user')
     })
@@ -217,13 +218,13 @@ describe('Admin Dashboard Routes', () => {
           ipAddress: null,
           userAgent: null,
           createdAt: 1706200000000,
-        }),
+        }) as AuditLogEntry[],
         total: 100,
       })
 
       const res = await app.request('/admin/dashboard/audit-log?limit=50&offset=0')
 
-      const data = (await res.json())
+      const data = await res.json()
       expect(data.pagination.total).toBe(100)
       expect(data.pagination.limit).toBe(50)
       expect(data.pagination.hasMore).toBe(true)
@@ -237,7 +238,7 @@ describe('Admin Dashboard Routes', () => {
       const res = await app.request('/admin/dashboard/health')
 
       expect(res.status).toBe(200)
-      const data = (await res.json())
+      const data = await res.json()
       expect(data.status).toBe('healthy')
       expect(data.checks.database).toBe(true)
     })
@@ -248,7 +249,7 @@ describe('Admin Dashboard Routes', () => {
       const res = await app.request('/admin/dashboard/health')
 
       expect(res.status).toBe(200)
-      const data = (await res.json())
+      const data = await res.json()
       expect(data.status).toBe('degraded')
       expect(data.checks.database).toBe(false)
     })

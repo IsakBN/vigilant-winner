@@ -27,7 +27,7 @@ async function importKey(keyBase64: string): Promise<CryptoKey> {
   const keyBytes = base64ToArray(keyBase64)
 
   if (keyBytes.length !== KEY_LENGTH) {
-    throw new Error(`Invalid key length: expected ${KEY_LENGTH} bytes`)
+    throw new Error(`Invalid key length: expected ${String(KEY_LENGTH)} bytes`)
   }
 
   return crypto.subtle.importKey('raw', keyBytes, { name: ALGORITHM }, false, [

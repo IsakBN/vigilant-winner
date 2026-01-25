@@ -68,7 +68,7 @@ describe('encryption', () => {
     it('produces valid JSON', async () => {
       const encrypted = await encrypt('test', testKey)
 
-      expect(() => JSON.parse(encrypted)).not.toThrow()
+      expect(() => JSON.parse(encrypted) as unknown).not.toThrow()
     })
 
     it('contains required fields', async () => {

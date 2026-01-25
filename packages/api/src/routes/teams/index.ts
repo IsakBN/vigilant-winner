@@ -73,7 +73,7 @@ teamsRouter.get('/', async (c) => {
     LIMIT ? OFFSET ?
   `).bind(userId, limit, offset).all()
 
-  const data = results.results?.map(formatTeam) ?? []
+  const data = results.results.map(formatTeam)
 
   return c.json({
     data,
@@ -326,7 +326,7 @@ teamsRouter.get('/:teamId/members', async (c) => {
     LIMIT ? OFFSET ?
   `).bind(teamId, limit, offset).all()
 
-  const data = results.results?.map(formatMember) ?? []
+  const data = results.results.map(formatMember)
 
   return c.json({
     data,
@@ -472,7 +472,34 @@ teamsRouter.route('/', auditRouter)
 // Helpers
 // =============================================================================
 
-function formatTeam(team: Record<string, unknown> | null) {
+interface TeamRecord {
+  id: string
+  name: string
+  slug: string
+  owner_id: string
+  role?: string
+  member_count?: number
+  created_at: number
+  updated_at: number
+}
+
+interface MemberRecord {
+  id: string
+  user_id: string
+  role: string
+  created_at: number
+}
+
+function formatTeam(team: TeamRecord | null): {
+  id: string
+  name: string
+  slug: string
+  ownerId: string
+  role?: string
+  memberCount?: number
+  createdAt: number
+  updatedAt: number
+} | null {
   if (!team) return null
 
   return {
@@ -487,7 +514,12 @@ function formatTeam(team: Record<string, unknown> | null) {
   }
 }
 
-function formatMember(member: Record<string, unknown>) {
+function formatMember(member: MemberRecord): {
+  id: string
+  userId: string
+  role: string
+  createdAt: number
+} {
   return {
     id: member.id,
     userId: member.user_id,

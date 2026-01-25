@@ -125,7 +125,7 @@ apiKeysRoutes.get(
       ORDER BY created_at DESC
     `).bind(appId).all<ApiKeyRow>()
 
-    const apiKeys = (keys.results ?? []).map(k => ({
+    const apiKeys = keys.results.map(k => ({
       id: k.id,
       name: k.name,
       keyPrefix: k.key_prefix,

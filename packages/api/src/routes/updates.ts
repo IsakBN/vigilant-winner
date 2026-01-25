@@ -17,7 +17,7 @@ export const updatesRouter = new Hono<{ Bindings: Env }>()
  *
  * Check for available updates for a device.
  */
-updatesRouter.post('/check', zValidator('json', updateCheckRequestSchema), async (c) => {
+updatesRouter.post('/check', zValidator('json', updateCheckRequestSchema), (c) => {
   const body = c.req.valid('json')
 
   // TODO: Implement update check logic
@@ -26,6 +26,7 @@ updatesRouter.post('/check', zValidator('json', updateCheckRequestSchema), async
   // 3. Find matching release using targeting rules
   // 4. Return update info or no-update response
 
+  // eslint-disable-next-line no-console
   console.log('[updates/check] Request for app:', body.appId, 'device:', body.deviceId)
 
   return c.json({

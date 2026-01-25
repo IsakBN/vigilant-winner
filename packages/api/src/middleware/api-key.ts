@@ -164,7 +164,7 @@ export const apiKeyMiddleware = createMiddleware<{
     name: string
   }>()
 
-  if (!keyRecords.results || keyRecords.results.length === 0) {
+  if (keyRecords.results.length === 0) {
     return c.json(
       { error: ERROR_CODES.UNAUTHORIZED, message: 'Invalid API key' },
       401
@@ -232,14 +232,17 @@ export const apiKeyMiddleware = createMiddleware<{
 /**
  * Create a middleware that requires specific permissions
  */
-export function requirePermission(required: ApiKeyPermission | ApiKeyPermission[]) {
+export function requirePermission(required: ApiKeyPermission | ApiKeyPermission[]): ReturnType<typeof createMiddleware<{
+  Bindings: Env
+  Variables: ApiKeyVariables
+}>> {
   const requiredPerms = Array.isArray(required) ? required : [required]
 
   return createMiddleware<{
     Bindings: Env
     Variables: ApiKeyVariables
   }>(async (c, next) => {
-    const apiKey = c.get('apiKey')
+    const apiKey = c.get('apiKey') as ApiKeyData | undefined
 
     if (!apiKey) {
       return c.json(

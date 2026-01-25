@@ -141,7 +141,7 @@ function parseStackTrace(stackTrace: string): { filename: string; lineno?: numbe
     .filter((line) => line.trim())
     .map((line) => {
       const match = /at\s+(.+?)\s*\((.+?):(\d+)/.exec(line)
-      if (match && match[1] && match[2] && match[3]) {
+      if (match?.[1] && match[2] && match[3]) {
         return {
           function: match[1],
           filename: match[2],

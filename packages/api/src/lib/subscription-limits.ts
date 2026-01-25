@@ -236,13 +236,13 @@ function formatExceededMessage(
   percentage: number
 ): string {
   if (limitType === 'MAU') {
-    return `MAU limit exceeded (${current.toLocaleString()} / ${limit.toLocaleString()}, ${percentage}%). Please upgrade your plan.`
+    return `MAU limit exceeded (${current.toLocaleString()} / ${limit.toLocaleString()}, ${String(percentage)}%). Please upgrade your plan.`
   }
   const currentGb = (current / 1024 / 1024 / 1024).toFixed(2)
   const limitGb = (limit / 1024 / 1024 / 1024).toFixed(2)
-  return `Storage limit exceeded (${currentGb} GB / ${limitGb} GB, ${percentage}%). Please upgrade your plan.`
+  return `Storage limit exceeded (${currentGb} GB / ${limitGb} GB, ${String(percentage)}%). Please upgrade your plan.`
 }
 
 function formatWarningMessage(limitType: 'MAU' | 'storage', percentage: number): string {
-  return `Approaching ${limitType} limit (${percentage}% used). Consider upgrading your plan.`
+  return `Approaching ${limitType} limit (${String(percentage)}% used). Consider upgrading your plan.`
 }

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call */
 /**
  * Admin user management route tests
  *
@@ -66,7 +67,7 @@ describe('Admin User Management Routes', () => {
       const res = await app.request('/admin/users?limit=20&offset=0')
 
       expect(res.status).toBe(200)
-      const data = (await res.json())
+      const data = await res.json()
       expect(data.users).toHaveLength(1)
       expect(data.users[0]?.email).toBe('user1@test.com')
       expect(data.pagination.total).toBe(100)
@@ -106,7 +107,7 @@ describe('Admin User Management Routes', () => {
       const res = await app.request('/admin/users?status=suspended')
 
       expect(res.status).toBe(200)
-      const data = (await res.json())
+      const data = await res.json()
       expect(data.users.every((u) => u.isSuspended)).toBe(true)
     })
   })
@@ -133,7 +134,7 @@ describe('Admin User Management Routes', () => {
       const res = await app.request('/admin/users/550e8400-e29b-41d4-a716-446655440000')
 
       expect(res.status).toBe(200)
-      const data = (await res.json())
+      const data = await res.json()
       expect(data.user.email).toBe('user@test.com')
       expect(data.subscription.plan.name).toBe('pro')
     })

@@ -247,7 +247,10 @@ integrationsRouter.patch(
       WHERE id = ?
     `).bind(integrationId).first<IntegrationRow>()
 
-    return c.json({ integration: formatIntegration(integration!) })
+    if (!integration) {
+      return c.json({ error: ERROR_CODES.NOT_FOUND, message: 'Integration not found' }, 404)
+    }
+    return c.json({ integration: formatIntegration(integration) })
   }
 )
 

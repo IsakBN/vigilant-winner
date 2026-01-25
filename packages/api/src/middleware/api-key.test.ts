@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { Hono, type Context } from 'hono'
+import { Hono } from 'hono'
 import bcrypt from 'bcryptjs'
 import { apiKeyMiddleware, requirePermission, hashApiKey } from './api-key'
 import type { Env } from '../types/env'
@@ -23,7 +23,7 @@ interface TestEnv {
   Variables: { apiKey: ApiKeyInfo | undefined }
 }
 
-function createMockEnv() {
+function createMockEnv(): Partial<Env> {
   const mockDb = {
     prepare: vi.fn().mockReturnThis(),
     bind: vi.fn().mockReturnThis(),

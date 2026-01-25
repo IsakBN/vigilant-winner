@@ -75,7 +75,7 @@ describe('fnv1aHash', () => {
 describe('getBucket', () => {
   it('returns a value between 0-99', () => {
     for (let i = 0; i < 100; i++) {
-      const bucket = getBucket(`device-${i}`)
+      const bucket = getBucket(`device-${String(i)}`)
       expect(bucket).toBeGreaterThanOrEqual(0)
       expect(bucket).toBeLessThan(100)
     }
@@ -93,13 +93,13 @@ describe('getBucket', () => {
 
     // Generate 10000 device IDs and count bucket distribution
     for (let i = 0; i < 10000; i++) {
-      const bucket = getBucket(`device-${i}-random`)
-      buckets.set(bucket, (buckets.get(bucket) || 0) + 1)
+      const bucket = getBucket(`device-${String(i)}-random`)
+      buckets.set(bucket, (buckets.get(bucket) ?? 0) + 1)
     }
 
     // Each bucket should have roughly 100 entries (+/- 50% is reasonable)
     for (let b = 0; b < 100; b++) {
-      const count = buckets.get(b) || 0
+      const count = buckets.get(b) ?? 0
       expect(count).toBeGreaterThan(20)
       expect(count).toBeLessThan(200)
     }

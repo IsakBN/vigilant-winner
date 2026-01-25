@@ -5,7 +5,7 @@
  * @modified 2026-01-25
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { checkMAULimit, checkStorageLimit, checkStorageLimitWithAddition } from './subscription-limits'
 import type { Env } from '../types/env'
 
@@ -18,14 +18,13 @@ function createMockEnv(
   planRow: Record<string, unknown> | null,
   usageValue: number
 ): Env {
-  const prepareResults: Record<string, unknown> = {}
   let queryIndex = 0
 
   return {
     DB: {
       prepare: vi.fn(() => ({
         bind: vi.fn(() => ({
-          first: vi.fn(async () => {
+          first: vi.fn(() => {
             queryIndex++
             // First query: subscription lookup
             if (queryIndex === 1) return subscriptionRow

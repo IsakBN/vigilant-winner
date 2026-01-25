@@ -17,7 +17,7 @@ export const devicesRouter = new Hono<{ Bindings: Env }>()
  *
  * Register a new device and get an access token.
  */
-devicesRouter.post('/register', zValidator('json', deviceRegisterRequestSchema), async (c) => {
+devicesRouter.post('/register', zValidator('json', deviceRegisterRequestSchema), (c) => {
   const body = c.req.valid('json')
 
   // TODO: Implement device registration
@@ -26,6 +26,7 @@ devicesRouter.post('/register', zValidator('json', deviceRegisterRequestSchema),
   // 3. Generate JWT access token
   // 4. Return token
 
+  // eslint-disable-next-line no-console
   console.log('[devices/register] Request for app:', body.appId)
 
   return c.json({
@@ -39,7 +40,7 @@ devicesRouter.post('/register', zValidator('json', deviceRegisterRequestSchema),
  *
  * Refresh an expiring access token.
  */
-devicesRouter.post('/refresh', async (c) => {
+devicesRouter.post('/refresh', (c) => {
   // TODO: Implement token refresh
   // 1. Validate current token
   // 2. Generate new token

@@ -304,13 +304,13 @@ describe('update check routes logic', () => {
     const DEFAULT_CHANNEL = 'production'
 
     it('defaults to production channel when not specified', () => {
-      const requestedChannel = undefined
+      const requestedChannel = undefined as string | undefined
       const channel = requestedChannel ?? DEFAULT_CHANNEL
       expect(channel).toBe('production')
     })
 
     it('uses specified channel when provided', () => {
-      const requestedChannel = 'staging'
+      const requestedChannel = 'staging' as string | undefined
       const channel = requestedChannel ?? DEFAULT_CHANNEL
       expect(channel).toBe('staging')
     })

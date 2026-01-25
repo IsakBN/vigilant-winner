@@ -162,7 +162,7 @@ async function handlePush(env: Env, payload: PushPayload): Promise<void> {
   if (ref !== `refs/heads/${branch}`) return
 
   // Trigger a build (placeholder - would integrate with build system)
-  const latestCommit = commits[0]
+  const latestCommit = commits[0] as typeof commits[0] | undefined
   if (latestCommit) {
     await triggerBuild(env, appRepo.app_id, {
       trigger: 'github_push',

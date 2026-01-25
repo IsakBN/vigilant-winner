@@ -10,7 +10,7 @@ import { requireAdminMiddleware, getAdminUser, getAdminId, isAdminEmail } from '
 
 // Mock auth lib
 vi.mock('../lib/auth', () => ({
-  isAdmin: vi.fn((email: string) => email?.endsWith('@bundlenudge.com')),
+  isAdmin: vi.fn((email: string) => email.endsWith('@bundlenudge.com')),
 }))
 
 interface AdminUser {

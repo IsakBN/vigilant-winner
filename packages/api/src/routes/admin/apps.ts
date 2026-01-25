@@ -101,11 +101,11 @@ adminAppsRouter.get('/', zValidator('query', listAppsSchema), async (c) => {
   await logAdminAction(c.env.DB, {
     adminId,
     action: 'view_app',
-    details: { search, ownerId, platform, count: results.results?.length ?? 0 },
+    details: { search, ownerId, platform, count: results.results.length },
   })
 
   return c.json({
-    apps: (results.results ?? []).map(a => ({
+    apps: results.results.map(a => ({
       id: a.id,
       name: a.name,
       bundleId: a.bundle_id,
@@ -117,7 +117,7 @@ adminAppsRouter.get('/', zValidator('query', listAppsSchema), async (c) => {
       deviceCount: a.device_count,
       createdAt: a.created_at,
     })),
-    pagination: { total, limit, offset, hasMore: offset + (results.results?.length ?? 0) < total },
+    pagination: { total, limit, offset, hasMore: offset + results.results.length < total },
   })
 })
 
@@ -198,11 +198,11 @@ adminAppsRouter.get('/:appId', zValidator('param', appIdSchema), async (c) => {
       devices: deviceCount?.cnt ?? 0,
       channels: channelCount?.cnt ?? 0,
     },
-    recentReleases: (releases.results ?? []).map(r => ({
+    recentReleases: releases.results.map(r => ({
       id: r.id, version: r.version, status: r.status,
       rolloutPercentage: r.rollout_percentage, createdAt: r.created_at,
     })),
-    channels: channels.results ?? [],
+    channels: channels.results,
   })
 })
 

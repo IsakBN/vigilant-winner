@@ -81,12 +81,27 @@ any                    // No any types
 as any                 // No type assertions to any
 @ts-ignore             // No ignoring errors
 export default         // No default exports
+async () => { }        // No async without await
+value!                 // No non-null assertions (use ?.  or if checks)
+obj?.prop ?? default   // No unnecessary ?. or ?? on non-null values
 
 // ✅ ALWAYS
 unknown                // Instead of any
 strict: true           // In tsconfig
 named exports          // export { Thing }
+String(num)            // When using numbers in template strings
 ```
+
+### Lint Rules (Common Mistakes)
+
+| Rule | Problem | Solution |
+|------|---------|----------|
+| `require-await` | `async` without `await` | Remove `async` or add await |
+| `no-unnecessary-condition` | `?.` or `??` on non-null | Remove optional chain |
+| `no-unsafe-member-access` | Accessing `any` props | Add type assertion |
+| `no-non-null-assertion` | Using `!` operator | Use `?.` or null check |
+| `restrict-template-expressions` | `${number}` | Use `${String(num)}` |
+| `no-unused-vars` | Unused variable | Remove or prefix with `_` |
 
 ### Patterns
 
@@ -95,6 +110,7 @@ named exports          // export { Thing }
 - Early returns over nested conditions
 - Async/await over raw promises
 - Tests colocated with source (`*.test.ts`)
+- Type `res.json()` calls: `(await res.json()) as { field: Type }`
 
 ### Avoid
 

@@ -40,7 +40,7 @@ githubRouter.use('*', authMiddleware)
  * GET /v1/github/install
  * Get the GitHub App installation URL
  */
-githubRouter.get('/install', async (c) => {
+githubRouter.get('/install', (c) => {
   const appName = c.env.GITHUB_APP_NAME
   const installUrl = `https://github.com/apps/${appName}/installations/new`
 
@@ -158,7 +158,7 @@ githubRouter.get('/repos/:owner/:repo/contents/*', async (c) => {
   const user = c.get('user')
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')
-  const path = c.req.param('*') || ''
+  const path = c.req.param('*') ?? ''
 
   const installation = await c.env.DB.prepare(
     'SELECT installation_id FROM github_installations WHERE user_id = ?'

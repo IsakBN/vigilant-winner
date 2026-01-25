@@ -36,7 +36,7 @@ interface AdminVariables {
  */
 export const requireAdminMiddleware = createMiddleware<{
   Bindings: Env
-  Variables: AdminVariables & { user?: { id: string; email: string; name: string | null; isAdmin: boolean } }
+  Variables: AdminVariables & { user?: { id: string; email: string | null; name: string | null; isAdmin: boolean } }
 }>(async (c, next) => {
   // Get user from existing auth middleware
   const user = c.get('user')

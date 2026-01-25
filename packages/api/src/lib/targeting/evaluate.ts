@@ -53,7 +53,7 @@ export function evaluateRule(
   const value = device[rule.field]
 
   // Null/undefined field values don't match any rule
-  if (value === undefined || value === null) {
+  if (value == null) {
     return false
   }
 

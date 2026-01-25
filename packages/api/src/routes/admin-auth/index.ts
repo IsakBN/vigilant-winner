@@ -94,7 +94,7 @@ adminAuthRouter.post('/send-otp', zValidator('json', sendOtpSchema), async (c) =
     const remainingMins = Math.ceil(remainingMs / 60000)
     return c.json({
       error: ERROR_CODES.RATE_LIMITED,
-      message: `Account locked. Try again in ${remainingMins} minutes.`,
+      message: `Account locked. Try again in ${String(remainingMins)} minutes.`,
     }, 429)
   }
 
@@ -117,7 +117,7 @@ adminAuthRouter.post('/send-otp', zValidator('json', sendOtpSchema), async (c) =
   // Reset send count if outside window
   const shouldResetCount = !existing?.last_attempt_at ||
     existing.last_attempt_at < windowStart
-  const newSendCount = shouldResetCount ? 1 : (existing?.send_count ?? 0) + 1
+  const newSendCount = shouldResetCount ? 1 : (existing.send_count) + 1
 
   // Upsert OTP record
   await c.env.DB.prepare(`
@@ -155,7 +155,7 @@ adminAuthRouter.post('/send-otp', zValidator('json', sendOtpSchema), async (c) =
   return c.json({
     success: true,
     message: 'OTP sent to your email',
-    expiresIn: OTP_EXPIRY_MS / 1000,
+    expiresIn: Math.floor(OTP_EXPIRY_MS / 1000),
   })
 })
 
@@ -202,7 +202,7 @@ adminAuthRouter.post('/verify-otp', zValidator('json', verifyOtpSchema), async (
     const remainingMins = Math.ceil(remainingMs / 60000)
     return c.json({
       error: ERROR_CODES.RATE_LIMITED,
-      message: `Account locked. Try again in ${remainingMins} minutes.`,
+      message: `Account locked. Try again in ${String(remainingMins)} minutes.`,
     }, 429)
   }
 

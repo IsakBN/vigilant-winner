@@ -74,12 +74,12 @@ export async function sendEmail(env: Env, options: EmailOptions): Promise<EmailR
       }
     }
 
-    const data = (await response.json())
+    const data: { id: string } = await response.json()
     return { success: true, id: data.id }
-  } catch (error) {
+  } catch (err: unknown) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: err instanceof Error ? err.message : 'Unknown error',
     }
   }
 }

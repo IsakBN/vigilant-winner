@@ -61,7 +61,7 @@ export const telemetryRouter = new Hono<{ Bindings: Env }>()
  * POST /v1/telemetry
  * Record a single telemetry event
  */
-telemetryRouter.post('/', zValidator('json', telemetryEventSchema), async (c) => {
+telemetryRouter.post('/', zValidator('json', telemetryEventSchema), (c) => {
   const event = c.req.valid('json')
   const eventId = crypto.randomUUID()
   const now = Math.floor(Date.now() / 1000)
@@ -85,7 +85,7 @@ telemetryRouter.post('/', zValidator('json', telemetryEventSchema), async (c) =>
  * POST /v1/telemetry/batch
  * Record multiple telemetry events (for offline sync)
  */
-telemetryRouter.post('/batch', zValidator('json', batchTelemetrySchema), async (c) => {
+telemetryRouter.post('/batch', zValidator('json', batchTelemetrySchema), (c) => {
   const { events } = c.req.valid('json')
   const now = Math.floor(Date.now() / 1000)
 
@@ -247,7 +247,7 @@ async function checkAndTriggerRollback(
     'SELECT settings FROM apps WHERE id = ? AND deleted_at IS NULL'
   ).bind(appId).first<{ settings: string | null }>()
 
-  const settings = app?.settings ? JSON.parse(app.settings) : {}
+  const settings = app?.settings ? JSON.parse(app.settings) as { crashRollbackThreshold?: number } : {}
   const threshold = settings.crashRollbackThreshold ?? 5 // Default 5%
 
   // Get release stats

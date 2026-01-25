@@ -190,13 +190,13 @@ export async function getAuditLog(
     created_at: number
   }>()
 
-  const entries: AuditLogEntry[] = (results.results ?? []).map((row) => ({
+  const entries: AuditLogEntry[] = results.results.map((row) => ({
     id: row.id,
     adminId: row.admin_id,
     action: row.action,
     targetUserId: row.target_user_id,
     targetAppId: row.target_app_id,
-    details: row.details ? JSON.parse(row.details) : null,
+    details: row.details ? (JSON.parse(row.details) as Record<string, unknown>) : null,
     ipAddress: row.ip_address,
     userAgent: row.user_agent,
     createdAt: row.created_at,

@@ -77,6 +77,7 @@ describe('subscription routes logic', () => {
         mauLimit: plan.mau_limit,
         storageGb: plan.storage_gb,
         bundleRetention: plan.bundle_retention,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         features: plan.features ? JSON.parse(plan.features as string) : [],
       }
     }
@@ -291,8 +292,8 @@ describe('subscription routes logic', () => {
       const free = plans.find(p => p.name === 'free')
       const pro = plans.find(p => p.name === 'pro')
 
-      expect(pro!.mauLimit).toBeGreaterThan(free!.mauLimit)
-      expect(pro!.storageGb).toBeGreaterThan(free!.storageGb)
+      expect(pro?.mauLimit).toBeGreaterThan(free?.mauLimit ?? 0)
+      expect(pro?.storageGb).toBeGreaterThan(free?.storageGb ?? 0)
     })
 
     it('team tier has highest limits', () => {

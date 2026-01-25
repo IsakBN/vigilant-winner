@@ -363,7 +363,7 @@ invitationsRouter.post(
 export function generateOTP(): string {
   const array = new Uint32Array(1)
   crypto.getRandomValues(array)
-  const value = array[0] ?? 0
+  const value = array[0]
   return (value % 1000000).toString().padStart(OTP_LENGTH, '0')
 }
 
@@ -388,7 +388,9 @@ async function verifyOTP(otp: string, storedHash: string): Promise<boolean> {
 
   // Legacy SHA-256 hash - log warning for monitoring
   // TODO: Remove legacy support after migration period
+   
   console.warn('[OTP] Legacy SHA-256 hash detected - consider re-sending invitation')
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
   return verifyOTPLegacy(otp, storedHash)
 }
 

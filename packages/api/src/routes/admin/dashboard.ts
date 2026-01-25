@@ -100,13 +100,13 @@ adminDashboardRouter.get('/overview', async (c) => {
 
   // Process subscription stats
   const subscriptionBreakdown: Record<string, number> = {}
-  for (const row of subscriptionStats?.results ?? []) {
+  for (const row of subscriptionStats.results) {
     subscriptionBreakdown[row.status] = row.cnt
   }
 
   // Process plan breakdown
   const planCounts: Record<string, number> = {}
-  for (const row of planBreakdown?.results ?? []) {
+  for (const row of planBreakdown.results) {
     if (row.name) {
       planCounts[row.name] = row.cnt
     }

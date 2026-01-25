@@ -281,7 +281,7 @@ describe('GitHub App routes', () => {
         ],
       }
       expect(reposPayload.action).toBe('added')
-      expect(reposPayload.repositories_added?.length).toBeGreaterThan(0)
+      expect(reposPayload.repositories_added.length).toBeGreaterThan(0)
     })
   })
 

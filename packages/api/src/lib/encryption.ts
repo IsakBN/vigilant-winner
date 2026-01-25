@@ -160,7 +160,7 @@ export function generateEncryptionKey(): string {
  */
 export function isEncrypted(value: string): boolean {
   try {
-    const parsed = JSON.parse(value) as Record<string, unknown>
+    const parsed = JSON.parse(value) as unknown
     return (
       typeof parsed === 'object' &&
       parsed !== null &&

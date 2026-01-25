@@ -31,7 +31,7 @@ export const appsRouter = new Hono<{ Bindings: Env }>()
  *
  * List all apps for the authenticated user/organization.
  */
-appsRouter.get('/', async (c) => {
+appsRouter.get('/', (c) => {
   // TODO: Implement app listing
   // 1. Get user from auth context
   // 2. Query apps from D1
@@ -47,7 +47,7 @@ appsRouter.get('/', async (c) => {
  *
  * Create a new app.
  */
-appsRouter.post('/', zValidator('json', createAppSchema), async (c) => {
+appsRouter.post('/', zValidator('json', createAppSchema), (c) => {
   const body = c.req.valid('json')
 
   // TODO: Implement app creation
@@ -69,7 +69,7 @@ appsRouter.post('/', zValidator('json', createAppSchema), async (c) => {
  *
  * Get a specific app.
  */
-appsRouter.get('/:id', async (c) => {
+appsRouter.get('/:id', (c) => {
   const id = c.req.param('id')
 
   // TODO: Implement app fetching
@@ -88,7 +88,7 @@ appsRouter.get('/:id', async (c) => {
  *
  * Update an app.
  */
-appsRouter.patch('/:id', zValidator('json', updateAppSchema), async (c) => {
+appsRouter.patch('/:id', zValidator('json', updateAppSchema), (c) => {
   const id = c.req.param('id')
   const body = c.req.valid('json')
 
@@ -109,7 +109,7 @@ appsRouter.patch('/:id', zValidator('json', updateAppSchema), async (c) => {
  *
  * Delete an app (soft delete).
  */
-appsRouter.delete('/:id', async (c) => {
+appsRouter.delete('/:id', (c) => {
   const id = c.req.param('id')
 
   // TODO: Implement app deletion
@@ -128,7 +128,7 @@ appsRouter.delete('/:id', async (c) => {
  *
  * Get app statistics (devices, updates, crashes).
  */
-appsRouter.get('/:id/stats', async (c) => {
+appsRouter.get('/:id/stats', (c) => {
   const id = c.req.param('id')
 
   // TODO: Implement stats aggregation

@@ -187,7 +187,7 @@ auditRouter.get(
 
     const csv = [
       headers.join(','),
-      ...rows.map((row) => row.map((cell) => escapeCsvCell(String(cell))).join(',')),
+      ...rows.map((row) => row.map((cell) => escapeCsvCell(cell)).join(',')),
     ].join('\n')
 
     c.header('Content-Type', 'text/csv; charset=utf-8')
