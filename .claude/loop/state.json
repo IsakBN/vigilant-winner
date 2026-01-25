@@ -1,7 +1,7 @@
 {
   "phase": "ready",
   "currentPackage": "api",
-  "currentFeature": "teams-invitations",
+  "currentFeature": "teams-rbac",
   "completedPackages": [],
   "completedFeatures": [
     "setup:setup",
@@ -20,7 +20,8 @@
     "api:telemetry",
     "api:targeting-engine",
     "api:stripe-billing",
-    "api:teams-crud"
+    "api:teams-crud",
+    "api:teams-invitations"
   ],
   "failedAttempts": [
     {

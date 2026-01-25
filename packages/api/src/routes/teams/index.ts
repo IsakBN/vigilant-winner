@@ -8,6 +8,7 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import type { Env } from '../../types/env'
+import { invitationsRouter } from './invitations'
 
 // =============================================================================
 // Schemas
@@ -416,6 +417,12 @@ teamsRouter.delete('/:teamId/members/:memberId', async (c) => {
 
   return c.json({ success: true })
 })
+
+// =============================================================================
+// Mount Invitations Router
+// =============================================================================
+
+teamsRouter.route('/', invitationsRouter)
 
 // =============================================================================
 // Helpers
