@@ -1,0 +1,39 @@
+Business Source License 1.1
+
+Licensor: BundleNudge
+
+Licensed Work: BundleNudge
+               The Licensed Work is (c) 2025 BundleNudge
+
+Additional Use Grant: You may use the Licensed Work for any purpose,
+                      including production use, PROVIDED THAT you do not
+                      offer the Licensed Work to third parties as a
+                      hosted or managed service that competes with
+                      BundleNudge's paid offerings.
+
+Change Date: January 23, 2030 (Five years from initial release)
+
+Change License: Apache License, Version 2.0
+
+---
+
+USAGE EXAMPLES:
+
+Allowed:
+- Self-host BundleNudge for your own React Native applications
+- Modify the source code for internal use
+- Use BundleNudge in commercial applications you build
+- Contribute improvements back to the project
+
+Not Allowed:
+- Offer "OTA updates as a service" to other developers
+- Resell or white-label BundleNudge as a hosted service
+- Create a competing SaaS offering using this code
+
+---
+
+For the full text of the Business Source License 1.1, see:
+https://mariadb.com/bsl11/
+
+For licensing inquiries or commercial partnerships, contact:
+license@bundlenudge.com

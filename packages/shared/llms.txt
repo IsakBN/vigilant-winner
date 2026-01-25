@@ -1,0 +1,126 @@
+# @bundlenudge/shared
+
+> Shared TypeScript types, Zod schemas, and constants for BundleNudge.
+
+## Purpose
+
+Foundation package providing type safety across the entire BundleNudge monorepo. Contains Zod schemas for validation, TypeScript types inferred from those schemas, and constants for error codes, subscription tiers, and queue priorities.
+
+## Key Exports
+
+### Schemas (Zod)
+
+- `AppSchema` - App entity validation
+- `ReleaseSchema` - Release entity validation
+- `ChannelSchema` - Channel entity validation
+- `UpdateCheckRequestSchema` - SDK update check request
+- `UpdateCheckResponseSchema` - API update check response
+- `UploadJobSchema` - Upload job state
+- `DevicePingSchema` - Device telemetry
+
+### Types (inferred from schemas)
+
+- `App`, `Release`, `Channel` - Entity types
+- `UpdateCheckRequest`, `UpdateCheckResponse` - Operation types
+- `SubscriptionTier`, `TierLimits` - Subscription types
+
+### Constants
+
+- `ERROR_CODES` - All error code constants
+- `TIER_LIMITS` - Limits per subscription tier
+- `QUEUE_PRIORITIES` - Queue priority mappings
+
+## Usage Pattern
+
+```typescript
+import { AppSchema, type App, ERROR_CODES, TIER_LIMITS } from '@bundlenudge/shared';
+
+// Validate input
+const result = AppSchema.safeParse(input);
+if (!result.success) {
+  throw new Error(ERROR_CODES.INVALID_INPUT);
+}
+
+// Use typed data
+const app: App = result.data;
+
+// Check tier limits
+const maxApps = TIER_LIMITS[user.tier].maxApps;
+```
+
+## File Structure
+
+```
+src/
+├── index.ts              # All exports
+├── schemas/              # Zod schemas
+│   ├── app.ts
+│   ├── release.ts
+│   ├── channel.ts
+│   ├── update.ts
+│   └── upload.ts
+├── types/                # TypeScript types
+│   ├── api.ts
+│   ├── sdk.ts
+│   └── subscription.ts
+├── constants/            # Constants
+│   ├── errors.ts
+│   ├── tiers.ts
+│   └── queues.ts
+└── utils/                # Utilities
+    └── version.ts
+```
+
+## Dependencies
+
+- `zod` - Schema validation (only dependency)
+
+## Key Concepts
+
+### Subscription Tiers
+
+```typescript
+export const TIERS = ['free', 'pro', 'team', 'enterprise'] as const;
+export type SubscriptionTier = typeof TIERS[number];
+
+export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
+  free: { maxApps: 1, maxReleasesPerMonth: 10, queuePriority: 3 },
+  pro: { maxApps: 5, maxReleasesPerMonth: 100, queuePriority: 2 },
+  team: { maxApps: 20, maxReleasesPerMonth: 500, queuePriority: 1 },
+  enterprise: { maxApps: -1, maxReleasesPerMonth: -1, queuePriority: 0 },
+};
+```
+
+### Queue Priorities
+
+```typescript
+export const QUEUE_PRIORITY = {
+  P0: 0,  // Enterprise - highest priority
+  P1: 1,  // Team
+  P2: 2,  // Pro
+  P3: 3,  // Free - lowest priority
+} as const;
+```
+
+## Error Handling
+
+All error codes are typed constants:
+
+```typescript
+export const ERROR_CODES = {
+  APP_NOT_FOUND: 'APP_NOT_FOUND',
+  RELEASE_NOT_FOUND: 'RELEASE_NOT_FOUND',
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  RATE_LIMITED: 'RATE_LIMITED',
+  INVALID_BUNDLE: 'INVALID_BUNDLE',
+} as const;
+```
+
+## Code Conventions
+
+- Max 250 lines per file
+- Max 50 lines per function
+- No `any` types
+- Named exports only
+- Zod schemas with inferred types
+- Constants with `as const`

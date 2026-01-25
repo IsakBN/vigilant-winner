@@ -1,0 +1,52 @@
+{
+  "name": "@bundlenudge/{{PACKAGE_NAME}}",
+  "version": "0.0.0",
+  "description": "{{DESCRIPTION}}",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts",
+    "dev": "tsup src/index.ts --format esm --dts --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "test": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@bundlenudge/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "eslint": "^9.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^2.0.0"
+  },
+  "keywords": [
+    "bundlenudge",
+    "ota",
+    "react-native",
+    "updates"
+  ],
+  "author": "BundleNudge",
+  "license": "BSL-1.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bundlenudge/bundlenudge",
+    "directory": "packages/{{PACKAGE_NAME}}"
+  },
+  "bugs": {
+    "url": "https://github.com/bundlenudge/bundlenudge/issues"
+  },
+  "homepage": "https://bundlenudge.com"
+}

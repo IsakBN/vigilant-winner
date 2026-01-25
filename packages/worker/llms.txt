@@ -1,0 +1,43 @@
+# @bundlenudge/worker
+
+> Mac build worker for native iOS/Android builds.
+
+## Purpose
+
+Background worker that consumes build jobs from queue, executes native builds, handles code signing, and uploads artifacts.
+
+## Key Exports
+
+- `BuildWorker` - Main worker class
+- `startWorker()` - Start worker process
+
+## Usage
+
+```typescript
+import { BuildWorker } from '@bundlenudge/worker';
+
+const worker = new BuildWorker({
+  queueUrl: process.env.QUEUE_URL,
+  signingCert: process.env.SIGNING_CERT,
+});
+
+await worker.start();
+```
+
+## File Structure
+
+```
+src/
+├── index.ts          # Exports
+├── worker.ts         # Main loop
+├── builder.ts        # Build execution
+├── signing.ts        # Code signing
+└── queue.ts          # Queue consumer
+```
+
+## Code Conventions
+
+- Max 250 lines per file
+- Handle build failures gracefully
+- Never log secrets
+- Clean up build artifacts

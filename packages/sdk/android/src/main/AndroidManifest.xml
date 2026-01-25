@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.bundlenudge">
+    <!-- Internet permission for downloading bundles -->
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>

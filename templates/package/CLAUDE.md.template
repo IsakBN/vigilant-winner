@@ -1,0 +1,99 @@
+# @bundlenudge/{{PACKAGE_NAME}}
+
+## Purpose
+
+{{PURPOSE}}
+
+## Reference
+
+```
+/Users/isaks_macbook/Desktop/Dev/codepush/packages/{{PACKAGE_NAME}}
+```
+
+## Tech Stack
+
+{{TECH_STACK}}
+
+## Directory Structure
+
+```
+packages/{{PACKAGE_NAME}}/
+├── src/
+│   ├── index.ts          # Public exports
+│   ├── types.ts          # Type definitions
+│   └── *.test.ts         # Colocated tests
+├── package.json
+├── tsconfig.json
+├── CLAUDE.md             # This file
+├── plan.md               # Implementation checklist
+├── checkin.md            # Progress state
+└── llms.txt              # LLM context
+```
+
+## DO's
+
+### Code Style
+
+- Max 250 lines per file
+- Max 50 lines per function
+- Named exports only
+- Zod for all validation
+- Explicit error handling
+
+### Patterns
+
+{{PATTERNS}}
+
+## DON'Ts
+
+### Never
+
+- No `any` types (use `unknown`)
+- No default exports
+- No `console.log` (use logger)
+- No silent catches
+- No `@ts-ignore`
+- No files > 250 lines
+
+### Avoid
+
+{{ANTI_PATTERNS}}
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+{{KEY_FILES}}
+
+## Commands
+
+```bash
+# Development
+pnpm --filter @bundlenudge/{{PACKAGE_NAME}} dev
+
+# Build
+pnpm --filter @bundlenudge/{{PACKAGE_NAME}} build
+
+# Test
+pnpm --filter @bundlenudge/{{PACKAGE_NAME}} test
+
+# Type check
+pnpm --filter @bundlenudge/{{PACKAGE_NAME}} typecheck
+
+# Lint
+pnpm --filter @bundlenudge/{{PACKAGE_NAME}} lint
+```
+
+## Dependencies
+
+{{DEPENDENCIES}}
+
+## Testing
+
+- Framework: Vitest
+- Pattern: Colocated (`file.ts` → `file.test.ts`)
+- Run: `pnpm test`
+
+## Notes
+
+{{NOTES}}

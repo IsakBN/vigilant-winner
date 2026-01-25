@@ -1,0 +1,44 @@
+# {{PACKAGE_NAME}} Package - Current State
+
+## Status
+
+- **Phase**: {{PHASE}}
+- **Iteration**: {{ITERATION}}
+- **Last Updated**: {{TIMESTAMP}}
+
+## Current Task
+
+{{CURRENT_TASK}}
+
+## Recently Completed
+
+{{COMPLETED_TASKS}}
+
+## Next Up
+
+{{NEXT_TASKS}}
+
+## Blockers
+
+{{BLOCKERS}}
+
+## Metrics
+
+| Metric | Value |
+|--------|-------|
+| Files | {{FILE_COUNT}} |
+| Lines | {{LINE_COUNT}} |
+| Tests | {{TEST_COUNT}} |
+| Coverage | {{COVERAGE}} |
+
+## Verification Status
+
+- [ ] TypeScript: {{TYPECHECK_STATUS}}
+- [ ] Tests: {{TEST_STATUS}}
+- [ ] Lint: {{LINT_STATUS}}
+- [ ] Build: {{BUILD_STATUS}}
+- [ ] Quality: {{QUALITY_STATUS}}
+
+## Notes
+
+{{NOTES}}

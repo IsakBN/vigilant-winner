@@ -1,0 +1,10 @@
+# Knowledge base output directory
+# Populated by interrogation workflow
+
+# Expected files after interrogation:
+# - interrogation-scope.md
+# - architecture-qa.md
+# - data-model-qa.md
+# - flows-qa.md
+# - edge-cases-qa.md
+# - bundlenudge-knowledge.md (main knowledge base)

@@ -1,0 +1,213 @@
+{
+  "phase": "ready",
+  "currentPackage": null,
+  "currentFeature": null,
+  "completedPackages": [],
+  "completedFeatures": [],
+  "failedAttempts": [],
+  "lastCheckpoint": null,
+  "startedAt": null,
+  "totalTokensUsed": 0,
+  "buildOrder": [
+    {
+      "package": "setup",
+      "phase": 0,
+      "description": "Project setup and validation",
+      "features": ["setup"],
+      "critical": true
+    },
+    {
+      "package": "shared",
+      "phase": 1,
+      "description": "Foundation types and schemas",
+      "features": ["types", "schemas", "constants"]
+    },
+    {
+      "package": "api",
+      "phase": 2,
+      "description": "Database and authentication",
+      "features": [
+        "database-schema",
+        "better-auth-setup",
+        "auth-middleware",
+        "github-oauth"
+      ]
+    },
+    {
+      "package": "api",
+      "phase": 3,
+      "description": "Core app features",
+      "features": [
+        "apps-crud",
+        "releases-crud",
+        "release-management",
+        "device-registration",
+        "update-check",
+        "telemetry",
+        "targeting-engine"
+      ]
+    },
+    {
+      "package": "api",
+      "phase": 4,
+      "description": "SaaS features",
+      "features": [
+        "stripe-billing",
+        "teams-crud",
+        "teams-invitations",
+        "teams-rbac",
+        "teams-audit"
+      ]
+    },
+    {
+      "package": "api",
+      "phase": 5,
+      "description": "Integrations",
+      "features": [
+        "webhooks-outgoing",
+        "crash-integrations",
+        "github-app",
+        "email-service"
+      ]
+    },
+    {
+      "package": "api",
+      "phase": 6,
+      "description": "Admin system",
+      "features": [
+        "admin-auth",
+        "admin-users",
+        "admin-subscriptions",
+        "admin-dashboard"
+      ]
+    },
+    {
+      "package": "api",
+      "phase": 7,
+      "description": "Build system",
+      "features": [
+        "ios-builds",
+        "android-builds",
+        "credentials-apple",
+        "credentials-android"
+      ]
+    },
+    {
+      "package": "dashboard",
+      "phase": 8,
+      "description": "Dashboard foundation",
+      "features": [
+        "scaffold",
+        "auth-pages",
+        "api-client"
+      ]
+    },
+    {
+      "package": "dashboard",
+      "phase": 9,
+      "description": "Dashboard app pages",
+      "features": [
+        "app-list",
+        "app-detail",
+        "release-management",
+        "device-audience"
+      ]
+    },
+    {
+      "package": "dashboard",
+      "phase": 10,
+      "description": "Dashboard SaaS pages",
+      "features": [
+        "billing-pages",
+        "team-pages",
+        "admin-pages"
+      ]
+    },
+    {
+      "package": "sdk",
+      "phase": 11,
+      "description": "SDK implementation",
+      "features": [
+        "storage",
+        "device-auth",
+        "updater",
+        "crash-detector",
+        "rollback-manager",
+        "route-monitor",
+        "public-api"
+      ]
+    },
+    {
+      "package": "dashboard",
+      "phase": 12,
+      "description": "Dashboard migration and adaptation",
+      "features": [
+        "adapt"
+      ]
+    }
+  ],
+  "promptFiles": {
+    "setup/setup": "phase-0-setup.md",
+    "shared/types": "shared-types.md",
+    "shared/schemas": "shared-schemas.md",
+    "shared/constants": "shared-constants.md",
+    "api/database-schema": "api-database-schema.md",
+    "api/better-auth-setup": "api-better-auth-setup.md",
+    "api/auth-middleware": "api-auth-middleware.md",
+    "api/github-oauth": "api-github-oauth.md",
+    "api/apps-crud": "api-apps-crud.md",
+    "api/releases-crud": "api-releases-crud.md",
+    "api/device-registration": "api-device-registration.md",
+    "api/update-check": "api-update-check.md",
+    "api/telemetry": "api-telemetry.md",
+    "api/stripe-billing": "api-stripe-billing.md",
+    "api/teams-crud": "api-teams-crud.md",
+    "api/teams-invitations": "api-teams-invitations.md",
+    "api/teams-rbac": "api-teams-rbac.md",
+    "api/teams-audit": "api-teams-audit.md",
+    "api/webhooks-outgoing": "api-webhooks-outgoing.md",
+    "api/crash-integrations": "api-crash-integrations.md",
+    "api/github-app": "api-github-app.md",
+    "api/email-service": "api-email-service.md",
+    "api/admin-auth": "api-admin-auth.md",
+    "api/admin-users": "api-admin-users.md",
+    "api/admin-subscriptions": "api-admin-subscriptions.md",
+    "api/admin-dashboard": "api-admin-dashboard.md",
+    "api/ios-builds": "api-ios-builds.md",
+    "api/android-builds": "api-android-builds.md",
+    "api/credentials-apple": "api-credentials-apple.md",
+    "api/credentials-android": "api-credentials-android.md",
+    "dashboard/scaffold": "dashboard-scaffold.md",
+    "dashboard/auth-pages": "dashboard-auth-pages.md",
+    "dashboard/api-client": "dashboard-api-client.md",
+    "dashboard/app-list": "dashboard-app-list.md",
+    "dashboard/app-detail": "dashboard-app-detail.md",
+    "dashboard/release-management": "dashboard-release-management.md",
+    "dashboard/device-audience": "dashboard-device-audience.md",
+    "dashboard/billing-pages": "dashboard-billing-pages.md",
+    "dashboard/team-pages": "dashboard-team-pages.md",
+    "dashboard/admin-pages": "dashboard-admin-pages.md",
+    "sdk/storage": "sdk-storage.md",
+    "sdk/device-auth": "sdk-device-auth.md",
+    "sdk/updater": "sdk-updater.md",
+    "sdk/crash-detector": "sdk-crash-detector.md",
+    "sdk/rollback-manager": "sdk-rollback-manager.md",
+    "sdk/public-api": "sdk-public-api.md",
+    "sdk/route-monitor": "sdk-route-monitor.md",
+    "api/release-management": "api-release-management.md",
+    "api/targeting-engine": "api-targeting-engine.md",
+    "dashboard/adapt": "dashboard-adapt.md"
+  },
+  "knowledgeDocs": [
+    ".claude/knowledge/INDEX.md",
+    ".claude/knowledge/CURRENT_STATE.md",
+    ".claude/knowledge/API_FEATURES.md",
+    ".claude/knowledge/IMPLEMENTATION_DETAILS.md",
+    ".claude/knowledge/CODEBASE_DEEP_DIVE.md",
+    ".claude/knowledge/KNOWLEDGE.md",
+    ".claude/knowledge/PRODUCT.md",
+    ".claude/knowledge/QUALITY_RULES.md"
+  ],
+  "totalFeatures": 50,
+  "estimatedPhases": 13
+}

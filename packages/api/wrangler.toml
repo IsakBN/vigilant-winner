@@ -1,0 +1,22 @@
+name = "bundlenudge-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "bundlenudge-db"
+database_id = "placeholder-id"
+
+# R2 Bucket for bundles
+[[r2_buckets]]
+binding = "BUNDLES"
+bucket_name = "bundlenudge-bundles"
+
+# KV for rate limiting
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "placeholder-id"
+
+[vars]
+ENVIRONMENT = "development"

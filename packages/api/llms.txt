@@ -1,0 +1,141 @@
+# @bundlenudge/api
+
+> Cloudflare Workers REST API for OTA updates with priority queues.
+
+## Purpose
+
+Backend API handling app management, release deployment, update checks, and upload processing. Uses Cloudflare's edge runtime with D1 (SQLite), R2 (storage), KV (rate limits), Queues (upload processing), and Durable Objects (WebSocket status).
+
+## Key Exports
+
+- `app` - Hono application instance
+- `UploadStatusDO` - Durable Object for WebSocket status
+
+## Usage Pattern
+
+```typescript
+import { Hono } from 'hono';
+import { appsRoutes } from './routes/apps';
+import { releasesRoutes } from './routes/releases';
+import { updatesRoutes } from './routes/updates';
+
+const app = new Hono<Env>()
+  .use('*', authMiddleware)
+  .use('*', rateLimitMiddleware)
+  .route('/v1/apps', appsRoutes)
+  .route('/v1/releases', releasesRoutes)
+  .route('/v1/updates', updatesRoutes);
+
+export { app };
+```
+
+## File Structure
+
+```
+src/
+├── index.ts              # App entry
+├── types.ts              # Env bindings
+├── routes/               # API endpoints
+│   ├── apps.ts
+│   ├── releases.ts
+│   ├── channels.ts
+│   ├── updates.ts        # SDK endpoint
+│   └── uploads.ts
+├── middleware/           # Request middleware
+│   ├── auth.ts
+│   ├── rate-limit.ts
+│   └── error.ts
+├── lib/                  # Business logic
+│   ├── jwt.ts
+│   ├── storage.ts
+│   ├── queue.ts          # Priority routing
+│   └── tiers.ts
+├── db/                   # Database
+│   ├── schema.ts
+│   └── queries/
+└── durable-objects/
+    └── upload-status.ts  # WebSocket DO
+```
+
+## Cloudflare Bindings
+
+```typescript
+interface Env {
+  DB: D1Database;
+  BUNDLES: R2Bucket;
+  RATE_LIMITS: KVNamespace;
+  CACHE: KVNamespace;
+  UPLOAD_QUEUE_P0: Queue;  // Enterprise
+  UPLOAD_QUEUE_P1: Queue;  // Team
+  UPLOAD_QUEUE_P2: Queue;  // Pro
+  UPLOAD_QUEUE_P3: Queue;  // Free
+  UPLOAD_STATUS: DurableObjectNamespace;
+  ANALYTICS: AnalyticsEngineDataset;
+}
+```
+
+## Dependencies
+
+- `@bundlenudge/shared` - Types and schemas
+- `hono` - Web framework
+- `drizzle-orm` - Database ORM
+- `zod` - Validation
+
+## Key Concepts
+
+### Priority Queue Routing
+
+```typescript
+function getQueueForTier(env: Env, tier: SubscriptionTier): Queue {
+  switch (tier) {
+    case 'enterprise': return env.UPLOAD_QUEUE_P0;
+    case 'team': return env.UPLOAD_QUEUE_P1;
+    case 'pro': return env.UPLOAD_QUEUE_P2;
+    default: return env.UPLOAD_QUEUE_P3;
+  }
+}
+```
+
+### Update Check Flow
+
+1. SDK calls `GET /v1/updates/check`
+2. Validate app key from header
+3. Check channel assignment
+4. Compare versions (semver)
+5. Return update info or 204 No Content
+
+### Upload Flow
+
+1. Dashboard initiates upload
+2. Create upload_job in D1
+3. Store bundle in R2 `pending/`
+4. Enqueue to priority queue
+5. Worker processes queue
+6. Move to final R2 location
+
+## Error Handling
+
+```typescript
+import { HTTPException } from 'hono/http-exception';
+
+if (!app) {
+  throw new HTTPException(404, {
+    message: ERROR_CODES.APP_NOT_FOUND
+  });
+}
+```
+
+## Rate Limiting
+
+- Uses KV for counters
+- Fails CLOSED (deny on error)
+- Limits per tier (see TIER_LIMITS)
+
+## Code Conventions
+
+- Max 250 lines per file
+- Max 50 lines per function
+- No `any` types
+- Named exports only
+- Zod validation on all inputs
+- Drizzle for all database queries

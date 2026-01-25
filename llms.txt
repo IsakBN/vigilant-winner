@@ -1,0 +1,54 @@
+# BundleNudge
+
+> OTA updates for React Native. Push JavaScript changes directly to users.
+
+## What is BundleNudge?
+
+BundleNudge enables over-the-air updates for React Native apps. Deploy JavaScript changes instantly without App Store review.
+
+## Documentation
+
+- [Installation](/docs/getting-started/installation.md): How to install the SDK
+- [Quick Start](/docs/getting-started/quickstart.md): 5-minute getting started
+- [SDK Reference](/docs/api-reference/sdk/): Full SDK API documentation
+- [REST API](/docs/api-reference/rest-api/): HTTP API endpoints
+- [Self-Hosting](/docs/self-hosting/): Deploy your own instance
+
+## Code Structure
+
+- [packages/api/]: Cloudflare Workers API (Hono + Drizzle)
+- [packages/sdk/]: React Native SDK
+- [packages/dashboard/]: Next.js management dashboard
+- [packages/shared/]: Shared TypeScript types
+- [packages/builder/]: Bundle builder service
+- [packages/worker/]: Mac build worker
+
+## Tech Stack
+
+- **API**: Cloudflare Workers, Hono.js, Drizzle ORM, Zod
+- **Storage**: Cloudflare R2 (bundles), D1 (metadata), KV (rate limits)
+- **SDK**: React Native 0.72+, react-native-fs
+- **Dashboard**: Next.js 15, React 19, TanStack Query, Tailwind CSS
+- **Testing**: Vitest
+
+## Key Concepts
+
+- **Bundle**: JavaScript code bundle for React Native
+- **Release**: A version of your app's JavaScript code
+- **Update**: The process of delivering a new bundle to devices
+- **Rollback**: Reverting to a previous bundle version after detecting issues
+- **Delta Update**: Only downloading the changed parts of a bundle
+
+## Code Conventions
+
+- Max 250 lines per file
+- Max 50 lines per function
+- No `any` types (use `unknown`)
+- Named exports only (no default exports)
+- Colocated tests (file.ts + file.test.ts)
+- Zod for all validation
+
+## License
+
+BSL 1.1 - Free for self-hosting. Cannot offer competing service.
+Converts to Apache 2.0 on January 23, 2030.

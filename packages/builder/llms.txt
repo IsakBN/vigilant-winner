@@ -1,0 +1,47 @@
+# @bundlenudge/builder
+
+> Bundle builder for processing JavaScript bundles.
+
+## Purpose
+
+Service for validating uploaded bundles, generating incremental diffs, and preparing manifests for SDK consumption.
+
+## Key Exports
+
+- `processBundle()` - Main entry point
+- `validateBundle()` - Validate bundle structure
+- `generateDiff()` - Create binary diff
+- `createManifest()` - Generate bundle manifest
+
+## Usage
+
+```typescript
+import { processBundle } from '@bundlenudge/builder';
+
+const result = await processBundle({
+  newBundle: Buffer,
+  oldBundle: Buffer | null,
+});
+// { manifest, diff, metadata }
+```
+
+## File Structure
+
+```
+src/
+├── index.ts          # Exports
+├── processor.ts      # Main logic
+├── validator.ts      # Bundle validation
+├── differ.ts         # Diff generation
+├── manifest.ts       # Manifest creation
+└── utils/
+    ├── hash.ts
+    └── compress.ts
+```
+
+## Code Conventions
+
+- Max 250 lines per file
+- Stream large files
+- Validate all inputs
+- Compress diffs

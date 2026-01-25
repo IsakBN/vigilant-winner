@@ -1,0 +1,116 @@
+# @bundlenudge/dashboard
+
+> Next.js 15 management dashboard for BundleNudge OTA updates.
+
+## Purpose
+
+Web application for managing React Native OTA updates. Features include app management, release deployment, channel configuration, and team settings. Built with Next.js App Router, React 19, TanStack Query, and Tailwind CSS.
+
+## Key Features
+
+- App CRUD management
+- Release upload and deployment
+- Channel-based distribution
+- Real-time upload progress (WebSocket)
+- API key management
+- User authentication
+
+## File Structure
+
+```
+src/
+├── app/
+│   ├── (auth)/               # Login, signup
+│   │   ├── login/page.tsx
+│   │   └── signup/page.tsx
+│   ├── (main)/               # Authenticated
+│   │   └── dashboard/
+│   │       ├── page.tsx      # Dashboard home
+│   │       ├── apps/         # App management
+│   │       └── settings/     # User settings
+│   └── layout.tsx
+├── components/
+│   ├── ui/                   # shadcn primitives
+│   ├── apps/                 # App feature
+│   ├── releases/             # Release feature
+│   └── shared/               # Cross-feature
+├── hooks/
+│   ├── useApps.ts
+│   ├── useReleases.ts
+│   └── useAuth.ts
+└── lib/
+    ├── api/                  # API client
+    └── utils.ts
+```
+
+## Component Patterns
+
+### Page Component (thin)
+
+```tsx
+export default function AppsPage() {
+  return (
+    <PageLayout>
+      <PageHeader title="Apps" />
+      <AppList />
+    </PageLayout>
+  );
+}
+```
+
+### Feature Component (with hook)
+
+```tsx
+export function AppList() {
+  const { apps, isLoading, error } = useApps();
+  if (isLoading) return <AppListSkeleton />;
+  if (error) return <ErrorState error={error} />;
+  return <AppGrid apps={apps} />;
+}
+```
+
+### Data Hook (TanStack Query)
+
+```tsx
+export function useApps() {
+  return useQuery({
+    queryKey: ['apps'],
+    queryFn: api.apps.list,
+  });
+}
+```
+
+## Dependencies
+
+- `@bundlenudge/shared` - Types
+- `next` - Framework
+- `@tanstack/react-query` - Data
+- `tailwindcss` - Styling
+
+## Visual Guidelines
+
+### Avoid
+
+- Purple-blue gradients
+- Floating blur blobs
+- Glassmorphism
+- Everything centered
+- Identical card grids
+- Generic AI headlines
+
+### Prefer
+
+- Clean, functional design
+- Left-aligned text
+- Varied layouts
+- Subtle animations
+- Brand-appropriate colors
+
+## Code Conventions
+
+- Max 250 lines per file
+- Max 50 lines per function
+- One component per file
+- Named exports only
+- TanStack Query for all API calls
+- shadcn/ui for UI primitives

@@ -1,0 +1,50 @@
+# @bundlenudge/{{PACKAGE_NAME}}
+
+> {{ONE_LINE_DESCRIPTION}}
+
+## Purpose
+
+{{PURPOSE_DESCRIPTION}}
+
+## Key Exports
+
+{{EXPORTS}}
+
+## Usage Pattern
+
+```typescript
+{{USAGE_EXAMPLE}}
+```
+
+## File Structure
+
+```
+src/
+{{FILE_STRUCTURE}}
+```
+
+## Dependencies
+
+{{DEPENDENCIES}}
+
+## Key Concepts
+
+{{CONCEPTS}}
+
+## Error Handling
+
+{{ERROR_HANDLING}}
+
+## Testing
+
+- Framework: Vitest
+- Pattern: Colocated tests (*.test.ts)
+- Mocking: vi.mock for external deps
+
+## Code Conventions
+
+- Max 250 lines per file
+- Max 50 lines per function
+- No `any` types
+- Named exports only
+- Zod for validation

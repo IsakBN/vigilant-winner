@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+.dev.vars
+.wrangler/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Cloudflare
+.wrangler/
+.mf/
+
+# Next.js
+.next/
+out/
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# OS
+Thumbs.db
+
+# iOS
+packages/sdk/ios/Pods/
+*.xcworkspace
+*.xcuserdata
+
+# Android
+packages/sdk/android/.gradle/
+packages/sdk/android/build/
+packages/sdk/android/local.properties

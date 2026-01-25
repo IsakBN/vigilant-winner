@@ -1,0 +1,288 @@
+{
+  "name": "bundlenudge",
+  "version": "0.0.0",
+  "description": "OTA updates for React Native. Push JavaScript changes directly to users without App Store review.",
+  "license": "BSL-1.1",
+  "repository": "https://github.com/bundlenudge/bundlenudge",
+  "documentation": "https://docs.bundlenudge.com",
+
+  "businessModel": {
+    "type": "dual",
+    "hosted": "Cloud SaaS with paid tiers",
+    "selfHosted": "Free for internal/personal use",
+    "license": {
+      "current": "BSL 1.1",
+      "restrictions": "Cannot offer competing OTA update service",
+      "conversionDate": "2030-01-23",
+      "conversionLicense": "Apache-2.0"
+    }
+  },
+
+  "packages": [
+    {
+      "name": "@bundlenudge/shared",
+      "path": "packages/shared",
+      "description": "Shared TypeScript types, Zod schemas, and constants used across all packages",
+      "exports": [
+        "AppSchema",
+        "ReleaseSchema",
+        "ChannelSchema",
+        "UpdateCheckSchema",
+        "SubscriptionTier",
+        "QueuePriority",
+        "ErrorCodes"
+      ],
+      "dependencies": ["zod"],
+      "category": "foundation"
+    },
+    {
+      "name": "@bundlenudge/api",
+      "path": "packages/api",
+      "description": "Cloudflare Workers REST API with Hono.js, D1 database, R2 storage, priority queues, and Durable Objects",
+      "exports": ["app", "createApp"],
+      "dependencies": [
+        "hono",
+        "drizzle-orm",
+        "@bundlenudge/shared",
+        "zod"
+      ],
+      "cloudflareBindings": {
+        "D1": ["DB"],
+        "R2": ["BUNDLES"],
+        "KV": ["RATE_LIMITS", "CACHE"],
+        "Queues": ["UPLOAD_QUEUE_P0", "UPLOAD_QUEUE_P1", "UPLOAD_QUEUE_P2", "UPLOAD_QUEUE_P3"],
+        "DurableObjects": ["UPLOAD_STATUS"],
+        "AnalyticsEngine": ["ANALYTICS"]
+      },
+      "category": "backend"
+    },
+    {
+      "name": "@bundlenudge/sdk",
+      "path": "packages/sdk",
+      "description": "React Native SDK for checking, downloading, and applying OTA updates",
+      "exports": [
+        "BundleNudge",
+        "configure",
+        "checkForUpdate",
+        "downloadUpdate",
+        "applyUpdate",
+        "getCurrentBundle",
+        "rollback"
+      ],
+      "peerDependencies": [
+        "react-native >= 0.72",
+        "react-native-fs"
+      ],
+      "category": "client"
+    },
+    {
+      "name": "@bundlenudge/dashboard",
+      "path": "packages/dashboard",
+      "description": "Next.js 15 management dashboard for apps, releases, channels, analytics, and team management",
+      "exports": [],
+      "dependencies": [
+        "next",
+        "react",
+        "@tanstack/react-query",
+        "tailwindcss",
+        "@bundlenudge/shared"
+      ],
+      "category": "frontend"
+    },
+    {
+      "name": "@bundlenudge/builder",
+      "path": "packages/builder",
+      "description": "Bundle builder service for processing uploads, generating diffs, and creating optimized bundles",
+      "exports": ["processBundle", "generateDiff", "validateBundle"],
+      "dependencies": ["@bundlenudge/shared"],
+      "category": "service"
+    },
+    {
+      "name": "@bundlenudge/worker",
+      "path": "packages/worker",
+      "description": "Mac build worker for native iOS/Android builds with code signing",
+      "exports": ["BuildWorker", "startWorker"],
+      "dependencies": ["@bundlenudge/shared"],
+      "category": "service"
+    }
+  ],
+
+  "architecture": {
+    "style": "Monorepo with pnpm workspaces",
+    "runtime": "Cloudflare Workers (edge)",
+    "database": "Cloudflare D1 (SQLite at edge)",
+    "storage": "Cloudflare R2 (S3-compatible)",
+    "cache": "Cloudflare KV",
+    "queues": "Cloudflare Queues with 4 priority levels",
+    "realtime": "Durable Objects with WebSocket",
+    "analytics": "Cloudflare Analytics Engine"
+  },
+
+  "subscriptionTiers": {
+    "free": {
+      "queuePriority": "P3",
+      "maxApps": 1,
+      "maxReleasesPerMonth": 10,
+      "maxBundleSize": "5MB",
+      "retentionDays": 7,
+      "features": ["basic_updates"]
+    },
+    "pro": {
+      "queuePriority": "P2",
+      "maxApps": 5,
+      "maxReleasesPerMonth": 100,
+      "maxBundleSize": "25MB",
+      "retentionDays": 30,
+      "features": ["basic_updates", "rollback", "channels"]
+    },
+    "team": {
+      "queuePriority": "P1",
+      "maxApps": 20,
+      "maxReleasesPerMonth": 500,
+      "maxBundleSize": "50MB",
+      "retentionDays": 90,
+      "features": ["basic_updates", "rollback", "channels", "ab_testing", "gradual_rollout", "team_management"]
+    },
+    "enterprise": {
+      "queuePriority": "P0",
+      "maxApps": "unlimited",
+      "maxReleasesPerMonth": "unlimited",
+      "maxBundleSize": "100MB",
+      "retentionDays": 365,
+      "features": ["all", "sla", "dedicated_support", "custom_domain"]
+    }
+  },
+
+  "queueSystem": {
+    "description": "Priority-based upload processing queues",
+    "queues": [
+      { "name": "UPLOAD_QUEUE_P0", "priority": 0, "tier": "enterprise", "maxConcurrent": 50 },
+      { "name": "UPLOAD_QUEUE_P1", "priority": 1, "tier": "team", "maxConcurrent": 20 },
+      { "name": "UPLOAD_QUEUE_P2", "priority": 2, "tier": "pro", "maxConcurrent": 10 },
+      { "name": "UPLOAD_QUEUE_P3", "priority": 3, "tier": "free", "maxConcurrent": 5 }
+    ],
+    "routing": "Subscription tier determines queue assignment at upload time"
+  },
+
+  "database": {
+    "type": "D1 (SQLite)",
+    "orm": "Drizzle",
+    "tables": [
+      "users",
+      "organizations",
+      "memberships",
+      "apps",
+      "releases",
+      "channels",
+      "channel_releases",
+      "upload_jobs",
+      "device_pings",
+      "crash_reports",
+      "subscriptions",
+      "api_keys",
+      "audit_logs",
+      "feature_flags"
+    ]
+  },
+
+  "storage": {
+    "type": "R2",
+    "structure": {
+      "bundles": "{appId}/{releaseId}/bundle.js",
+      "sourcemaps": "{appId}/{releaseId}/bundle.js.map",
+      "diffs": "{appId}/{releaseId}/diff-from-{fromReleaseId}.patch",
+      "pending": "pending/{jobId}/bundle.js",
+      "manifests": "manifests/{appId}/latest.json"
+    }
+  },
+
+  "codeConventions": {
+    "maxLinesPerFile": 250,
+    "maxLinesPerFunction": 50,
+    "maxNestingDepth": 3,
+    "maxParameters": 4,
+    "anyTypesAllowed": false,
+    "defaultExportsAllowed": false,
+    "testPattern": "*.test.ts (colocated)",
+    "validation": "Zod for all input validation"
+  },
+
+  "fileIndex": {
+    "packages/shared/src/index.ts": "Re-exports all shared types and schemas",
+    "packages/shared/src/schemas/": "Zod schemas for all entities",
+    "packages/shared/src/types/": "TypeScript type definitions",
+    "packages/shared/src/constants/": "Error codes, tier limits, queue priorities",
+
+    "packages/api/src/index.ts": "Hono app entry point, middleware setup",
+    "packages/api/src/routes/": "Route handlers (apps, releases, channels, updates, uploads)",
+    "packages/api/src/middleware/": "Auth, rate limiting, error handling",
+    "packages/api/src/lib/": "JWT, encryption, storage, queue utilities",
+    "packages/api/src/db/": "Drizzle schema and queries",
+    "packages/api/src/durable-objects/": "UploadStatusDO for WebSocket",
+
+    "packages/sdk/src/index.ts": "BundleNudge class, public API",
+    "packages/sdk/src/updater.ts": "Update checking and downloading logic",
+    "packages/sdk/src/storage.ts": "Local bundle storage with react-native-fs",
+    "packages/sdk/src/rollback.ts": "Rollback detection and execution",
+    "packages/sdk/src/health.ts": "Health monitoring and crash detection",
+
+    "packages/dashboard/src/app/": "Next.js App Router pages",
+    "packages/dashboard/src/components/": "React components (ui/, apps/, releases/)",
+    "packages/dashboard/src/hooks/": "React Query hooks for API calls",
+    "packages/dashboard/src/lib/api/": "API client functions"
+  },
+
+  "keyFlows": {
+    "updateCheck": [
+      "SDK calls GET /v1/updates/check",
+      "API validates app key",
+      "API checks channel assignment",
+      "API compares versions",
+      "API returns update info or 204"
+    ],
+    "bundleUpload": [
+      "Dashboard uploads bundle",
+      "API creates upload_job in D1",
+      "API stores bundle in R2 pending/",
+      "API enqueues to priority queue based on tier",
+      "Worker processes queue",
+      "Worker validates bundle",
+      "Worker generates diffs",
+      "Worker moves to final R2 location",
+      "Worker updates release status"
+    ],
+    "crashMonitoring": [
+      "SDK detects crash on startup",
+      "SDK reports crash to API",
+      "API increments crash counter",
+      "Cron job checks crash rates every 5 min",
+      "If rate > threshold, auto-rollback triggers",
+      "SDK receives rollback on next check"
+    ]
+  },
+
+  "integrations": {
+    "crashReporting": ["sentry", "bugsnag", "crashlytics"],
+    "cicd": ["github-actions", "gitlab-ci", "bitrise", "expo-eas"],
+    "github": {
+      "app": true,
+      "features": ["auto-releases", "pr-previews", "status-checks"]
+    }
+  },
+
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "quality-audit": "./scripts/quality-audit.sh"
+  },
+
+  "llmContext": {
+    "indexFile": "/llms.txt",
+    "fullContext": "/llms-full.txt",
+    "structuredMetadata": "/codebase.json",
+    "perPackageContext": "packages/*/llms.txt"
+  }
+}

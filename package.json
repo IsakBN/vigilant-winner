@@ -1,0 +1,53 @@
+{
+  "name": "bundlenudge",
+  "version": "0.0.0",
+  "private": true,
+  "description": "OTA updates for React Native. Push JavaScript changes directly to users without App Store review.",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "test:run": "pnpm -r test -- --run",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "lint:fix": "pnpm -r lint -- --fix",
+    "clean": "pnpm -r clean && rm -rf node_modules",
+    "verify": "./scripts/verify.sh",
+    "quality-audit": "./scripts/quality-audit.sh",
+    "preflight": "./scripts/preflight-check.sh",
+    "interrogate": "./.claude/workflows/runner/interrogate.sh",
+    "build-package": "./scripts/preflight-check.sh && ./.claude/workflows/runner/build-package.sh",
+    "loop": "./.claude/loop/runner.sh",
+    "loop:continue": "./.claude/loop/runner.sh --continue"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^2.0.0"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "keywords": [
+    "react-native",
+    "ota",
+    "updates",
+    "codepush",
+    "bundlenudge"
+  ],
+  "author": "BundleNudge",
+  "license": "BSL-1.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bundlenudge/bundlenudge"
+  },
+  "bugs": {
+    "url": "https://github.com/bundlenudge/bundlenudge/issues"
+  },
+  "homepage": "https://bundlenudge.com"
+}

@@ -1,0 +1,48 @@
+# {{PACKAGE_NAME}} Package Plan
+
+## Overview
+
+{{OVERVIEW}}
+
+## Phase 1: Foundation
+
+- [ ] package.json
+- [ ] tsconfig.json
+- [ ] eslint.config.js
+- [ ] vitest.config.ts
+- [ ] src/index.ts (exports)
+- [ ] src/types.ts
+
+## Phase 2: Core Implementation
+
+{{CORE_TASKS}}
+
+## Phase 3: Testing
+
+{{TEST_TASKS}}
+
+## Phase 4: Integration
+
+{{INTEGRATION_TASKS}}
+
+## Completion Criteria
+
+- [ ] All files under 250 lines
+- [ ] No `any` types
+- [ ] All tests passing
+- [ ] TypeScript compiles
+- [ ] Lint passes
+- [ ] Build succeeds
+- [ ] Quality audit passes
+
+## Dependencies
+
+This package depends on:
+{{DEPENDS_ON}}
+
+This package is depended on by:
+{{DEPENDED_BY}}
+
+## Notes
+
+{{NOTES}}
