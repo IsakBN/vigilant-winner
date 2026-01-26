@@ -140,3 +140,29 @@ export {
   loadVariant,
 } from './targeting'
 export type { VariantManager } from './targeting'
+
+// Constraints & version utilities
+export {
+  compareVersions,
+  isVersionGte,
+  isVersionLte,
+  isVersionInRange,
+  parseVersion,
+  evaluateConstraints,
+  checkMandatoryUpdate,
+  getMandatoryMessage,
+  checkAppStoreUpdate,
+  shouldBlockApp,
+  shouldRedirectToStore,
+} from './constraints'
+export type {
+  ParsedVersion,
+  UpdateConstraints,
+  DeviceContext,
+  EvaluationResult,
+  MandatoryUpdateConfig,
+  MandatoryUpdateState,
+  MandatoryUpdateData,
+  AppStoreUpdateResponse,
+  AppStoreUpdateState,
+} from './constraints'
