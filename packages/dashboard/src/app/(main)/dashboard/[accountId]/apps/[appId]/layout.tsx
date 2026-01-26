@@ -2,7 +2,7 @@
 
 import { useParams, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { Home, Package, Smartphone, Settings, BookOpen } from 'lucide-react'
+import { Home, Package, Smartphone, Settings, BookOpen, Radio } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ============================================================================
@@ -82,6 +82,11 @@ export default function AppDetailLayout({
       label: 'Releases',
       href: `${basePath}/releases`,
       icon: <Package className="w-4 h-4" />,
+    },
+    {
+      label: 'Channels',
+      href: `${basePath}/channels`,
+      icon: <Radio className="w-4 h-4" />,
     },
     {
       label: 'Devices',

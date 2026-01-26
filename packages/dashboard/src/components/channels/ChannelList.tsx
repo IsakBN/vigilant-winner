@@ -1,0 +1,106 @@
+'use client'
+
+/**
+ * ChannelList Component
+ *
+ * Displays a grid of channel cards with status information.
+ */
+
+import { Radio, Plus } from 'lucide-react'
+import { Button, Skeleton, Card, CardContent } from '@/components/ui'
+import { ChannelCard } from './ChannelCard'
+import type { Channel } from '@/lib/api'
+
+// =============================================================================
+// Types
+// =============================================================================
+
+interface ChannelListProps {
+  channels: Channel[]
+  appId: string
+  accountId: string
+  isLoading: boolean
+  onCreateClick: () => void
+}
+
+// =============================================================================
+// Loading State
+// =============================================================================
+
+function ChannelListSkeleton() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {[1, 2, 3].map((i) => (
+        <Card key={i}>
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between mb-4">
+              <Skeleton className="w-10 h-10 rounded-lg" />
+              <Skeleton className="w-16 h-5 rounded" />
+            </div>
+            <Skeleton className="h-6 w-32 mb-2" />
+            <Skeleton className="h-4 w-24 mb-4" />
+            <Skeleton className="h-4 w-full mb-4" />
+            <Skeleton className="h-1.5 w-full rounded-full" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+// =============================================================================
+// Empty State
+// =============================================================================
+
+function EmptyChannelState({ onCreateClick }: { onCreateClick: () => void }) {
+  return (
+    <div className="text-center py-12 bg-neutral-50 rounded-xl border border-dashed border-neutral-200">
+      <div className="mx-auto w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center mb-4">
+        <Radio className="w-6 h-6 text-neutral-400" />
+      </div>
+      <h3 className="text-lg font-semibold text-neutral-900 mb-2">
+        No channels yet
+      </h3>
+      <p className="text-sm text-neutral-500 max-w-sm mx-auto mb-6">
+        Channels let you deploy releases to different environments like production, staging, or beta.
+      </p>
+      <Button onClick={onCreateClick}>
+        <Plus className="w-4 h-4 mr-2" />
+        Create Channel
+      </Button>
+    </div>
+  )
+}
+
+// =============================================================================
+// Component
+// =============================================================================
+
+export function ChannelList({
+  channels,
+  appId,
+  accountId,
+  isLoading,
+  onCreateClick,
+}: ChannelListProps) {
+  if (isLoading) {
+    return <ChannelListSkeleton />
+  }
+
+  if (channels.length === 0) {
+    return <EmptyChannelState onCreateClick={onCreateClick} />
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {channels.map((channel) => (
+        <ChannelCard
+          key={channel.id}
+          channel={channel}
+          appId={appId}
+          accountId={accountId}
+        />
+      ))}
+    </div>
+  )
+}

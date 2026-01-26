@@ -33,3 +33,34 @@ export type {
     ListAppsResponse,
     GetAppResponse,
 } from './apps'
+
+// Re-export channels API
+export { channels } from './channels'
+export type {
+    Channel,
+    ChannelTargetingRule,
+    ChannelTargetingRules,
+    CreateChannelInput,
+    UpdateChannelInput,
+    ListChannelsResponse,
+    GetChannelResponse,
+    CreateChannelResponse,
+    UpdateChannelResponse,
+    ListChannelsParams,
+} from './channels'
+
+// Re-export releases API
+export { releases } from './releases'
+export type {
+    Release,
+    ReleaseStatus,
+    ReleaseStats,
+    ReleaseWithStats,
+    CreateReleaseInput,
+    UpdateReleaseInput,
+    ListReleasesParams,
+    ListReleasesResponse,
+    GetReleaseResponse,
+    CreateReleaseResponse,
+    UpdateReleaseResponse,
+} from './releases'
