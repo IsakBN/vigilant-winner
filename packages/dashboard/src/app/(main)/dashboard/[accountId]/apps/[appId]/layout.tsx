@@ -2,7 +2,7 @@
 
 import { useParams, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { Home, Package, Smartphone, Settings, BookOpen, Radio } from 'lucide-react'
+import { Home, Package, Smartphone, Settings, BookOpen, Radio, Hammer } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ============================================================================
@@ -92,6 +92,11 @@ export default function AppDetailLayout({
       label: 'Devices',
       href: `${basePath}/devices`,
       icon: <Smartphone className="w-4 h-4" />,
+    },
+    {
+      label: 'Builds',
+      href: `${basePath}/builds`,
+      icon: <Hammer className="w-4 h-4" />,
     },
     {
       label: 'Settings',

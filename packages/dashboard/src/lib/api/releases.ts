@@ -170,6 +170,6 @@ export const releases = {
             throw new Error('Failed to upload bundle')
         }
 
-        return response.json() as Promise<Release>
+        return response.json() as Promise<{ bundleUrl: string }>
     },
 }
