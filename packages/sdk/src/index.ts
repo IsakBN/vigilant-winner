@@ -10,6 +10,20 @@ export { Updater } from './updater'
 export { RollbackManager } from './rollback-manager'
 export { CrashDetector } from './crash-detector'
 
+// React hooks
+export { useBundleNudge, useCodePush } from './hooks'
+export type { UseBundleNudgeResult, BundleNudgeStatus } from './hooks'
+
+// Setup utilities
+export {
+  setupBundleNudge,
+  setupCodePush,
+  getBundleNudgeStatus,
+  recordCrash,
+} from './setup'
+export { withBundleNudge, withCodePush } from './setup/hoc'
+export type { SetupOptions, BundleNudgeDebugStatus } from './setup'
+
 // Health monitoring exports
 export {
   startHealthMonitoring,
