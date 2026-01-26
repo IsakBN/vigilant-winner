@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
 import { AuthProvider } from './AuthProvider'
+import { ToastProvider, AlertDialogProvider } from '@/components/ui'
 
 interface ProvidersProps {
   children: ReactNode
@@ -28,7 +29,11 @@ export function Providers({ children }: ProvidersProps) {
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
-        {children}
+        <AlertDialogProvider>
+          <ToastProvider>
+            {children}
+          </ToastProvider>
+        </AlertDialogProvider>
       </QueryClientProvider>
     </AuthProvider>
   )
