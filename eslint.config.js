@@ -63,6 +63,8 @@ export default tseslint.config(
       '@typescript-eslint/no-unnecessary-type-assertion': 'off',
       // Allow non-null assertions in tests for cleaner test code
       '@typescript-eslint/no-non-null-assertion': 'off',
+      // Allow unbound methods in tests (vi.mocked handles binding correctly)
+      '@typescript-eslint/unbound-method': 'off',
     },
   },
   {

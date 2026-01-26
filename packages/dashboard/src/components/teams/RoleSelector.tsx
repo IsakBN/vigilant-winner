@@ -45,7 +45,7 @@ export function RoleSelector({
     return (
         <Select
             value={value}
-            onValueChange={(val) => onChange(val as SelectableRole)}
+            onValueChange={(val: string) => onChange(val as SelectableRole)}
             disabled={disabled}
         >
             <SelectTrigger className={className ?? 'w-[120px]'}>
@@ -84,7 +84,7 @@ export function RoleSelectorWithDescription({
         <div className="space-y-1">
             <Select
                 value={value}
-                onValueChange={(val) => onChange(val as SelectableRole)}
+                onValueChange={(val: string) => onChange(val as SelectableRole)}
                 disabled={disabled}
             >
                 <SelectTrigger className={className ?? 'w-full'}>

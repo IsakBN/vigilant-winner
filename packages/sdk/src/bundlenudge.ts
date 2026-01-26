@@ -16,6 +16,10 @@ import { Storage } from './storage'
 import { Updater } from './updater'
 import { CrashDetector } from './crash-detector'
 import { RollbackManager } from './rollback-manager'
+import { VersionGuard } from './version-guard'
+import { BundleValidator } from './bundle-validator'
+import { HealthMonitor } from './health-monitor'
+import { HealthConfigFetcher } from './health-config'
 import { getModuleWithFallback } from './native-module'
 
 export interface BundleNudgeCallbacks {
@@ -39,6 +43,9 @@ export class BundleNudge {
   private updater: Updater
   private crashDetector: CrashDetector
   private rollbackManager: RollbackManager
+  private versionGuard: VersionGuard | null = null
+  private bundleValidator: BundleValidator
+  private healthMonitor: HealthMonitor | null = null
   private nativeModule: NativeModuleInterface | null = null
 
   private status: UpdateStatus = 'idle'
@@ -57,30 +64,31 @@ export class BundleNudge {
     const nativeModuleProxy = this.createNativeModuleProxy()
 
     this.updater = new Updater({
-      storage: this.storage,
-      config: this.config,
-      nativeModule: nativeModuleProxy,
-      onProgress: (progress) => {
-        this.callbacks.onDownloadProgress?.(progress)
-      },
+      storage: this.storage, config: this.config, nativeModule: nativeModuleProxy,
+      onProgress: (progress) => this.callbacks.onDownloadProgress?.(progress),
     })
 
     this.crashDetector = new CrashDetector(this.storage, {
       verificationWindowMs: this.config.verificationWindowMs,
       crashThreshold: this.config.crashThreshold,
       crashWindowMs: this.config.crashWindowMs,
-      onRollback: async () => {
-        await this.rollbackManager.rollback('crash_detected')
-      },
-      onVerified: async () => {
-        await this.rollbackManager.markUpdateVerified()
-      },
+      onRollback: async () => this.rollbackManager.rollback('crash_detected'),
+      onVerified: async () => this.rollbackManager.markUpdateVerified(),
     })
 
-    this.rollbackManager = new RollbackManager({
-      storage: this.storage,
-      config: this.config,
-      nativeModule: nativeModuleProxy,
+    this.rollbackManager = new RollbackManager({ storage: this.storage, config: this.config, nativeModule: nativeModuleProxy })
+
+    this.bundleValidator = this.createBundleValidator()
+  }
+
+  private createBundleValidator(): BundleValidator {
+    return new BundleValidator(this.storage, {
+      hashFile: async (path: string) => {
+        if (!this.nativeModule) return ''
+        const mod = this.nativeModule as unknown as { hashFile?: (p: string) => Promise<string> }
+        return mod.hashFile?.(path) ?? ''
+      },
+      onValidationFailed: (version) => { console.warn(`[BundleNudge] Bundle ${version} failed validation`); },
     })
   }
 
@@ -153,77 +161,66 @@ export class BundleNudge {
     await this.nativeModule?.notifyAppReady()
   }
 
-  /** Restart the app to apply pending update. */
-  async restartApp(): Promise<void> {
-    await this.nativeModule?.restartApp(true)
-  }
-
-  /** Clear all downloaded updates. */
-  async clearUpdates(): Promise<void> {
-    await this.nativeModule?.clearUpdates()
-  }
-
-  /** Get current update status. */
+  async restartApp(): Promise<void> { await this.nativeModule?.restartApp(true) }
+  async clearUpdates(): Promise<void> { await this.nativeModule?.clearUpdates() }
   getStatus(): UpdateStatus { return this.status }
-
-  /** Get current bundle version. */
   getCurrentVersion(): string | null { return this.storage.getCurrentVersion() }
-
-  /** Check if rollback is available. */
   canRollback(): boolean { return this.rollbackManager.canRollback() }
-
-  /** Manually trigger rollback. */
-  async rollback(): Promise<void> {
-    await this.rollbackManager.rollback('manual')
-  }
+  getBundleValidator(): BundleValidator { return this.bundleValidator }
+  async rollback(): Promise<void> { await this.rollbackManager.rollback('manual') }
+  trackEvent(name: string): void { this.healthMonitor?.reportEvent(name) }
+  trackEndpoint(method: string, url: string, status: number): void { this.healthMonitor?.reportEndpoint(method, url, status) }
+  isHealthVerified(): boolean { return this.healthMonitor?.isFullyVerified() ?? true }
 
   private async init(): Promise<void> {
     if (this.isInitialized) return
-
-    // Initialize storage
     await this.storage.initialize()
-
-    // Register device if needed
-    if (!this.storage.getAccessToken()) {
-      await this.registerDevice()
-    }
-
-    // Check for crashes
+    this.versionGuard = this.createVersionGuard()
+    await this.versionGuard.checkForNativeUpdate() // Clears bundles if App Store update
+    if (!this.storage.getAccessToken()) await this.registerDevice()
+    await this.initHealthMonitor()
     await this.crashDetector.checkForCrash()
-
-    // Start verification window if we have a previous version
     this.crashDetector.startVerificationWindow()
-
-    // Auto-check on launch if configured
-    if (this.config.checkOnLaunch !== false) {
-      // Run in background, don't await
-      this.checkForUpdate().catch(() => {
-        // Ignore errors on background check
-      })
-    }
-
+    if (this.config.checkOnLaunch !== false) void this.checkForUpdate().catch(() => undefined)
     this.isInitialized = true
+  }
+
+  private async initHealthMonitor(): Promise<void> {
+    const apiUrl = this.config.apiUrl ?? 'https://api.bundlenudge.com'
+    const fetcher = new HealthConfigFetcher({
+      apiUrl, appId: this.config.appId, getAccessToken: () => this.storage.getAccessToken(),
+    })
+    const config = await fetcher.fetchConfig()
+    if (config.events.length === 0 && config.endpoints.length === 0) return // No config, skip
+    this.healthMonitor = new HealthMonitor({
+      events: config.events, endpoints: config.endpoints, crashDetector: this.crashDetector,
+      // eslint-disable-next-line no-console -- Intentional logging for debugging
+      onAllPassed: () => { console.info('[BundleNudge] Health checks passed, update verified'); },
+    })
+  }
+
+  private createVersionGuard(): VersionGuard {
+    return new VersionGuard(this.storage, {
+      getCurrentVersion: () => {
+        if (!this.nativeModule) {
+          return { appVersion: '1.0.0', buildNumber: '1', recordedAt: Date.now() }
+        }
+        type ConfigSync = { appVersion?: string; buildNumber?: string } | undefined
+        const mod = this.nativeModule as unknown as { getConfiguration?: () => ConfigSync }
+        const cfg = mod.getConfiguration?.()
+        return { appVersion: cfg?.appVersion ?? '1.0.0', buildNumber: cfg?.buildNumber ?? '1', recordedAt: Date.now() }
+      },
+      // eslint-disable-next-line no-console -- Intentional logging for debugging
+      onNativeUpdateDetected: () => { console.info('[BundleNudge] App Store update detected, cleared OTA bundles'); },
+    })
   }
 
   private async registerDevice(): Promise<void> {
     const apiUrl = this.config.apiUrl ?? 'https://api.bundlenudge.com'
     const nativeConfig = await this.nativeModule?.getConfiguration()
-
-    const response = await fetch(`${apiUrl}/v1/devices/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        appId: this.config.appId,
-        deviceId: this.storage.getDeviceId(),
-        platform: Platform.OS,
-        appVersion: nativeConfig?.appVersion ?? '1.0.0',
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error(`Device registration failed: ${String(response.status)}`)
-    }
-
+    const body = { appId: this.config.appId, deviceId: this.storage.getDeviceId(), platform: Platform.OS, appVersion: nativeConfig?.appVersion ?? '1.0.0' }
+    const response = await fetch(`${apiUrl}/v1/devices/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    if (!response.ok) throw new Error(`Device registration failed: ${String(response.status)}`)
     const data = (await response.json()) as DeviceRegisterResponse
     await this.storage.setAccessToken(data.accessToken)
   }

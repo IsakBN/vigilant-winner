@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Package, Smartphone, ArrowRight } from 'lucide-react'
 import { useApp } from '@/hooks/useApp'
+import { useReleases } from '@/hooks/useReleases'
 import { AppHeader } from '@/components/apps/AppHeader'
 import { AppStats } from '@/components/apps/AppStats'
 import { Button } from '@/components/ui/button'
@@ -39,6 +40,20 @@ function formatRelativeTime(timestamp: number): string {
   if (hours < 24) return `${hours}h ago`
   if (days < 7) return `${days}d ago`
   return new Date(timestamp).toLocaleDateString()
+}
+
+/**
+ * Map API release status to UI status
+ */
+function mapReleaseStatus(status: string): Release['status'] {
+  const statusMap: Record<string, Release['status']> = {
+    active: 'rolling',
+    completed: 'complete',
+    paused: 'paused',
+    rolled_back: 'failed',
+    pending: 'rolling',
+  }
+  return statusMap[status] ?? 'rolling'
 }
 
 function StatusBadge({ status }: { status: Release['status'] }) {
@@ -187,10 +202,20 @@ export default function AppOverviewPage() {
   const appId = params.appId as string
   const accountId = params.accountId as string
 
-  const { data: app, isLoading, error } = useApp(appId)
+  const { data: app, isLoading: appLoading, error } = useApp(appId)
+  const { data: releasesData, isLoading: releasesLoading } = useReleases(appId, { pageSize: 5 })
 
-  // Mock releases data - in real app this would come from useReleases hook
-  const mockReleases: Release[] = []
+  const isLoading = appLoading || releasesLoading
+
+  // Transform API releases to the component format
+  const releases: Release[] = (releasesData?.releases ?? []).map((r) => ({
+    id: r.id,
+    version: r.version,
+    channel: r.channel ?? 'production',
+    status: mapReleaseStatus(r.status),
+    rolloutPercentage: r.rolloutPercentage ?? 100,
+    createdAt: r.createdAt,
+  }))
 
   if (error) {
     return (
@@ -227,7 +252,7 @@ export default function AppOverviewPage() {
 
       {/* Recent Releases */}
       <RecentReleases
-        releases={mockReleases}
+        releases={releases}
         appId={appId}
         accountId={accountId}
         isLoading={isLoading}

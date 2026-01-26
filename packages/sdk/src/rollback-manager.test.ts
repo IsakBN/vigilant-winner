@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/unbound-method */
+ 
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /**
@@ -29,6 +29,9 @@ function createMockStorage(metadata: Partial<StoredMetadata> = {}): Storage {
     lastCheckTime: null,
     crashCount: 0,
     lastCrashTime: null,
+    verificationState: null,
+    appVersionInfo: null,
+    bundleHashes: {},
     ...metadata,
   }
 
@@ -55,6 +58,7 @@ function createMockNativeModule(): NativeModuleInterface {
     restartApp: vi.fn().mockResolvedValue(true),
     clearUpdates: vi.fn().mockResolvedValue(true),
     saveBundleToStorage: vi.fn().mockResolvedValue('/path/to/bundle'),
+    hashFile: vi.fn().mockResolvedValue('mockhash'),
   }
 }
 

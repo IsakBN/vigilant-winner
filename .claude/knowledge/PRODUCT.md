@@ -33,17 +33,20 @@ Edge-deployed globally via Cloudflare. Delta updates minimize bandwidth. Handles
 | Feature | Description |
 |---------|-------------|
 | **Instant Deployment** | Push JS bundle updates directly to devices |
-| **Delta Updates** | Only download changed modules (up to 90% smaller) |
+| **Optimized Bundles** | Hermes bytecode + gzip compression (~15-25% of JS size) |
 | **Hash Verification** | SHA-256 integrity checks on all bundles |
 | **Offline Support** | Updates cached locally, apply on next launch |
 | **Version Tracking** | Current, pending, and previous versions stored |
 
 **How it works:**
 1. SDK checks for updates on app launch
-2. If available, downloads bundle (or delta patch)
+2. If available, downloads optimized Hermes bytecode bundle
 3. Verifies hash integrity
 4. Applies on next app restart
 5. Reports success/failure to server
+
+> **Note:** RN 0.73+ uses Hermes bytecode which is already highly optimized.
+> Combined with gzip compression, bundles are ~15-25% of original JS size.
 
 ---
 

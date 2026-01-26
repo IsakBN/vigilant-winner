@@ -1,12 +1,12 @@
 'use client'
 
+import * as React from 'react'
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
   useState,
-  type ReactNode,
 } from 'react'
 
 interface User {
@@ -21,12 +21,19 @@ interface Session {
   accessToken?: string
 }
 
+interface EmailLoginResult {
+  success: boolean
+  error?: string
+  requiresVerification?: boolean
+}
+
 interface AuthContextType {
   user: User | null
   session: Session | null
   isLoading: boolean
   isAuthenticated: boolean
   login: (provider: 'github' | 'google') => void
+  loginWithEmail: (email: string, password: string) => Promise<EmailLoginResult>
   logout: () => Promise<void>
   refreshSession: () => Promise<void>
 }
@@ -45,7 +52,11 @@ const AuthContext = createContext<AuthContextType | null>(null)
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+interface AuthProviderProps {
+  children: React.ReactNode
+}
+
+export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element {
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -89,6 +100,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = redirectUrl
   }, [])
 
+  const loginWithEmail = useCallback(async (
+    email: string,
+    password: string
+  ): Promise<EmailLoginResult> => {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/sign-in/email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await response.json() as {
+        user?: SessionResponse['user']
+        error?: string
+        message?: string
+        requiresVerification?: boolean
+      }
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.error || data.message || 'Login failed',
+          requiresVerification: data.requiresVerification,
+        }
+      }
+
+      // Refresh session after successful login
+      await fetchSession()
+      return { success: true }
+    } catch {
+      return { success: false, error: 'An unexpected error occurred' }
+    }
+  }, [fetchSession])
+
   const logout = useCallback(async () => {
     try {
       await fetch(`${API_URL}/api/auth/logout`, {
@@ -110,18 +156,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const user = session?.user ?? null
 
+  const contextValue: AuthContextType = {
+    user,
+    session,
+    isLoading,
+    isAuthenticated: !!user,
+    login,
+    loginWithEmail,
+    logout,
+    refreshSession,
+  }
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        session,
-        isLoading,
-        isAuthenticated: !!user,
-        login,
-        logout,
-        refreshSession,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   )
