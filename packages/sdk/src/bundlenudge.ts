@@ -4,6 +4,7 @@
  * Main SDK class - public API for React Native apps.
  */
 
+import { Platform } from 'react-native'
 import type {
   BundleNudgeConfig,
   UpdateStatus,
@@ -15,6 +16,7 @@ import { Storage } from './storage'
 import { Updater } from './updater'
 import { CrashDetector } from './crash-detector'
 import { RollbackManager } from './rollback-manager'
+import { getModuleWithFallback } from './native-module'
 
 export interface BundleNudgeCallbacks {
   onStatusChange?: (status: UpdateStatus) => void
@@ -51,16 +53,22 @@ export class BundleNudge {
 
     this.storage = new Storage()
 
+    // Initialize native module first (needed by Updater and RollbackManager)
+    const nativeModuleProxy = this.createNativeModuleProxy()
+
     this.updater = new Updater({
       storage: this.storage,
       config: this.config,
+      nativeModule: nativeModuleProxy,
       onProgress: (progress) => {
         this.callbacks.onDownloadProgress?.(progress)
       },
     })
 
     this.crashDetector = new CrashDetector(this.storage, {
-      verificationWindowMs: 60000,
+      verificationWindowMs: this.config.verificationWindowMs,
+      crashThreshold: this.config.crashThreshold,
+      crashWindowMs: this.config.crashWindowMs,
       onRollback: async () => {
         await this.rollbackManager.rollback('crash_detected')
       },
@@ -69,36 +77,26 @@ export class BundleNudge {
       },
     })
 
-    // RollbackManager will be properly initialized after native module is available
     this.rollbackManager = new RollbackManager({
       storage: this.storage,
       config: this.config,
-      nativeModule: this.createNativeModuleProxy(),
+      nativeModule: nativeModuleProxy,
     })
   }
 
-  /**
-   * Initialize the SDK.
-   * Call this in your app's entry point.
-   */
+  /** Initialize the SDK. Call this in your app's entry point. */
   static async initialize(
     config: BundleNudgeConfig,
     callbacks?: BundleNudgeCallbacks
   ): Promise<BundleNudge> {
-    if (BundleNudge.instance) {
-      return BundleNudge.instance
-    }
-
+    if (BundleNudge.instance) return BundleNudge.instance
     const instance = new BundleNudge(config, callbacks)
     await instance.init()
-
     BundleNudge.instance = instance
     return instance
   }
 
-  /**
-   * Get the singleton instance.
-   */
+  /** Get the singleton instance. */
   static getInstance(): BundleNudge {
     if (!BundleNudge.instance) {
       throw new Error('BundleNudge not initialized. Call initialize() first.')
@@ -106,26 +104,16 @@ export class BundleNudge {
     return BundleNudge.instance
   }
 
-  /**
-   * Check for updates.
-   */
+  /** Check for updates. */
   async checkForUpdate(): Promise<UpdateInfo | null> {
     this.setStatus('checking')
-
     try {
       const result = await this.updater.checkForUpdate()
-
       if (result.updateAvailable && result.update) {
         this.setStatus('update-available')
         this.callbacks.onUpdateAvailable?.(result.update)
         return result.update
       }
-
-      if (result.requiresAppStoreUpdate) {
-        // Handle app store update required
-        // Could trigger a callback here
-      }
-
       this.setStatus('up-to-date')
       return null
     } catch (error) {
@@ -135,17 +123,12 @@ export class BundleNudge {
     }
   }
 
-  /**
-   * Download and install an update.
-   */
+  /** Download and install an update. */
   async downloadAndInstall(update: UpdateInfo): Promise<void> {
     this.setStatus('downloading')
-
     try {
       await this.updater.downloadAndInstall(update)
       this.setStatus('installing')
-
-      // If immediate mode, restart now
       if (this.config.installMode === 'immediate') {
         await this.restartApp()
       } else {
@@ -158,65 +141,38 @@ export class BundleNudge {
     }
   }
 
-  /**
-   * Sync: check for update and install if available.
-   * Convenience method combining checkForUpdate and downloadAndInstall.
-   */
+  /** Sync: check for update and install if available. */
   async sync(): Promise<void> {
     const update = await this.checkForUpdate()
-
-    if (update) {
-      await this.downloadAndInstall(update)
-    }
+    if (update) await this.downloadAndInstall(update)
   }
 
-  /**
-   * Notify the SDK that the app is ready.
-   * Call this after your main UI has rendered.
-   */
+  /** Notify the SDK that the app is ready. Call after main UI renders. */
   async notifyAppReady(): Promise<void> {
     await this.crashDetector.notifyAppReady()
     await this.nativeModule?.notifyAppReady()
   }
 
-  /**
-   * Restart the app to apply pending update.
-   */
+  /** Restart the app to apply pending update. */
   async restartApp(): Promise<void> {
     await this.nativeModule?.restartApp(true)
   }
 
-  /**
-   * Clear all downloaded updates.
-   */
+  /** Clear all downloaded updates. */
   async clearUpdates(): Promise<void> {
     await this.nativeModule?.clearUpdates()
   }
 
-  /**
-   * Get current update status.
-   */
-  getStatus(): UpdateStatus {
-    return this.status
-  }
+  /** Get current update status. */
+  getStatus(): UpdateStatus { return this.status }
 
-  /**
-   * Get current bundle version.
-   */
-  getCurrentVersion(): string | null {
-    return this.storage.getCurrentVersion()
-  }
+  /** Get current bundle version. */
+  getCurrentVersion(): string | null { return this.storage.getCurrentVersion() }
 
-  /**
-   * Check if rollback is available.
-   */
-  canRollback(): boolean {
-    return this.rollbackManager.canRollback()
-  }
+  /** Check if rollback is available. */
+  canRollback(): boolean { return this.rollbackManager.canRollback() }
 
-  /**
-   * Manually trigger rollback.
-   */
+  /** Manually trigger rollback. */
   async rollback(): Promise<void> {
     await this.rollbackManager.rollback('manual')
   }
@@ -250,7 +206,8 @@ export class BundleNudge {
   }
 
   private async registerDevice(): Promise<void> {
-    const apiUrl = this.config.apiUrl || 'https://api.bundlenudge.com'
+    const apiUrl = this.config.apiUrl ?? 'https://api.bundlenudge.com'
+    const nativeConfig = await this.nativeModule?.getConfiguration()
 
     const response = await fetch(`${apiUrl}/v1/devices/register`, {
       method: 'POST',
@@ -258,16 +215,16 @@ export class BundleNudge {
       body: JSON.stringify({
         appId: this.config.appId,
         deviceId: this.storage.getDeviceId(),
-        platform: 'ios', // TODO: Get from native
-        appVersion: '1.0.0', // TODO: Get from native
+        platform: Platform.OS,
+        appVersion: nativeConfig?.appVersion ?? '1.0.0',
       }),
     })
 
     if (!response.ok) {
-      throw new Error(`Device registration failed: ${response.status}`)
+      throw new Error(`Device registration failed: ${String(response.status)}`)
     }
 
-    const data: DeviceRegisterResponse = await response.json()
+    const data = (await response.json()) as DeviceRegisterResponse
     await this.storage.setAccessToken(data.accessToken)
   }
 
@@ -277,14 +234,8 @@ export class BundleNudge {
   }
 
   private createNativeModuleProxy(): NativeModuleInterface {
-    // Proxy that will forward to actual native module when available
-    return {
-      getConfiguration: async () => ({ appVersion: '1.0.0', buildNumber: '1', bundleId: 'unknown' }),
-      getCurrentBundleInfo: async () => null,
-      getBundlePath: async () => null,
-      notifyAppReady: async () => true,
-      restartApp: async () => true,
-      clearUpdates: async () => true,
-    }
+    const { module } = getModuleWithFallback()
+    this.nativeModule = module
+    return module
   }
 }

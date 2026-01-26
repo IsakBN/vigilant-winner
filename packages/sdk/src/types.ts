@@ -25,6 +25,15 @@ export interface BundleNudgeConfig {
 
   /** Minimum seconds between update checks (default: 60) */
   minimumCheckInterval?: number
+
+  /** Verification window in ms (default: 60000 = 60 seconds) */
+  verificationWindowMs?: number
+
+  /** Number of crashes before rollback (default: 3) */
+  crashThreshold?: number
+
+  /** Time window for crash counting in ms (default: 10000 = 10 seconds) */
+  crashWindowMs?: number
 }
 
 export type UpdateStatus =
@@ -58,18 +67,9 @@ export interface UpdateCheckResult {
   update?: UpdateInfo
 }
 
-export interface StoredMetadata {
-  deviceId: string
-  accessToken: string | null
-  currentVersion: string | null
-  currentVersionHash: string | null
-  previousVersion: string | null
-  pendingVersion: string | null
-  pendingUpdateFlag: boolean
-  lastCheckTime: number | null
-  crashCount: number
-  lastCrashTime: number | null
-}
+// StoredMetadata is now defined in storage.ts using Zod schema
+// Re-export for backward compatibility
+export type { StoredMetadata } from './storage'
 
 export interface NativeModuleInterface {
   getConfiguration(): Promise<{
@@ -92,4 +92,12 @@ export interface NativeModuleInterface {
   restartApp(onlyIfUpdateIsPending: boolean): Promise<boolean>
 
   clearUpdates(): Promise<boolean>
+
+  /**
+   * Save a bundle to native filesystem storage.
+   * @param version - The version identifier for the bundle
+   * @param bundleData - Base64 encoded bundle data
+   * @returns The path where the bundle was saved
+   */
+  saveBundleToStorage(version: string, bundleData: string): Promise<string>
 }

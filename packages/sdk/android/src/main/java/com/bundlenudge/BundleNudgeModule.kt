@@ -2,6 +2,7 @@ package com.bundlenudge
 
 import android.content.Context
 import android.os.Build
+import android.util.Base64
 import android.util.Log
 import com.facebook.react.ReactApplication
 import com.facebook.react.bridge.*
@@ -272,6 +273,68 @@ class BundleNudgeModule(reactContext: ReactApplicationContext) : ReactContextBas
         } catch (e: Exception) {
             Log.e(TAG, "Failed to clear updates: ${e.message}")
             promise.reject("E_CLEAR_ERROR", "Failed to clear updates: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Regex pattern for valid version strings (alphanumeric, dots, hyphens, underscores only)
+     */
+    private val versionPattern = Regex("^[a-zA-Z0-9._-]+$")
+
+    /**
+     * Sanitize version string to prevent path traversal attacks
+     */
+    private fun sanitizeVersion(version: String): String {
+        return version
+            .replace(Regex("[/\\\\]"), "_")
+            .replace("..", "")
+    }
+
+    /**
+     * Validate version string matches expected pattern
+     */
+    private fun isValidVersion(version: String): Boolean {
+        return versionPattern.matches(version)
+    }
+
+    /**
+     * Save a bundle to native filesystem storage
+     * @param version The version identifier for the bundle
+     * @param bundleData Base64 encoded bundle data
+     */
+    @ReactMethod
+    fun saveBundleToStorage(version: String, bundleData: String, promise: Promise) {
+        try {
+            // Sanitize version to prevent path traversal
+            val sanitizedVersion = sanitizeVersion(version)
+
+            // Validate version format
+            if (!isValidVersion(sanitizedVersion)) {
+                Log.e(TAG, "Invalid version format: $version")
+                promise.reject("E_INVALID_VERSION", "Invalid version format. Only alphanumeric, dots, hyphens, and underscores allowed.", null)
+                return
+            }
+
+            // Decode base64 data
+            val data = Base64.decode(bundleData, Base64.DEFAULT)
+
+            // Create bundle directory path: bundlenudge/bundles/{version}/
+            val bundleDir = File(getBundleNudgePath(reactApplicationContext), "$BUNDLES_DIR/$sanitizedVersion")
+
+            // Create directory if it doesn't exist
+            if (!bundleDir.exists()) {
+                bundleDir.mkdirs()
+            }
+
+            // Write bundle to file
+            val bundleFile = File(bundleDir, "bundle.js")
+            bundleFile.writeBytes(data)
+
+            Log.d(TAG, "Bundle saved to: ${bundleFile.absolutePath}")
+            promise.resolve(bundleFile.absolutePath)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save bundle: ${e.message}")
+            promise.reject("E_SAVE_ERROR", "Failed to save bundle: ${e.message}", e)
         }
     }
 

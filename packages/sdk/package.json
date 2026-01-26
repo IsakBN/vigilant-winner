@@ -26,13 +26,16 @@
     "android"
   ],
   "peerDependencies": {
+    "@react-native-async-storage/async-storage": ">=1.19.0",
     "react": ">=18.0.0",
     "react-native": ">=0.72.0"
   },
   "dependencies": {
-    "@bundlenudge/shared": "workspace:*"
+    "@bundlenudge/shared": "workspace:*",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@react-native-async-storage/async-storage": "^1.23.0",
     "@types/react": "^18.2.0",
     "@types/react-native": "^0.72.0",
     "tsup": "^8.0.0",

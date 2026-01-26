@@ -7,9 +7,24 @@
 
 import type { Storage } from './storage'
 
+/** Default number of crashes before triggering rollback */
+export const DEFAULT_CRASH_THRESHOLD = 3
+
+/** Default time window for crash counting (10 seconds) */
+export const DEFAULT_CRASH_WINDOW_MS = 10_000
+
+/** Default verification window (60 seconds) */
+export const DEFAULT_VERIFICATION_WINDOW_MS = 60_000
+
 export interface CrashDetectorConfig {
   /** Verification window in ms (default: 60000 = 60 seconds) */
   verificationWindowMs?: number
+
+  /** Number of crashes before rollback (default: 3) */
+  crashThreshold?: number
+
+  /** Time window for crash counting in ms (default: 10000 = 10 seconds) */
+  crashWindowMs?: number
 
   /** Callback when rollback is needed */
   onRollback: () => Promise<void>
@@ -34,10 +49,18 @@ export class CrashDetector {
 
   /**
    * Check for crash on app start.
-   * If we crashed after an update, trigger rollback.
+   * If we crashed after an update within the time window and
+   * exceed the threshold, trigger rollback.
    */
   async checkForCrash(): Promise<boolean> {
     const metadata = this.storage.getMetadata()
+    const threshold = this.config.crashThreshold ?? DEFAULT_CRASH_THRESHOLD
+    const windowMs = this.config.crashWindowMs ?? DEFAULT_CRASH_WINDOW_MS
+
+    // Check if we have a previous version to rollback to
+    if (!metadata.previousVersion) {
+      return false
+    }
 
     // If we have a pending update flag but no pending version,
     // it means we crashed before applying the update properly
@@ -45,19 +68,25 @@ export class CrashDetector {
       return false // No crash, just incomplete state
     }
 
-    // If we have a previous version and the app didn't call notifyAppReady
-    // within the verification window, it likely crashed
-    if (metadata.previousVersion && metadata.crashCount > 0) {
-      // Record crash
+    // Check if last crash was within the window
+    const now = Date.now()
+    const lastCrashTime = metadata.lastCrashTime
+
+    if (lastCrashTime && (now - lastCrashTime) < windowMs) {
+      // Crash within window - increment and check threshold
       const crashCount = await this.storage.recordCrash()
 
       if (this.config.onCrashReported) {
         this.config.onCrashReported(crashCount)
       }
 
-      // Trigger rollback on first crash
-      await this.config.onRollback()
-      return true
+      if (crashCount >= threshold) {
+        await this.config.onRollback()
+        return true
+      }
+    } else if (lastCrashTime) {
+      // Crash outside window - reset count
+      await this.storage.clearCrashCount()
     }
 
     return false
@@ -78,10 +107,10 @@ export class CrashDetector {
     }
 
     this.isVerifying = true
-    const windowMs = this.config.verificationWindowMs ?? 60000
+    const windowMs = this.config.verificationWindowMs ?? DEFAULT_VERIFICATION_WINDOW_MS
 
     this.verificationTimer = setTimeout(() => {
-      this.handleVerificationTimeout()
+      void this.handleVerificationTimeout()
     }, windowMs)
   }
 

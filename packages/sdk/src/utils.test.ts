@@ -1,9 +1,86 @@
-import { describe, it, expect } from 'vitest'
+/* eslint-disable @typescript-eslint/unbound-method */
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { generateDeviceId, compareSemver, retry, sleep } from './utils'
 
 describe('utils', () => {
   describe('generateDeviceId', () => {
-    it('generates a valid UUID v4 format', () => {
+    const originalCrypto = globalThis.crypto
+
+    afterEach(() => {
+      // Restore original crypto
+      Object.defineProperty(globalThis, 'crypto', {
+        value: originalCrypto,
+        writable: true,
+        configurable: true,
+      })
+    })
+
+    it('uses crypto.randomUUID when available', () => {
+      const mockUUID = '550e8400-e29b-41d4-a716-446655440000'
+      Object.defineProperty(globalThis, 'crypto', {
+        value: {
+          randomUUID: vi.fn(() => mockUUID),
+          getRandomValues: vi.fn(),
+        },
+        writable: true,
+        configurable: true,
+      })
+
+      const deviceId = generateDeviceId()
+      expect(deviceId).toBe(mockUUID)
+      expect(globalThis.crypto.randomUUID).toHaveBeenCalled()
+    })
+
+    it('falls back to crypto.getRandomValues when randomUUID unavailable', () => {
+      Object.defineProperty(globalThis, 'crypto', {
+        value: {
+          randomUUID: undefined,
+          getRandomValues: vi.fn((arr: Uint8Array) => {
+            // Fill with predictable values for testing
+            for (let i = 0; i < arr.length; i++) {
+              arr[i] = i * 16 + i
+            }
+            return arr
+          }),
+        },
+        writable: true,
+        configurable: true,
+      })
+
+      const deviceId = generateDeviceId()
+      // Should be a valid UUID v4 format
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      expect(deviceId).toMatch(uuidRegex)
+      expect(globalThis.crypto.getRandomValues).toHaveBeenCalled()
+    })
+
+    it('throws error when no crypto available', () => {
+      Object.defineProperty(globalThis, 'crypto', {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      })
+
+      expect(() => generateDeviceId()).toThrow(
+        'crypto.randomUUID or crypto.getRandomValues required for secure device ID generation'
+      )
+    })
+
+    it('throws error when crypto exists but has no secure methods', () => {
+      Object.defineProperty(globalThis, 'crypto', {
+        value: {},
+        writable: true,
+        configurable: true,
+      })
+
+      expect(() => generateDeviceId()).toThrow(
+        'crypto.randomUUID or crypto.getRandomValues required for secure device ID generation'
+      )
+    })
+
+    it('generates valid UUID v4 format with native crypto', () => {
+      // Use real crypto (should be available in test environment)
       const deviceId = generateDeviceId()
       const uuidRegex =
         /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -54,19 +131,19 @@ describe('utils', () => {
 
   describe('retry', () => {
     it('returns result on first success', async () => {
-      const fn = async () => 'success'
+      const fn = (): Promise<string> => Promise.resolve('success')
       const result = await retry(fn)
       expect(result).toBe('success')
     })
 
     it('retries on failure', async () => {
       let attempts = 0
-      const fn = async () => {
+      const fn = (): Promise<string> => {
         attempts++
         if (attempts < 3) {
-          throw new Error('fail')
+          return Promise.reject(new Error('fail'))
         }
-        return 'success'
+        return Promise.resolve('success')
       }
 
       const result = await retry(fn, { baseDelayMs: 10 })
@@ -75,9 +152,7 @@ describe('utils', () => {
     })
 
     it('throws after max attempts', async () => {
-      const fn = async () => {
-        throw new Error('always fails')
-      }
+      const fn = (): Promise<never> => Promise.reject(new Error('always fails'))
 
       await expect(
         retry(fn, { maxAttempts: 2, baseDelayMs: 10 })

@@ -240,6 +240,73 @@ class BundleNudge: NSObject, RCTBridgeModule {
         }
     }
 
+    // MARK: - Version Validation
+
+    /// Regex pattern for valid version strings (alphanumeric, dots, hyphens, underscores only)
+    private static let versionPattern = "^[a-zA-Z0-9._-]+$"
+
+    /// Sanitize version string to prevent path traversal attacks
+    private func sanitizeVersion(_ version: String) -> String {
+        return version
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "\\", with: "_")
+            .replacingOccurrences(of: "..", with: "")
+    }
+
+    /// Validate version string matches expected pattern
+    private func isValidVersion(_ version: String) -> Bool {
+        guard let regex = try? NSRegularExpression(pattern: BundleNudge.versionPattern) else {
+            return false
+        }
+        let range = NSRange(location: 0, length: version.utf16.count)
+        return regex.firstMatch(in: version, range: range) != nil
+    }
+
+    @objc
+    func saveBundleToStorage(_ version: String,
+                              bundleData: String,
+                              resolve: @escaping RCTPromiseResolveBlock,
+                              reject: @escaping RCTPromiseRejectBlock) {
+        do {
+            // Sanitize version to prevent path traversal
+            let sanitizedVersion = sanitizeVersion(version)
+
+            // Validate version format
+            guard isValidVersion(sanitizedVersion) else {
+                NSLog("[BundleNudge] Invalid version format: %@", version)
+                reject("E_INVALID_VERSION", "Invalid version format. Only alphanumeric, dots, hyphens, and underscores allowed.", nil)
+                return
+            }
+
+            // Decode base64 data
+            guard let data = Data(base64Encoded: bundleData) else {
+                reject("E_DECODE_FAILED", "Failed to decode base64 bundle data", nil)
+                return
+            }
+
+            // Create bundle directory path: bundlenudge/bundles/{version}/
+            let bundleDir = (BundleNudge.bundleNudgePath() as NSString)
+                .appendingPathComponent(BundleNudge.bundlesDirectory)
+                .appending("/\(sanitizedVersion)")
+
+            // Create directory if it doesn't exist
+            try FileManager.default.createDirectory(
+                atPath: bundleDir,
+                withIntermediateDirectories: true
+            )
+
+            // Write bundle to file
+            let bundlePath = (bundleDir as NSString).appendingPathComponent("bundle.js")
+            try data.write(to: URL(fileURLWithPath: bundlePath))
+
+            NSLog("[BundleNudge] Bundle saved to: %@", bundlePath)
+            resolve(bundlePath)
+        } catch {
+            NSLog("[BundleNudge] Failed to save bundle: %@", error.localizedDescription)
+            reject("E_SAVE_FAILED", "Failed to save bundle: \(error.localizedDescription)", error)
+        }
+    }
+
     // MARK: - Private Static Helpers
 
     private static func getCurrentBundlePath() -> String? {

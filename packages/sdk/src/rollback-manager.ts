@@ -91,7 +91,7 @@ export class RollbackManager {
     fromVersion: string | null,
     toVersion: string
   ): Promise<void> {
-    const apiUrl = this.config.apiUrl || 'https://api.bundlenudge.com'
+    const apiUrl = this.config.apiUrl ?? 'https://api.bundlenudge.com'
     const accessToken = this.storage.getAccessToken()
 
     try {

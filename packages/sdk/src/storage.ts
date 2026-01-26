@@ -4,8 +4,28 @@
  * Manages SDK metadata persistence using AsyncStorage.
  */
 
-import type { StoredMetadata } from './types'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { z } from 'zod'
 import { generateDeviceId } from './utils'
+
+/**
+ * Zod schema for stored metadata validation.
+ * Validates data loaded from AsyncStorage to ensure integrity.
+ */
+const storedMetadataSchema = z.object({
+  deviceId: z.string().min(1),
+  accessToken: z.string().nullable(),
+  currentVersion: z.string().nullable(),
+  currentVersionHash: z.string().nullable(),
+  previousVersion: z.string().nullable(),
+  pendingVersion: z.string().nullable(),
+  pendingUpdateFlag: z.boolean(),
+  lastCheckTime: z.number().nullable(),
+  crashCount: z.number().int().min(0).max(100), // Cap at 100
+  lastCrashTime: z.number().nullable(),
+})
+
+export type StoredMetadata = z.infer<typeof storedMetadataSchema>
 
 const STORAGE_KEY = '@bundlenudge:metadata'
 
@@ -14,19 +34,31 @@ export class Storage {
 
   /**
    * Initialize storage and load existing metadata.
+   * Uses Zod validation to ensure data integrity.
    */
   async initialize(): Promise<void> {
     try {
       const stored = await this.getItem(STORAGE_KEY)
       if (stored) {
-        this.metadata = JSON.parse(stored)
+        const parsed: unknown = JSON.parse(stored)
+        const result = storedMetadataSchema.safeParse(parsed)
+
+        if (result.success) {
+          this.metadata = result.data
+        } else {
+          // Schema validation failed - corrupted metadata, reset
+          console.warn('[BundleNudge] Corrupted metadata detected, resetting')
+          this.metadata = this.getDefaultMetadata()
+          await this.persist()
+        }
       } else {
         // First launch - generate device ID
         this.metadata = this.getDefaultMetadata()
         await this.persist()
       }
     } catch {
-      // Corrupted storage - reset
+      // JSON parse error or storage error - reset
+      console.warn('[BundleNudge] Storage error, resetting to defaults')
       this.metadata = this.getDefaultMetadata()
       await this.persist()
     }
@@ -181,13 +213,27 @@ export class Storage {
     await this.setItem(STORAGE_KEY, JSON.stringify(this.metadata))
   }
 
-  // Abstract storage methods - will be implemented with AsyncStorage
-  private async getItem(_key: string): Promise<string | null> {
-    // TODO: Use AsyncStorage
-    return null
+  /**
+   * Get item from AsyncStorage.
+   */
+  private async getItem(key: string): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem(key)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      throw new Error(`Failed to read from storage: ${message}`)
+    }
   }
 
-  private async setItem(_key: string, _value: string): Promise<void> {
-    // TODO: Use AsyncStorage
+  /**
+   * Set item in AsyncStorage.
+   */
+  private async setItem(key: string, value: string): Promise<void> {
+    try {
+      await AsyncStorage.setItem(key, value)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      throw new Error(`Failed to write to storage: ${message}`)
+    }
   }
 }

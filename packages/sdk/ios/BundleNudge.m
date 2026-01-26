@@ -28,4 +28,9 @@ RCT_EXTERN_METHOD(restartApp:(BOOL)onlyIfUpdateIsPending
 RCT_EXTERN_METHOD(clearUpdates:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(saveBundleToStorage:(NSString *)version
+                  bundleData:(NSString *)bundleData
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
 @end

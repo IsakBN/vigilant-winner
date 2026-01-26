@@ -4,15 +4,29 @@
 
 /**
  * Generate a unique device ID.
- * Uses UUID v4 format.
+ * Uses cryptographically secure UUID v4 format.
  */
 export function generateDeviceId(): string {
-  // Simple UUID v4 implementation
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0
-    const v = c === 'x' ? r : (r & 0x3) | 0x8
-    return v.toString(16)
-  })
+  // Use crypto.randomUUID if available (modern environments)
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+
+  // Fallback to crypto.getRandomValues (RFC4122 compliant UUID v4)
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = new Uint8Array(16)
+    crypto.getRandomValues(bytes)
+    bytes[6] = (bytes[6] & 0x0f) | 0x40 // Version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80 // Variant 1
+
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+  }
+
+  // Throw error if no secure source available
+  throw new Error(
+    'crypto.randomUUID or crypto.getRandomValues required for secure device ID generation'
+  )
 }
 
 /**
@@ -46,13 +60,13 @@ export async function retry<T>(
 ): Promise<T> {
   const { maxAttempts = 3, baseDelayMs = 1000, maxDelayMs = 30000 } = options
 
-  let lastError: Error | undefined
+  let lastError: Error = new Error('Retry failed')
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await fn()
     } catch (error) {
-      lastError = error as Error
+      lastError = error instanceof Error ? error : new Error(String(error))
 
       if (attempt === maxAttempts) {
         break
@@ -85,4 +99,22 @@ export function compareSemver(a: string, b: string): number {
   }
 
   return 0
+}
+
+/**
+ * Convert ArrayBuffer to base64 string.
+ * Used for passing binary data to native modules.
+ */
+export function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  const chunkSize = 8192 // Process in chunks to avoid call stack issues
+
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length))
+    binary += String.fromCharCode.apply(null, Array.from(chunk))
+  }
+
+  // Use btoa which is available in React Native via JavaScriptCore/Hermes
+  return btoa(binary)
 }
