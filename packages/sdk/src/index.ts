@@ -66,3 +66,28 @@ export type {
   EndpointHealthCheckResult,
   HealthCheckServiceConfig,
 } from './health-check'
+
+// Crash reporter integrations
+export {
+  tagCrashReporters,
+  tagSentry,
+  tagBugsnag,
+  tagCrashlytics,
+  clearCrashReporterTags,
+} from './integrations'
+export type { ReleaseMetadata, TaggingResult } from './integrations'
+
+// Metrics tracking
+export { MetricsTracker } from './metrics'
+export { startSessionTracking } from './metrics'
+export type {
+  MetricEventType,
+  MetricEvent,
+  VariantInfo,
+  MetricsConfig,
+} from './metrics'
+
+// Background/preload downloads
+export { PreloadManager, preloadUpdate } from './background'
+export { getDeviceConditions, shouldDownload } from './background'
+export type { DeviceConditions, PreloadConfig, PreloadResult } from './background'
