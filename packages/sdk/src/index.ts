@@ -91,3 +91,36 @@ export type {
 export { PreloadManager, preloadUpdate } from './background'
 export { getDeviceConditions, shouldDownload } from './background'
 export type { DeviceConditions, PreloadConfig, PreloadResult } from './background'
+
+// Upload client (CLI/CI)
+export { UploadClient, uploadBundle } from './upload'
+export type {
+  UploadConfig,
+  UploadOptions,
+  UploadResult,
+  UploadJobStatus,
+} from './upload'
+
+// Debug utilities
+export {
+  setDebugEnabled,
+  isDebugEnabled,
+  logDebug,
+  logInfo,
+  logWarn,
+  logError,
+  getRecentLogs,
+  clearLogs,
+} from './debug'
+export type { LogLevel, LogEntry } from './debug'
+
+// Native helpers
+export {
+  restartApp,
+  clearAllUpdates,
+  notifyAppReady,
+  getCurrentBundlePath,
+  hasPendingUpdate,
+  getNativeInfo,
+} from './native'
+export type { RestartOptions, NativeInfo } from './native'
