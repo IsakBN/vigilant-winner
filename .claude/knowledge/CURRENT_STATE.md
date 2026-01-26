@@ -1,150 +1,181 @@
 # BundleNudge Current State
 
-> **Last Updated:** 2026-01-25
+> **Last Updated:** 2026-01-26
 >
 > This document tracks what has been built vs what remains.
 
 ---
 
-## Current Status: Wave 6 Complete - API Feature Complete!
+## Current Status: SDK Complete, Dashboard Wiring Needed
 
-**Route Coverage:** 127/127 routes (100%)
-**Test Count:** 1,446 tests
-**Agent Structure:** Hierarchical (Launch PM → Coordinators → Executors → Auditors)
+**API Routes:** 127/127 (100%)
+**API Tests:** 1,446+
+**SDK Tests:** 399
+**Shared Tests:** 144
+**Total Tests:** ~2,000
+
+---
+
+## Package Status
+
+| Package | Status | Tests | Notes |
+|---------|--------|-------|-------|
+| `@bundlenudge/api` | 95% | 1,446 | Stub routes need fixing |
+| `@bundlenudge/sdk` | 95% | 399 | Native modules need impl |
+| `@bundlenudge/shared` | 100% | 144 | Complete |
+| `dashboard` | 70% | - | UI built, needs API wiring |
+| `builder` | 20% | - | Scaffolded |
+| `worker` | 20% | - | Scaffolded |
 
 ---
 
 ## Completed Waves
 
-### Wave 1: Security Critical ✅
-| Task | Agent | Result |
-|------|-------|--------|
-| Fix rollout hash (FNV-1a) | `remediate-rollout-hash` | Fixed |
-| Add auth rate limiting | `remediate-auth-rate-limit` | Fixed |
-| Create encryption utils | `remediate-encryption-utils` | Created |
-| Encrypt GitHub tokens | `remediate-github-token-encryption` | Fixed |
-| Encrypt webhook secrets | `remediate-webhook-encryption` | Fixed |
+### API Waves 1-6 ✅
 
-### Wave 2: Core Functionality ✅
-| Task | Agent | Result |
-|------|-------|--------|
-| Implement API key middleware | `remediate-api-key-middleware` | Created |
-| Fix multi-release resolution | `remediate-multi-release-resolution` | Fixed |
-| Add pagination to list endpoints | `remediate-pagination` | Added |
-| Add project members CRUD | `remediate-project-members` | Created |
-| Switch OTP to bcrypt | `remediate-otp-bcrypt` | Fixed |
+| Wave | Description | Status |
+|------|-------------|--------|
+| Wave 1 | Security Critical (FNV-1a, rate limiting, encryption) | ✅ |
+| Wave 2 | Core Functionality (API keys, pagination, members) | ✅ |
+| Wave 3 | Schemas/Constants (auth, teams, billing) | ✅ |
+| Wave 4 | Feature Completion (channels, health, metrics) | ✅ |
+| Wave 5 | Admin System (auth, users, dashboard) | ✅ |
+| Wave 6 | Build System (iOS, Android) | ✅ |
 
-### Wave 3: Schemas/Constants ✅
-| Task | Agent | Result |
-|------|-------|--------|
-| Create auth schemas | `remediate-auth-schemas` | Created |
-| Create team schemas | `remediate-team-schemas` | Created |
-| Create billing schemas | `remediate-billing-schemas` | Created |
-| Add PLAN_LIMITS | `remediate-plan-limits` | Added |
-| Add RATE_LIMITS | `remediate-rate-limits-constants` | Added |
+### SDK Waves 4-10 ✅
 
-### Wave 4: Feature Completion ✅
-| Task | Routes | Tests |
-|------|--------|-------|
-| Channels system | 5 | 33 |
-| Health reports | 4 | 40 |
-| Advanced metrics | 4 | 40 |
-| Bundle size tracking | 2 | 30 |
-| Device management | 7 | 35 |
-| Upload status | 2 | 20 |
-
-### Wave 5: Admin System ✅
-| Task | Routes | Tests |
-|------|--------|-------|
-| Admin Auth | 3 | 15 |
-| Admin Users | 4 | 24 |
-| Admin Dashboard | 3 | 45 |
-| Admin Subscriptions | 4 | 20 |
-
-### Wave 6: Build System ✅
-| Task | Routes | Tests |
-|------|--------|-------|
-| iOS Builds | 4 | 45 |
-| Android Builds | 4 | 47 |
+| Wave | Description | Tests | Status |
+|------|-------------|-------|--------|
+| Wave 4 | Server-side delta patching (API) | 63 | ✅ |
+| Wave 5 | React hooks + setup utilities | - | ✅ |
+| Wave 6 | Crash reporters, metrics, background | - | ✅ |
+| Wave 7 | Upload, debug, native helpers | 45 | ✅ |
+| Wave 8 | Device targeting + variants | 42 | ✅ |
+| Wave 9 | Update constraints | 87 | ✅ |
+| Wave 10 | Expo config plugin | - | ✅ |
 
 ---
 
-## API Feature Complete!
+## SDK Feature Completion
 
-All API routes implemented. Next phase: Dashboard + SDK
-
----
-
-## Route Statistics
-
-| Category | Legacy | Current | Gap |
-|----------|--------|---------|-----|
-| Apps | 14 | 13 | 93% ✅ |
-| Releases | 15 | 10 | 67% |
-| Devices | 12 | 11 | 92% ✅ |
-| Updates | 3 | 1 | 33% |
-| Telemetry | 5 | 3 | 60% |
-| Teams | 18 | 17 | 94% ✅ |
-| Auth | 8 | 5 | 63% |
-| Subscriptions | 8 | 6 | 75% |
-| Webhooks | 9 | 7 | 78% |
-| Integrations | 8 | 6 | 75% |
-| GitHub | 10 | 7 | 70% |
-| Channels | 6 | 5 | 83% ✅ |
-| Health | 4 | 4 | 100% ✅ |
-| Metrics | 4 | 4 | 100% ✅ |
-| Bundles | 2 | 2 | 100% ✅ |
-| Uploads | 2 | 2 | 100% ✅ |
-| Admin | 14 | 14 | 100% ✅ |
-| Builds | 8 | 8 | 100% ✅ |
-| **Total** | 127 | 127 | 100% ✅ |
+| Feature | BundleNudge | CodePush | Status |
+|---------|-------------|----------|--------|
+| Core update flow | ✅ | ✅ | Done |
+| Crash-based rollback | ✅ | ✅ | Done |
+| Health monitoring | ✅ | ✅ | Done |
+| Endpoint health checks | ✅ | ✅ | Done |
+| Delta patching | ✅ | ✅ | Done (server-side) |
+| React hooks | ✅ | ✅ | Done |
+| Setup utilities | ✅ | ✅ | Done |
+| Crash reporter integration | ✅ | ✅ | Done (Sentry, Bugsnag, Crashlytics) |
+| Metrics & A/B testing | ✅ | ✅ | Done |
+| Background downloads | ✅ | ✅ | Done |
+| Upload system | ✅ | ✅ | Done |
+| Device targeting | ✅ | ✅ | Done |
+| Version constraints | ✅ | ✅ | Done |
+| Expo plugin | ✅ | ❌ | Done |
+| Native modules | 🟡 | ✅ | Stubs only |
 
 ---
 
-## Test Coverage
+## Known Issues
 
-| Package | Tests | Status |
-|---------|-------|--------|
-| API | 1,446 | ✅ |
-| Shared | 144 | ✅ |
-| SDK | ~20 | 🟡 |
-| **Total** | 1,610+ | Complete |
+### 1. API Stub Routes (HIGH)
+**Problem:** Main API uses stub routes instead of real implementations
+```
+packages/api/src/routes/devices.ts     → STUB (returns placeholder)
+packages/api/src/routes/releases.ts    → STUB (returns empty)
+```
+**Real implementations exist at:**
+```
+packages/api/src/routes/devices/index.ts   → 348 lines
+packages/api/src/routes/releases/index.ts  → 424 lines
+```
+**Fix:** Update imports in `packages/api/src/index.ts`
+
+### 2. Dashboard Mock Data (MEDIUM)
+**Problem:** Some dashboard pages use mock data instead of API hooks
+**Location:** `packages/dashboard/src/app/(main)/dashboard/[accountId]/apps/[appId]/page.tsx`
+```typescript
+const mockReleases: Release[] = []  // Mock releases data
+```
+**Fix:** Replace with `useReleases()` hook
+
+### 3. Native Modules (LOW)
+**Problem:** SDK uses fallback stubs when native module unavailable
+**Status:** Expected behavior for dev/Expo Go, but real native code needed for production
+**Fix:** Implement iOS Swift + Android Kotlin modules
+
+---
+
+## What Remains
+
+### Immediate (Wave 11)
+- [ ] Fix API route imports (5 min)
+- [ ] Update SDK_PHASE_PLAN.md (10 min)
+
+### Short-term (Wave 12)
+- [ ] Wire dashboard to real API (2-4 hrs)
+- [ ] Remove all mock data from dashboard
+- [ ] Add useReleases hook usage
+
+### Medium-term
+- [ ] Implement native iOS module (Swift)
+- [ ] Implement native Android module (Kotlin)
+- [ ] End-to-end testing
+- [ ] Documentation update
+
+### Long-term
+- [ ] Builder package implementation
+- [ ] Worker package implementation
+- [ ] CI/CD pipeline
+- [ ] Production deployment
+
+---
+
+## Test Coverage Summary
+
+| Package | Test Files | Tests | Status |
+|---------|------------|-------|--------|
+| API | 40+ | 1,446 | ✅ |
+| SDK | 21 | 399 | ✅ |
+| Shared | 5 | 144 | ✅ |
+| Dashboard | 0 | 0 | 🟡 |
+| **Total** | 66+ | ~2,000 | ✅ |
 
 ---
 
 ## Quality Metrics
 
-| Metric | Before Remediation | After Wave 4 |
-|--------|-------------------|--------------|
-| Critical security bugs | 5 | 0 ✅ |
-| Missing rate limiting | All auth | None ✅ |
-| Unencrypted secrets | 2 systems | 0 ✅ |
-| Broken hash | Yes | Fixed ✅ |
-| Missing schemas | 3 categories | 0 ✅ |
-| Missing constants | 2 categories | 0 ✅ |
-| Route coverage | 70% | 100% ✅ |
-| Test count | 1,012 | 1,610 ✅ |
+| Metric | Status |
+|--------|--------|
+| TypeScript strict mode | ✅ All packages |
+| ESLint clean | ✅ All packages |
+| No `any` types | ✅ Enforced |
+| Test coverage | ✅ ~2,000 tests |
+| Security audit | ✅ Passed (encryption, rate limiting) |
 
 ---
 
-## Critical Path
+## Overall Progress: ~75%
 
-1. ✅ Phase 0-5 features (24 features) - DONE
-2. ✅ Wave 1-3 Remediation - DONE
-3. ✅ Wave 4: Feature Completion - DONE
-4. ✅ Wave 5: Admin System - DONE
-5. ✅ **Wave 6: Build System** - DONE
-6. 🔄 **Wave 7: Dashboard + SDK** ← NEXT
+```
+API Backend     ████████████████████░░░░  95%
+SDK             ████████████████████░░░░  95%
+Shared          ████████████████████████  100%
+Dashboard UI    █████████████████░░░░░░░  85%
+Dashboard API   ████████░░░░░░░░░░░░░░░░  40%
+Native Modules  ██░░░░░░░░░░░░░░░░░░░░░░  10%
+Docs            ██████░░░░░░░░░░░░░░░░░░  30%
+─────────────────────────────────────────
+Overall         ██████████████████░░░░░░  75%
+```
 
 ---
 
-## Lessons Learned (Updated)
+## Next Steps
 
-1. **Use hierarchical agents** - PM → Coordinators → Executors → Auditors
-2. **Always run auditors** - Security, Performance, Integration after each wave
-3. **GO/NO-GO gates** - Don't proceed without passing audits
-4. **Quality over speed** - Better to fix early than debug in production
-5. **Document agent work** - Track who built what with `@agent` attribution
-6. **Semantic understanding** - Know WHAT we're building, not just HOW
-7. **Resource management** - Run tests sequentially on limited RAM machines
-8. **Fix lint/type errors immediately** - Don't let them accumulate
+1. **Fix stub routes** → API fully functional
+2. **Wire dashboard** → Full user experience
+3. **Native modules** → Production-ready SDK
+4. **Deploy & test** → End-to-end validation
