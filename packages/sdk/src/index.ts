@@ -124,3 +124,19 @@ export {
   getNativeInfo,
 } from './native'
 export type { RestartOptions, NativeInfo } from './native'
+
+// Targeting & variants
+export {
+  collectDeviceInfo,
+  collectOsVersion,
+  collectLocale,
+  collectTimezone,
+  collectDeviceModel,
+  createVariantManager,
+  getVariant,
+  setVariant,
+  clearVariant,
+  isControlGroup,
+  loadVariant,
+} from './targeting'
+export type { VariantManager } from './targeting'
