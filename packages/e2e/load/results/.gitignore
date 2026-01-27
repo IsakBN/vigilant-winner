@@ -1,0 +1,5 @@
+# Ignore generated test results
+*.json
+
+# Keep this file
+!.gitignore
