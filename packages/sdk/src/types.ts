@@ -100,4 +100,11 @@ export interface NativeModuleInterface {
    * @returns The path where the bundle was saved
    */
   saveBundleToStorage(version: string, bundleData: string): Promise<string>
+
+  /**
+   * Calculate SHA-256 hash of a file.
+   * @param path - Absolute path to the file
+   * @returns Hex-encoded SHA-256 hash (64 characters)
+   */
+  hashFile(path: string): Promise<string>
 }

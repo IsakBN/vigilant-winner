@@ -23,6 +23,7 @@ export interface AppStats {
 
 export interface AppWithStats extends App {
   stats: AppStats
+  apiKey?: string | null // Only returned when app is first created or regenerated
 }
 
 interface UpdateAppInput {

@@ -29,7 +29,18 @@ const BCRYPT_PREFIX = '$2'
 const createInvitationSchema = z.object({
   email: z.string().email(),
   role: z.enum(['admin', 'member']).default('member'),
-})
+  scope: z.enum(['full', 'projects']).default('full'),
+  projectIds: z.array(z.string().uuid()).optional(),
+}).refine(
+  (data) => {
+    // projectIds required when scope='projects', forbidden when scope='full'
+    if (data.scope === 'projects') {
+      return Array.isArray(data.projectIds) && data.projectIds.length > 0
+    }
+    return data.projectIds === undefined || data.projectIds.length === 0
+  },
+  { message: 'projectIds required for scope=projects, forbidden for scope=full' }
+)
 
 const verifyInvitationSchema = z.object({
   email: z.string().email(),
@@ -65,7 +76,7 @@ invitationsRouter.get('/:teamId/invitations', async (c) => {
   }
 
   const results = await c.env.DB.prepare(`
-    SELECT id, email, role, invited_by, expires_at, created_at
+    SELECT id, email, role, scope, project_ids, invited_by, expires_at, created_at
     FROM team_invitations
     WHERE organization_id = ? AND accepted_at IS NULL
     ORDER BY created_at DESC
@@ -128,6 +139,22 @@ invitationsRouter.post(
       return c.json({ error: 'already_invited', message: 'Invitation already pending' }, 409)
     }
 
+    // If scope='projects', validate all project IDs belong to this team's org
+    if (body.scope === 'projects' && body.projectIds) {
+      const projectCount = await c.env.DB.prepare(`
+        SELECT COUNT(*) as count FROM apps
+        WHERE id IN (${body.projectIds.map(() => '?').join(',')})
+        AND owner_id IN (SELECT owner_id FROM organizations WHERE id = ?)
+      `).bind(...body.projectIds, teamId).first<{ count: number }>()
+
+      if (projectCount?.count !== body.projectIds.length) {
+        return c.json({
+          error: 'invalid_project_ids',
+          message: 'One or more project IDs are invalid or not in this organization',
+        }, 400)
+      }
+    }
+
     // Generate OTP
     const otp = generateOTP()
     const otpHash = await hashOTP(otp)
@@ -140,11 +167,16 @@ invitationsRouter.post(
       'SELECT name FROM organizations WHERE id = ?'
     ).bind(teamId).first<{ name: string }>()
 
-    // Create invitation
+    // Prepare projectIds JSON
+    const projectIdsJson = body.scope === 'projects' && body.projectIds
+      ? JSON.stringify(body.projectIds)
+      : null
+
+    // Create invitation with scope and projectIds
     await c.env.DB.prepare(`
       INSERT INTO team_invitations
-        (id, organization_id, email, role, token, invited_by, expires_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        (id, organization_id, email, role, token, invited_by, scope, project_ids, expires_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       invitationId,
       teamId,
@@ -152,6 +184,8 @@ invitationsRouter.post(
       body.role,
       otpHash, // Store OTP hash in token field
       userId,
+      body.scope,
+      projectIdsJson,
       expiresAt,
       now
     ).run()
@@ -165,6 +199,8 @@ invitationsRouter.post(
     await logAuditEvent(c.env.DB, teamId, userId, 'team.member_invited', {
       email: body.email,
       role: body.role,
+      scope: body.scope,
+      projectIds: body.projectIds ?? null,
     })
 
     return c.json({ success: true, invitationId }, 201)
@@ -231,6 +267,14 @@ invitationsRouter.post('/:teamId/invitations/:invitationId/resend', async (c) =>
 /**
  * DELETE /v1/teams/:teamId/invitations/:invitationId
  * Cancel invitation
+ *
+ * Permission rules:
+ * - Owner can cancel any invitation
+ * - Admins can cancel any invitation
+ * - Members CANNOT cancel invitations (they can't create them either)
+ *
+ * @agent owner-only-deletion
+ * @modified 2026-01-27
  */
 invitationsRouter.delete('/:teamId/invitations/:invitationId', async (c) => {
   const userId = c.req.header('X-User-Id')
@@ -247,19 +291,46 @@ invitationsRouter.delete('/:teamId/invitations/:invitationId', async (c) => {
     WHERE organization_id = ? AND user_id = ?
   `).bind(teamId, userId).first<{ role: string }>()
 
-  if (!membership || (membership.role !== 'owner' && membership.role !== 'admin')) {
+  if (!membership) {
+    return c.json({ error: 'not_found', message: 'Team not found' }, 404)
+  }
+
+  // Members cannot cancel invitations
+  if (membership.role === 'member') {
+    return c.json({
+      error: 'ADMIN_REQUIRED',
+      code: 'ADMIN_REQUIRED',
+      message: 'Only admins and owners can cancel invitations',
+    }, 403)
+  }
+
+  if (membership.role !== 'owner' && membership.role !== 'admin') {
     return c.json({ error: 'forbidden', message: 'Requires admin or owner role' }, 403)
   }
 
+  // Get invitation details for audit log
+  const invitation = await c.env.DB.prepare(`
+    SELECT email, role, invited_by FROM team_invitations
+    WHERE id = ? AND organization_id = ? AND accepted_at IS NULL
+  `).bind(invitationId, teamId).first<{ email: string; role: string; invited_by: string }>()
+
+  if (!invitation) {
+    return c.json({ error: 'not_found', message: 'Invitation not found' }, 404)
+  }
+
   // Delete invitation
-  const result = await c.env.DB.prepare(`
+  await c.env.DB.prepare(`
     DELETE FROM team_invitations
     WHERE id = ? AND organization_id = ? AND accepted_at IS NULL
   `).bind(invitationId, teamId).run()
 
-  if (!result.meta.changes) {
-    return c.json({ error: 'not_found', message: 'Invitation not found' }, 404)
-  }
+  // Log the cancellation
+  await logAuditEvent(c.env.DB, teamId, userId, 'team.invitation_cancelled', {
+    invitationId,
+    email: invitation.email,
+    role: invitation.role,
+    originalInviter: invitation.invited_by,
+  })
 
   return c.json({ success: true })
 })
@@ -287,8 +358,11 @@ invitationsRouter.post(
       organization_id: string
       token: string
       role: string
+      scope: 'full' | 'projects'
+      project_ids: string | null
       expires_at: number
       team_name: string
+      invited_by: string
     }>()
 
     if (!invitation) {
@@ -333,6 +407,25 @@ invitationsRouter.post(
       now
     ).run()
 
+    // If project-scoped, create member_project_access entries
+    if (invitation.scope === 'projects' && invitation.project_ids) {
+      const projectIds = JSON.parse(invitation.project_ids) as string[]
+      for (const appId of projectIds) {
+        await c.env.DB.prepare(`
+          INSERT INTO member_project_access
+            (id, organization_id, user_id, app_id, granted_by, granted_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).bind(
+          crypto.randomUUID(),
+          invitation.organization_id,
+          userId,
+          appId,
+          invitation.invited_by,
+          now
+        ).run()
+      }
+    }
+
     // Mark invitation as accepted
     await c.env.DB.prepare(`
       UPDATE team_invitations SET accepted_at = ? WHERE id = ?
@@ -342,6 +435,8 @@ invitationsRouter.post(
     await logAuditEvent(c.env.DB, invitation.organization_id, userId, 'team.member_joined', {
       email: body.email,
       role: invitation.role,
+      scope: invitation.scope,
+      projectIds: invitation.project_ids ? JSON.parse(invitation.project_ids) : null,
       invitationId: invitation.id,
     })
 
@@ -413,16 +508,30 @@ interface FormattedInvitation {
   id: unknown
   email: unknown
   role: unknown
+  scope: unknown
+  projectIds: unknown
   invitedBy: unknown
   expiresAt: unknown
   createdAt: unknown
 }
 
 function formatInvitation(inv: Record<string, unknown>): FormattedInvitation {
+  // Parse projectIds from JSON if it's a string
+  let projectIds = inv.project_ids
+  if (typeof projectIds === 'string') {
+    try {
+      projectIds = JSON.parse(projectIds)
+    } catch {
+      projectIds = null
+    }
+  }
+
   return {
     id: inv.id,
     email: inv.email,
     role: inv.role,
+    scope: inv.scope ?? 'full',
+    projectIds,
     invitedBy: inv.invited_by,
     expiresAt: inv.expires_at,
     createdAt: inv.created_at,

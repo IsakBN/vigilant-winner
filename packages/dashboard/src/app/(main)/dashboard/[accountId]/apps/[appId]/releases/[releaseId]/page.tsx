@@ -12,7 +12,8 @@ import {
     Settings,
 } from 'lucide-react'
 import { useRelease, useUpdateRelease, type ReleaseStatus } from '@/hooks/useReleases'
-import { ReleaseStats } from '@/components/releases'
+import { useRollbackReports } from '@/hooks/useRollbackReports'
+import { ReleaseStats, RollbackReports } from '@/components/releases'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -117,6 +118,7 @@ export default function ReleaseDetailPage() {
         refetchInterval: 30000,
     })
     const updateRelease = useUpdateRelease(appId, releaseId)
+    const rollbackReports = useRollbackReports(releaseId, { enabled: Boolean(release) })
 
     const basePath = `/dashboard/${accountId}/apps/${appId}`
 
@@ -357,6 +359,13 @@ export default function ReleaseDetailPage() {
                     </CardContent>
                 </Card>
             )}
+
+            {/* Rollback Reports */}
+            <RollbackReports
+                report={rollbackReports.data ?? null}
+                isLoading={rollbackReports.isLoading}
+                error={rollbackReports.error instanceof Error ? rollbackReports.error : null}
+            />
 
             {/* Error display */}
             {updateRelease.error && (

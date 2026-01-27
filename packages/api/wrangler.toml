@@ -18,5 +18,46 @@ bucket_name = "bundlenudge-bundles"
 binding = "RATE_LIMIT"
 id = "placeholder-id"
 
+# Cache KV (referenced in CLAUDE.md but missing)
+[[kv_namespaces]]
+binding = "CACHE"
+id = "placeholder-cache-id"
+
+# Priority Queues (P0=Enterprise, P1=Team, P2=Pro, P3=Free)
+[[queues.producers]]
+binding = "BUILD_QUEUE_P0"
+queue = "bundlenudge-builds-p0"
+
+[[queues.producers]]
+binding = "BUILD_QUEUE_P1"
+queue = "bundlenudge-builds-p1"
+
+[[queues.producers]]
+binding = "BUILD_QUEUE_P2"
+queue = "bundlenudge-builds-p2"
+
+[[queues.producers]]
+binding = "BUILD_QUEUE_P3"
+queue = "bundlenudge-builds-p3"
+
+# Dead Letter Queue
+[[queues.producers]]
+binding = "BUILD_QUEUE_DLQ"
+queue = "bundlenudge-builds-dlq"
+
+# Durable Objects
+[durable_objects]
+bindings = [
+  { name = "REALTIME", class_name = "RealtimeDO" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RealtimeDO"]
+
+# Cron triggers for scheduled jobs
+[triggers]
+crons = ["0 * * * *"]  # Every hour at minute 0
+
 [vars]
 ENVIRONMENT = "development"

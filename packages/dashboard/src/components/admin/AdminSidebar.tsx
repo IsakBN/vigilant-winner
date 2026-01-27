@@ -12,6 +12,7 @@ import {
   Flag,
   X,
   Shield,
+  Mail,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { href: '/admin/users', icon: Users, label: 'Users' },
   { href: '/admin/apps', icon: AppWindow, label: 'Apps' },
   { href: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions' },
+  { href: '/admin/newsletter', icon: Mail, label: 'Newsletter' },
   { href: '/admin/feature-flags', icon: Flag, label: 'Feature Flags' },
   { href: '/admin/settings', icon: Settings, label: 'Settings' },
 ]

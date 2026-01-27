@@ -34,6 +34,15 @@ export type AdminAction =
   | 'view_subscription_plans'
   | 'update_subscription'
   | 'grant_subscription'
+  // Newsletter actions
+  | 'import_newsletter_subscribers'
+  | 'export_newsletter_subscribers'
+  | 'create_newsletter_campaign'
+  | 'update_newsletter_campaign'
+  | 'delete_newsletter_campaign'
+  | 'send_test_newsletter'
+  | 'schedule_newsletter_campaign'
+  | 'send_newsletter_campaign'
 
 /**
  * Admin action log entry

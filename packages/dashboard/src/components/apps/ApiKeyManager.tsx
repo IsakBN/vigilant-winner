@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils'
 // ============================================================================
 
 interface ApiKeyManagerProps {
-  apiKey: string
+  apiKey: string | null
   isLoading?: boolean
   isRegenerating?: boolean
   onRegenerate: () => Promise<void>
@@ -81,6 +81,7 @@ export function ApiKeyManager({
   }
 
   const handleCopy = async () => {
+    if (!apiKey) return
     try {
       await navigator.clipboard.writeText(apiKey)
       setCopied(true)
@@ -95,7 +96,37 @@ export function ApiKeyManager({
     setIsRevealed(true) // Show the new key
   }
 
-  const displayKey = isRevealed ? apiKey : maskApiKey(apiKey)
+  const displayKey = apiKey ? (isRevealed ? apiKey : maskApiKey(apiKey)) : null
+
+  // No API key yet - show generate state
+  if (!displayKey) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">API Key</CardTitle>
+          <p className="text-sm text-neutral-500 mt-1">
+            Generate an API key to authenticate SDK requests from your app.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <p className="text-sm text-amber-800">
+                No API key has been generated yet. Click below to create one.
+              </p>
+            </div>
+            <Button onClick={handleRegenerate} disabled={isRegenerating}>
+              <RefreshCw className={cn(
+                'w-4 h-4 mr-2',
+                isRegenerating && 'animate-spin'
+              )} />
+              {isRegenerating ? 'Generating...' : 'Generate API Key'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card>

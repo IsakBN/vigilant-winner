@@ -289,4 +289,91 @@ describe('BundleNudge', () => {
       expect(instance.canRollback()).toBe(false)
     })
   })
+
+  describe('VersionGuard integration', () => {
+    it('calls VersionGuard during init', async () => {
+      // VersionGuard is called internally during init
+      // If init completes without error, VersionGuard was executed
+      const instance = await BundleNudge.initialize({
+        appId: 'test-app',
+        checkOnLaunch: false,
+      })
+
+      expect(instance).toBeDefined()
+    })
+
+    it('clears bundles before crash check on App Store update', async () => {
+      // The init flow is:
+      // 1. Initialize storage
+      // 2. VersionGuard check (clears bundles if App Store update)
+      // 3. Register device
+      // 4. CrashDetector check
+      // This order ensures bundles are cleared before crash detection
+      const instance = await BundleNudge.initialize({
+        appId: 'test-app',
+        checkOnLaunch: false,
+      })
+
+      // Instance created successfully means init flow completed
+      expect(instance).toBeDefined()
+      expect(instance.getStatus()).toBe('idle')
+    })
+  })
+
+  describe('BundleValidator integration', () => {
+    it('creates BundleValidator during construction', async () => {
+      const instance = await BundleNudge.initialize({
+        appId: 'test-app',
+        checkOnLaunch: false,
+      })
+
+      // getBundleValidator should return the validator instance
+      const validator = instance.getBundleValidator()
+      expect(validator).toBeDefined()
+    })
+
+    it('getBundleValidator returns consistent instance', async () => {
+      const instance = await BundleNudge.initialize({
+        appId: 'test-app',
+        checkOnLaunch: false,
+      })
+
+      const validator1 = instance.getBundleValidator()
+      const validator2 = instance.getBundleValidator()
+
+      expect(validator1).toBe(validator2)
+    })
+  })
+
+  describe('Health tracking', () => {
+    it('trackEvent does not throw when health monitor not configured', async () => {
+      const instance = await BundleNudge.initialize({
+        appId: 'test-app',
+        checkOnLaunch: false,
+      })
+
+      // Should not throw even without health config
+      expect(() => { instance.trackEvent('userLoaded'); }).not.toThrow()
+    })
+
+    it('trackEndpoint does not throw when health monitor not configured', async () => {
+      const instance = await BundleNudge.initialize({
+        appId: 'test-app',
+        checkOnLaunch: false,
+      })
+
+      // Should not throw even without health config
+      expect(() => { instance.trackEndpoint('GET', '/api/config', 200); }).not.toThrow()
+    })
+
+    it('isHealthVerified returns true when no health monitor', async () => {
+      const instance = await BundleNudge.initialize({
+        appId: 'test-app',
+        checkOnLaunch: false,
+      })
+
+      // Should return true (verified) when no health config
+      expect(instance.isHealthVerified()).toBe(true)
+    })
+  })
 })

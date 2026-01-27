@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, ChevronsUpDown, Plus, User, Users } from 'lucide-react'
 import { useAuth } from '@/providers/AuthProvider'
+import { useTeams } from '@/hooks/useTeams'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -39,9 +40,10 @@ export function AccountSwitcher({ accountId }: AccountSwitcherProps) {
   const { user } = useAuth()
   const [open, setOpen] = useState(false)
 
+  // Fetch teams for the current user
+  const { teams: userTeams } = useTeams(user?.id ?? '')
+
   // Build accounts list - personal account + teams
-  // For now, only personal account is supported
-  // Teams will be fetched from API when implemented
   const accounts: Account[] = [
     {
       id: user?.id || '',
@@ -49,7 +51,13 @@ export function AccountSwitcher({ accountId }: AccountSwitcherProps) {
       type: 'personal',
       image: user?.image,
     },
-    // TODO: Add team accounts from API
+    // Add team accounts from API
+    ...userTeams.map((team) => ({
+      id: team.id,
+      name: team.name,
+      type: 'team' as const,
+      image: null, // Team avatars not yet supported
+    })),
   ]
 
   const currentAccount = accounts.find((acc) => acc.id === accountId) || accounts[0]

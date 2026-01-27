@@ -2,11 +2,28 @@
 
 import { useParams } from 'next/navigation'
 import { useAuth } from '@/providers/AuthProvider'
+import { useApps } from '@/hooks/useApps'
 import { WelcomeCard } from '@/components/dashboard/WelcomeCard'
 import { QuickStats } from '@/components/dashboard/QuickStats'
 import { RecentApps } from '@/components/dashboard/RecentApps'
 import { GettingStarted } from '@/components/dashboard/GettingStarted'
 import { Skeleton } from '@/components/ui/skeleton'
+
+/**
+ * Format timestamp to relative time string
+ */
+function formatRelativeTime(timestamp: number): string {
+  const now = Date.now()
+  const diff = now - timestamp
+  const minutes = Math.floor(diff / 60000)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+
+  if (minutes < 60) return minutes <= 1 ? 'just now' : `${minutes}m ago`
+  if (hours < 24) return `${hours}h ago`
+  if (days < 7) return `${days}d ago`
+  return new Date(timestamp).toLocaleDateString()
+}
 
 /**
  * Account Dashboard Home
@@ -20,29 +37,38 @@ import { Skeleton } from '@/components/ui/skeleton'
 export default function AccountDashboardPage() {
   const params = useParams()
   const accountId = params.accountId as string
-  const { user, isLoading } = useAuth()
+  const { user, isLoading: authLoading } = useAuth()
+  const { apps, total, isLoading: appsLoading } = useApps(accountId)
+
+  const isLoading = authLoading || appsLoading
 
   if (isLoading) {
     return <DashboardSkeleton />
   }
 
-  // Mock data - in production, fetch from API
+  // Calculate stats from real data
   const stats = {
-    totalApps: 3,
-    activeDevices: 1250,
-    recentReleases: 12,
+    totalApps: total,
+    activeDevices: apps.reduce((sum, app) => sum + (app.activeDevices ?? 0), 0),
+    recentReleases: apps.filter((app) => app.lastReleaseAt).length,
   }
 
-  const apps = [
-    { id: '1', name: 'My App', platform: 'ios' as const, lastRelease: '2 hours ago' },
-    { id: '2', name: 'Another App', platform: 'android' as const, lastRelease: '1 day ago' },
-    { id: '3', name: 'Test App', platform: 'both' as const, lastRelease: '3 days ago' },
-  ]
+  // Transform apps to the format expected by RecentApps
+  const recentApps = apps.slice(0, 5).map((app) => ({
+    id: app.id,
+    name: app.name,
+    platform: app.platform,
+    lastRelease: app.lastReleaseAt
+      ? formatRelativeTime(app.lastReleaseAt)
+      : 'No releases yet',
+  }))
 
+  // Calculate onboarding status from real data
+  const hasDeployedRelease = apps.some((app) => app.lastReleaseAt != null)
   const onboardingSteps = {
-    hasApp: apps.length > 0,
-    hasInstalledSdk: true,
-    hasDeployedRelease: true,
+    hasApp: total > 0,
+    hasInstalledSdk: stats.activeDevices > 0, // Active devices implies SDK installed
+    hasDeployedRelease,
   }
 
   const isNewUser = !onboardingSteps.hasApp
@@ -63,7 +89,7 @@ export default function AccountDashboardPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
-            <RecentApps apps={apps} accountId={accountId} />
+            <RecentApps apps={recentApps} accountId={accountId} />
           </div>
           <div>
             {isNewUser && (

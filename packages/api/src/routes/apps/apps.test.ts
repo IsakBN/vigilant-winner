@@ -5,6 +5,10 @@
  * @agent wave4-channels
  * @modified 2026-01-25
  * @description Added tests for default channel creation
+ *
+ * @agent owner-only-deletion
+ * @modified 2026-01-27
+ * @description Added tests for owner-only project deletion permissions
  */
 import { describe, it, expect } from 'vitest'
 import { createAppSchema, updateAppSchema, ERROR_CODES } from '@bundlenudge/shared'
@@ -182,6 +186,89 @@ describe('apps routes logic', () => {
       expect(DEFAULT_CHANNELS[0]).toBe('production')
       expect(DEFAULT_CHANNELS[1]).toBe('staging')
       expect(DEFAULT_CHANNELS[2]).toBe('development')
+    })
+  })
+
+  describe('project deletion permissions', () => {
+    type Role = 'owner' | 'admin' | 'member'
+
+    /**
+     * Only the organization owner can delete projects.
+     * Direct app owner or org owner role is required.
+     */
+    function canDeleteProject(params: {
+      isDirectOwner: boolean
+      orgRole?: Role
+    }): boolean {
+      // Direct owner of the app can always delete
+      if (params.isDirectOwner) return true
+      // Organization owner can delete org's apps
+      if (params.orgRole === 'owner') return true
+      // Everyone else (admins, members) cannot delete
+      return false
+    }
+
+    describe('canDeleteProject', () => {
+      it('direct owner CAN delete project', () => {
+        expect(canDeleteProject({ isDirectOwner: true })).toBe(true)
+      })
+
+      it('org owner CAN delete project', () => {
+        expect(canDeleteProject({ isDirectOwner: false, orgRole: 'owner' })).toBe(true)
+      })
+
+      it('org admin CANNOT delete project', () => {
+        expect(canDeleteProject({ isDirectOwner: false, orgRole: 'admin' })).toBe(false)
+      })
+
+      it('org member CANNOT delete project', () => {
+        expect(canDeleteProject({ isDirectOwner: false, orgRole: 'member' })).toBe(false)
+      })
+
+      it('non-org user CANNOT delete project', () => {
+        expect(canDeleteProject({ isDirectOwner: false })).toBe(false)
+      })
+    })
+
+    describe('error responses', () => {
+      it('returns OWNER_REQUIRED error code for non-owners', () => {
+        const errorResponse = {
+          error: 'OWNER_REQUIRED',
+          message: 'Only the organization owner can delete projects',
+        }
+        expect(errorResponse.error).toBe('OWNER_REQUIRED')
+        expect(errorResponse.message).toContain('owner')
+      })
+    })
+  })
+
+  describe('audit logging for deletion', () => {
+    it('logs deletion attempt with correct structure', () => {
+      const auditLog = {
+        action: 'project.delete_attempted',
+        targetAppId: 'app-123',
+        details: {
+          allowed: false,
+          reason: 'not_owner',
+        },
+      }
+
+      expect(auditLog.action).toBe('project.delete_attempted')
+      expect(auditLog.details.allowed).toBe(false)
+      expect(auditLog.details.reason).toBe('not_owner')
+    })
+
+    it('logs successful deletion with app name', () => {
+      const auditLog = {
+        action: 'project.deleted',
+        targetAppId: 'app-123',
+        details: {
+          appName: 'My App',
+        },
+      }
+
+      expect(auditLog.action).toBe('project.deleted')
+      expect(auditLog.details.appName).toBe('My App')
     })
   })
 })

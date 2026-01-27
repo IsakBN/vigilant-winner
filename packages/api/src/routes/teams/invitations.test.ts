@@ -1,5 +1,7 @@
 /**
  * @agent remediate-otp-bcrypt
+ * @agent per-project-invitations
+ * @modified 2026-01-27
  */
 import { describe, it, expect, vi } from 'vitest'
 import { z } from 'zod'
@@ -10,7 +12,17 @@ import { generateOTP } from './invitations'
 const createInvitationSchema = z.object({
   email: z.string().email(),
   role: z.enum(['admin', 'member']).default('member'),
-})
+  scope: z.enum(['full', 'projects']).default('full'),
+  projectIds: z.array(z.string().uuid()).optional(),
+}).refine(
+  (data) => {
+    if (data.scope === 'projects') {
+      return Array.isArray(data.projectIds) && data.projectIds.length > 0
+    }
+    return data.projectIds === undefined || data.projectIds.length === 0
+  },
+  { message: 'projectIds required for scope=projects, forbidden for scope=full' }
+)
 
 const verifyInvitationSchema = z.object({
   email: z.string().email(),
@@ -335,6 +347,205 @@ describe('team invitations logic', () => {
 
     it('has member_joined event', () => {
       expect(invitationAuditEvents).toContain('team.member_joined')
+    })
+  })
+
+  describe('project-scoped invitations', () => {
+    const validUuid1 = '550e8400-e29b-41d4-a716-446655440000'
+    const validUuid2 = '550e8400-e29b-41d4-a716-446655440001'
+
+    it('accepts full scope invitation without projectIds', () => {
+      const result = createInvitationSchema.safeParse({
+        email: 'user@example.com',
+        role: 'member',
+        scope: 'full',
+      })
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.scope).toBe('full')
+        expect(result.data.projectIds).toBeUndefined()
+      }
+    })
+
+    it('accepts projects scope with valid projectIds', () => {
+      const result = createInvitationSchema.safeParse({
+        email: 'user@example.com',
+        role: 'member',
+        scope: 'projects',
+        projectIds: [validUuid1, validUuid2],
+      })
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.scope).toBe('projects')
+        expect(result.data.projectIds).toEqual([validUuid1, validUuid2])
+      }
+    })
+
+    it('rejects projects scope without projectIds', () => {
+      const result = createInvitationSchema.safeParse({
+        email: 'user@example.com',
+        role: 'member',
+        scope: 'projects',
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects projects scope with empty projectIds array', () => {
+      const result = createInvitationSchema.safeParse({
+        email: 'user@example.com',
+        role: 'member',
+        scope: 'projects',
+        projectIds: [],
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects full scope with projectIds', () => {
+      const result = createInvitationSchema.safeParse({
+        email: 'user@example.com',
+        role: 'member',
+        scope: 'full',
+        projectIds: [validUuid1],
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects invalid project IDs (non-UUID)', () => {
+      const result = createInvitationSchema.safeParse({
+        email: 'user@example.com',
+        role: 'member',
+        scope: 'projects',
+        projectIds: ['not-a-uuid', 'also-not-uuid'],
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('defaults to full scope when not specified', () => {
+      const result = createInvitationSchema.safeParse({
+        email: 'user@example.com',
+        role: 'member',
+      })
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.scope).toBe('full')
+      }
+    })
+  })
+
+  describe('invitation formatting with scope', () => {
+    function formatInvitation(inv: Record<string, unknown>) {
+      let projectIds = inv.project_ids
+      if (typeof projectIds === 'string') {
+        try {
+          projectIds = JSON.parse(projectIds)
+        } catch {
+          projectIds = null
+        }
+      }
+
+      return {
+        id: inv.id,
+        email: inv.email,
+        role: inv.role,
+        scope: inv.scope ?? 'full',
+        projectIds,
+        invitedBy: inv.invited_by,
+        expiresAt: inv.expires_at,
+        createdAt: inv.created_at,
+      }
+    }
+
+    it('formats full-scope invitation correctly', () => {
+      const dbInvitation = {
+        id: 'inv-123',
+        email: 'user@example.com',
+        role: 'member',
+        scope: 'full',
+        project_ids: null,
+        invited_by: 'user-456',
+        expires_at: 1700001800,
+        created_at: 1700000000,
+      }
+
+      const formatted = formatInvitation(dbInvitation)
+
+      expect(formatted.scope).toBe('full')
+      expect(formatted.projectIds).toBeNull()
+    })
+
+    it('formats project-scoped invitation correctly', () => {
+      const projectIds = ['app-1', 'app-2']
+      const dbInvitation = {
+        id: 'inv-123',
+        email: 'user@example.com',
+        role: 'member',
+        scope: 'projects',
+        project_ids: JSON.stringify(projectIds),
+        invited_by: 'user-456',
+        expires_at: 1700001800,
+        created_at: 1700000000,
+      }
+
+      const formatted = formatInvitation(dbInvitation)
+
+      expect(formatted.scope).toBe('projects')
+      expect(formatted.projectIds).toEqual(projectIds)
+    })
+
+    it('defaults to full scope for legacy invitations', () => {
+      const dbInvitation = {
+        id: 'inv-123',
+        email: 'user@example.com',
+        role: 'member',
+        // No scope field (legacy)
+        project_ids: null,
+        invited_by: 'user-456',
+        expires_at: 1700001800,
+        created_at: 1700000000,
+      }
+
+      const formatted = formatInvitation(dbInvitation)
+
+      expect(formatted.scope).toBe('full')
+    })
+  })
+
+  describe('member project access logic', () => {
+    type AccessCheck = {
+      hasFullAccess: boolean
+      hasProjectAccess: boolean
+      appId: string
+    }
+
+    function canAccessApp(check: AccessCheck): boolean {
+      // Users with full access can access any app
+      if (check.hasFullAccess) return true
+      // Users with project-scoped access need explicit permission
+      return check.hasProjectAccess
+    }
+
+    it('full-access member can access any app', () => {
+      expect(canAccessApp({
+        hasFullAccess: true,
+        hasProjectAccess: false,
+        appId: 'any-app',
+      })).toBe(true)
+    })
+
+    it('project-scoped member can access granted app', () => {
+      expect(canAccessApp({
+        hasFullAccess: false,
+        hasProjectAccess: true,
+        appId: 'granted-app',
+      })).toBe(true)
+    })
+
+    it('project-scoped member cannot access non-granted app', () => {
+      expect(canAccessApp({
+        hasFullAccess: false,
+        hasProjectAccess: false,
+        appId: 'other-app',
+      })).toBe(false)
     })
   })
 })

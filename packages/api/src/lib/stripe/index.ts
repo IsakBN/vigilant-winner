@@ -10,6 +10,8 @@ export {
   createPortalSession,
   getSubscription,
   cancelSubscription,
+  listInvoices,
+  getInvoice,
   type StripeResponse,
   type StripeSubscription,
   type StripeCheckoutSession,

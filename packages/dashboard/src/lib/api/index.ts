@@ -166,6 +166,7 @@ export {
     adminUsers,
     auditLogs,
     featureFlags,
+    newsletter,
     checkAdminAccess,
 } from './admin'
 export type {
@@ -222,4 +223,21 @@ export type {
     AuditLogEntry,
     ListAuditLogsParams,
     ListAuditLogsResponse,
+    // Newsletter types
+    CampaignStatus,
+    NewsletterSubscriber,
+    NewsletterCampaign,
+    CampaignStats,
+    ListSubscribersParams,
+    ListSubscribersResponse,
+    ListCampaignsParams,
+    ListCampaignsResponse,
+    GetCampaignResponse,
+    CampaignPreviewResponse,
+    CreateCampaignInput,
+    UpdateCampaignInput,
+    SendCampaignInput,
+    ImportSubscribersInput,
+    ImportSubscribersResponse,
+    SendCampaignResponse,
 } from './admin'

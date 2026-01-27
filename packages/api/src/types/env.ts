@@ -2,6 +2,17 @@
  * Cloudflare Workers environment bindings
  */
 
+/**
+ * Build job message for queue
+ */
+export interface BuildJobMessage {
+  buildId: string
+  buildType: 'ios' | 'android'
+  appId: string
+  priority: 0 | 1 | 2 | 3
+  createdAt: number
+}
+
 export interface Env {
   // D1 Database
   DB: D1Database
@@ -46,4 +57,15 @@ export interface Env {
   // URLs
   DASHBOARD_URL: string
   API_URL: string
+  APP_URL: string  // Base URL for email links
+
+  // Priority Queues (P0=Enterprise, P1=Team, P2=Pro, P3=Free)
+  BUILD_QUEUE_P0: Queue<BuildJobMessage>
+  BUILD_QUEUE_P1: Queue<BuildJobMessage>
+  BUILD_QUEUE_P2: Queue<BuildJobMessage>
+  BUILD_QUEUE_P3: Queue<BuildJobMessage>
+  BUILD_QUEUE_DLQ: Queue<BuildJobMessage>
+
+  // Durable Objects
+  REALTIME: DurableObjectNamespace
 }

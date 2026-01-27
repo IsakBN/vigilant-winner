@@ -13,6 +13,7 @@ import { adminUsersRouter } from './users'
 import { adminAppsRouter } from './apps'
 import { adminDashboardRouter } from './dashboard'
 import { adminSubscriptionsRouter } from './subscriptions'
+import { newsletterRouter } from './newsletter'
 import type { Env } from '../../types/env'
 
 /**
@@ -52,6 +53,13 @@ adminRouter.route('/users', adminUsersRouter)
 adminRouter.route('/apps', adminAppsRouter)
 adminRouter.route('/dashboard', adminDashboardRouter)
 adminRouter.route('/subscriptions', adminSubscriptionsRouter)
+adminRouter.route('/newsletter', newsletterRouter)
 
 // Re-export individual routers for testing
-export { adminUsersRouter, adminAppsRouter, adminDashboardRouter, adminSubscriptionsRouter }
+export {
+  adminUsersRouter,
+  adminAppsRouter,
+  adminDashboardRouter,
+  adminSubscriptionsRouter,
+  newsletterRouter,
+}

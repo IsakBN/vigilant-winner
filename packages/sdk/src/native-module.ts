@@ -61,6 +61,12 @@ export function createFallbackModule(): NativeModuleInterface {
       }
       return Promise.resolve('')
     },
+    hashFile: () => {
+      if (__DEV__) {
+        console.warn('[BundleNudge] hashFile called but native module not available')
+      }
+      return Promise.resolve('') // Empty string - JS validation will skip
+    },
   }
 }
 

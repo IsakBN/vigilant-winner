@@ -1,7 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import { useParams } from 'next/navigation'
-import { useApp } from '@/hooks/useApp'
+import { useApp, useRegenerateApiKey } from '@/hooks/useApp'
 import { SetupInstructions } from '@/components/apps/SetupInstructions'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -40,7 +41,18 @@ export default function SetupPage() {
   const params = useParams()
   const appId = params.appId as string
 
-  const { data: _app, isLoading, error } = useApp(appId)
+  const { data: app, isLoading, error } = useApp(appId)
+  const regenerateKey = useRegenerateApiKey(appId)
+  const [apiKey, setApiKey] = useState<string | null>(null)
+
+  const handleGenerateKey = async () => {
+    try {
+      const result = await regenerateKey.mutateAsync()
+      setApiKey(result.apiKey)
+    } catch {
+      // Error handled by mutation
+    }
+  }
 
   if (error) {
     return (
@@ -59,8 +71,8 @@ export default function SetupPage() {
     return <SetupPageSkeleton />
   }
 
-  // Mock API key - in real app this would come from the API
-  const mockApiKey = 'bnk_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+  // Use generated key, app's existing key, or show generate button
+  const displayKey = apiKey ?? app?.apiKey ?? null
 
   return (
     <div className="max-w-2xl">
@@ -71,7 +83,20 @@ export default function SetupPage() {
         </p>
       </div>
 
-      <SetupInstructions appId={appId} apiKey={mockApiKey} />
+      {displayKey ? (
+        <SetupInstructions appId={appId} apiKey={displayKey} />
+      ) : (
+        <div className="space-y-6">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <p className="text-amber-800 text-sm">
+              You need an API key to complete the setup. Generate one below.
+            </p>
+          </div>
+          <Button onClick={handleGenerateKey} disabled={regenerateKey.isPending}>
+            {regenerateKey.isPending ? 'Generating...' : 'Generate API Key'}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

@@ -2,7 +2,7 @@
  * Base email template with consistent styling
  */
 
-const BRAND_COLOR = '#4F46E5'
+const BRAND_COLOR = '#FF6B35'
 
 export function baseTemplate(content: string): string {
   return `

@@ -144,7 +144,39 @@ export interface StripeCheckoutSession {
 
 export interface StripeInvoice {
   id: string
-  subscription: string
+  subscription: string | null
   customer: string
   status: 'draft' | 'open' | 'paid' | 'uncollectible' | 'void'
+  currency: string
+  amount_due: number
+  amount_paid: number
+  hosted_invoice_url: string | null
+  invoice_pdf: string | null
+  period_start: number
+  period_end: number
+  created: number
+}
+
+/**
+ * List invoices for a customer
+ */
+export async function listInvoices(
+  secretKey: string,
+  customerId: string,
+  limit: number = 10
+): Promise<StripeResponse<{ data: StripeInvoice[] }>> {
+  return stripeRequest(secretKey, '/invoices', 'GET', {
+    'customer': customerId,
+    'limit': String(limit),
+  })
+}
+
+/**
+ * Get a single invoice
+ */
+export async function getInvoice(
+  secretKey: string,
+  invoiceId: string
+): Promise<StripeResponse<StripeInvoice>> {
+  return stripeRequest(secretKey, `/invoices/${invoiceId}`, 'GET')
 }

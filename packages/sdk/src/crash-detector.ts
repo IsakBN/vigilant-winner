@@ -41,6 +41,7 @@ export class CrashDetector {
   private config: CrashDetectorConfig
   private verificationTimer: ReturnType<typeof setTimeout> | null = null
   private isVerifying = false
+  private verificationComplete = false
 
   constructor(storage: Storage, config: CrashDetectorConfig) {
     this.storage = storage
@@ -110,28 +111,60 @@ export class CrashDetector {
     const windowMs = this.config.verificationWindowMs ?? DEFAULT_VERIFICATION_WINDOW_MS
 
     this.verificationTimer = setTimeout(() => {
-      void this.handleVerificationTimeout()
+      this.handleVerificationTimeout()
     }, windowMs)
   }
 
   /**
-   * Mark the current update as successful.
+   * Mark the app as ready.
+   * This alone does NOT trigger verification - health must also pass.
    * Call this when the app is ready (e.g., after rendering main screen).
    */
   async notifyAppReady(): Promise<void> {
     if (!this.isVerifying) return
 
-    // Clear verification timer
-    if (this.verificationTimer) {
-      clearTimeout(this.verificationTimer)
-      this.verificationTimer = null
+    await this.storage.setAppReady()
+    await this.checkVerificationComplete()
+  }
+
+  /**
+   * Mark health checks as passed.
+   * This alone does NOT trigger verification - app must also be ready.
+   * Call this when all critical health checks have passed.
+   */
+  async notifyHealthPassed(): Promise<void> {
+    if (!this.isVerifying) return
+
+    await this.storage.setHealthPassed()
+    await this.checkVerificationComplete()
+  }
+
+  /**
+   * Check if both verification conditions are met.
+   * Only clears previousVersion when BOTH appReady AND healthPassed are true.
+   */
+  private async checkVerificationComplete(): Promise<void> {
+    if (this.verificationComplete) return
+
+    const state = this.storage.getVerificationState()
+    if (!state) return
+
+    if (state.appReady && state.healthPassed) {
+      this.verificationComplete = true
+
+      // Clear verification timer
+      if (this.verificationTimer) {
+        clearTimeout(this.verificationTimer)
+        this.verificationTimer = null
+      }
+
+      this.isVerifying = false
+
+      // Clear crash count, reset verification state, and trigger callback
+      await this.storage.clearCrashCount()
+      await this.storage.resetVerificationState()
+      await this.config.onVerified()
     }
-
-    this.isVerifying = false
-
-    // Clear crash count and trigger verified callback
-    await this.storage.clearCrashCount()
-    await this.config.onVerified()
   }
 
   /**
@@ -145,12 +178,19 @@ export class CrashDetector {
     this.isVerifying = false
   }
 
-  private async handleVerificationTimeout(): Promise<void> {
+  /**
+   * Handle verification timeout.
+   * IMPORTANT: Does NOT call onVerified or clear previousVersion.
+   * The timeout only stops waiting - verification must come from both
+   * appReady AND healthPassed flags being true.
+   * This prevents the dangerous behavior of prematurely clearing
+   * previousVersion when health checks haven't actually passed.
+   */
+  private handleVerificationTimeout(): void {
     this.isVerifying = false
-
-    // If we got here without crash, the update is verified
-    // Clear previous version and call verified callback
-    await this.storage.clearPreviousVersion()
-    await this.config.onVerified()
+    this.verificationTimer = null
+    // Note: previousVersion is intentionally NOT cleared here.
+    // It will only be cleared when checkVerificationComplete() succeeds.
+    // This ensures we can still rollback if the app crashes later.
   }
 }

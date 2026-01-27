@@ -33,3 +33,6 @@ export {
     ReleaseDetailSkeleton,
     ReleaseCardGridSkeleton,
 } from './ReleaseSkeleton'
+
+// Rollback components
+export { RollbackReports, RollbackReportsCompact } from './RollbackReports'

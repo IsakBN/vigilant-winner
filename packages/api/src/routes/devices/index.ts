@@ -21,6 +21,9 @@ import type { Env } from '../../types/env'
 // Re-export the management router for app-scoped device routes
 export { deviceManagementRouter } from './management'
 
+// Re-export the rollback routers
+export { rollbackRouter, rollbackReportsRouter } from './rollback'
+
 // =============================================================================
 // Local Schemas
 // =============================================================================

@@ -32,6 +32,23 @@ export interface GitHubStatus {
 // Auth API
 // ============================================================================
 
+export interface LoginResponse {
+    user: User
+    token?: string
+    redirect?: string
+}
+
+export interface SignupResponse {
+    user: User
+    message?: string
+    requiresVerification?: boolean
+}
+
+export interface VerifyEmailResponse {
+    success: boolean
+    user?: User
+}
+
 export const auth = {
     /**
      * Get current user from backend
@@ -39,6 +56,73 @@ export const auth = {
      */
     async me(): Promise<{ user: User }> {
         return apiFetch('/auth/me')
+    },
+
+    /**
+     * Login with email and password
+     */
+    async login(email: string, password: string): Promise<LoginResponse> {
+        return apiFetch('/api/auth/sign-in/email', {
+            method: 'POST',
+            body: { email, password },
+        })
+    },
+
+    /**
+     * Sign up with email and password
+     */
+    async signup(
+        email: string,
+        password: string,
+        name?: string
+    ): Promise<SignupResponse> {
+        return apiFetch('/api/auth/sign-up/email', {
+            method: 'POST',
+            body: { email, password, name },
+        })
+    },
+
+    /**
+     * Verify email with OTP code
+     */
+    async verifyEmail(email: string, code: string): Promise<VerifyEmailResponse> {
+        return apiFetch('/api/auth/verify-email', {
+            method: 'POST',
+            body: { email, code },
+        })
+    },
+
+    /**
+     * Resend verification email
+     */
+    async resendVerification(email: string): Promise<{ success: boolean }> {
+        return apiFetch('/api/auth/resend-verification', {
+            method: 'POST',
+            body: { email },
+        })
+    },
+
+    /**
+     * Request password reset
+     */
+    async forgotPassword(email: string): Promise<{ success: boolean }> {
+        return apiFetch('/api/auth/forgot-password', {
+            method: 'POST',
+            body: { email },
+        })
+    },
+
+    /**
+     * Reset password with token
+     */
+    async resetPassword(
+        token: string,
+        newPassword: string
+    ): Promise<{ success: boolean }> {
+        return apiFetch('/api/auth/reset-password', {
+            method: 'POST',
+            body: { token, newPassword },
+        })
     },
 
     /**

@@ -17,6 +17,10 @@
  * @agent wave4-channels
  * @modified 2026-01-25
  * @description Auto-create default channels on app creation
+ *
+ * @agent wave4a-health-config
+ * @modified 2026-01-26
+ * @description Added health config routes
  */
 
 import { Hono } from 'hono'
@@ -27,6 +31,7 @@ import { authMiddleware, type AuthUser } from '../../middleware/auth'
 import type { Env } from '../../types/env'
 import { projectMembersRouter } from './members'
 import { apiKeysRoutes } from './api-keys'
+import { healthConfigRoutes } from './health-config'
 
 const API_KEY_PREFIX = 'bn_'
 const API_KEY_LENGTH = 32
@@ -59,29 +64,76 @@ appsRoutes.use('*', authMiddleware)
 
 /**
  * List user's apps with pagination
+ *
+ * Returns apps the user has access to via:
+ * 1. Direct ownership
+ * 2. Full organization membership (scope='full')
+ * 3. Project-scoped organization membership (via member_project_access)
+ *
+ * @agent per-project-invitations
+ * @modified 2026-01-27
  */
 appsRoutes.get('/', async (c) => {
   const user = c.get('user')
   const limit = Math.min(Number(c.req.query('limit')) || 20, 100)
   const offset = Number(c.req.query('offset')) || 0
 
-  // Get total count
+  // Get apps with access logic:
+  // 1. Apps user owns directly
+  // 2. Apps from orgs where user has full access (member but no project_access entries)
+  // 3. Apps user has explicit project access to (member_project_access)
   const countResult = await c.env.DB.prepare(`
-    SELECT COUNT(*) as total FROM apps WHERE owner_id = ? AND deleted_at IS NULL
-  `).bind(user.id).first<{ total: number }>()
+    SELECT COUNT(DISTINCT a.id) as total
+    FROM apps a
+    LEFT JOIN organization_members om ON a.owner_id = (
+      SELECT owner_id FROM organizations WHERE id = om.organization_id
+    )
+    LEFT JOIN member_project_access mpa ON mpa.app_id = a.id AND mpa.user_id = ?
+    WHERE a.deleted_at IS NULL AND (
+      -- Direct ownership
+      a.owner_id = ?
+      -- Or user is org member with full access (no project-scoped entries for this org)
+      OR (
+        om.user_id = ?
+        AND NOT EXISTS (
+          SELECT 1 FROM member_project_access
+          WHERE organization_id = om.organization_id AND user_id = ?
+        )
+      )
+      -- Or user has explicit project access
+      OR mpa.id IS NOT NULL
+    )
+  `).bind(user.id, user.id, user.id, user.id).first<{ total: number }>()
   const total = countResult?.total ?? 0
 
-  // Get paginated results
+  // Get paginated results with same access logic
   const results = await c.env.DB.prepare(`
-    SELECT
+    SELECT DISTINCT
       a.*,
       (SELECT COUNT(*) FROM releases WHERE app_id = a.id) as release_count,
       (SELECT COUNT(*) FROM devices WHERE app_id = a.id) as device_count
     FROM apps a
-    WHERE a.owner_id = ? AND a.deleted_at IS NULL
+    LEFT JOIN organization_members om ON a.owner_id = (
+      SELECT owner_id FROM organizations WHERE id = om.organization_id
+    )
+    LEFT JOIN member_project_access mpa ON mpa.app_id = a.id AND mpa.user_id = ?
+    WHERE a.deleted_at IS NULL AND (
+      -- Direct ownership
+      a.owner_id = ?
+      -- Or user is org member with full access (no project-scoped entries for this org)
+      OR (
+        om.user_id = ?
+        AND NOT EXISTS (
+          SELECT 1 FROM member_project_access
+          WHERE organization_id = om.organization_id AND user_id = ?
+        )
+      )
+      -- Or user has explicit project access
+      OR mpa.id IS NOT NULL
+    )
     ORDER BY a.created_at DESC
     LIMIT ? OFFSET ?
-  `).bind(user.id, limit, offset).all<AppRow>()
+  `).bind(user.id, user.id, user.id, user.id, limit, offset).all<AppRow>()
 
   return c.json({
     data: results.results,
@@ -212,15 +264,21 @@ appsRoutes.patch('/:appId', zValidator('json', updateAppSchema), async (c) => {
 
 /**
  * Delete app (soft delete)
+ *
+ * ONLY the organization owner can delete projects.
+ * Admins and members cannot delete projects.
+ *
+ * @agent owner-only-deletion
+ * @created 2026-01-27
  */
 appsRoutes.delete('/:appId', async (c) => {
   const user = c.get('user')
   const appId = c.req.param('appId')
 
-  // Verify ownership
+  // First, find the app
   const existing = await c.env.DB.prepare(
-    'SELECT * FROM apps WHERE id = ? AND owner_id = ? AND deleted_at IS NULL'
-  ).bind(appId, user.id).first<AppRow>()
+    'SELECT * FROM apps WHERE id = ? AND deleted_at IS NULL'
+  ).bind(appId).first<AppRow>()
 
   if (!existing) {
     return c.json(
@@ -229,12 +287,58 @@ appsRoutes.delete('/:appId', async (c) => {
     )
   }
 
+  // Check if user is the direct owner
+  const isDirectOwner = existing.owner_id === user.id
+
+  // Check if user is an organization owner for this app
+  const orgMembership = await c.env.DB.prepare(`
+    SELECT om.role, o.id as org_id
+    FROM organization_members om
+    JOIN organizations o ON o.id = om.organization_id
+    WHERE om.user_id = ? AND o.owner_id = ?
+  `).bind(user.id, existing.owner_id).first<{ role: string; org_id: string }>()
+
+  const isOrgOwner = orgMembership?.role === 'owner'
+
+  // Log the deletion attempt for audit purposes
+  if (orgMembership?.org_id) {
+    await logProjectAction(c.env.DB, {
+      orgId: orgMembership.org_id,
+      actorId: user.id,
+      action: 'project.delete_attempted',
+      targetAppId: appId,
+      details: {
+        allowed: isDirectOwner || isOrgOwner,
+        reason: isDirectOwner ? 'direct_owner' : isOrgOwner ? 'org_owner' : 'not_owner',
+      },
+    })
+  }
+
+  // Only direct owner or organization owner can delete
+  if (!isDirectOwner && !isOrgOwner) {
+    return c.json({
+      error: 'OWNER_REQUIRED',
+      message: 'Only the organization owner can delete projects',
+    }, 403)
+  }
+
   const now = Math.floor(Date.now() / 1000)
 
   // Soft delete the app
   await c.env.DB.prepare(
     'UPDATE apps SET deleted_at = ?, updated_at = ? WHERE id = ?'
   ).bind(now, now, appId).run()
+
+  // Log successful deletion
+  if (orgMembership?.org_id) {
+    await logProjectAction(c.env.DB, {
+      orgId: orgMembership.org_id,
+      actorId: user.id,
+      action: 'project.deleted',
+      targetAppId: appId,
+      details: { appName: existing.name },
+    })
+  }
 
   return c.json({ success: true })
 })
@@ -295,8 +399,45 @@ async function createDefaultChannels(
   }
 }
 
+/**
+ * Log project-related audit events
+ *
+ * @agent owner-only-deletion
+ * @created 2026-01-27
+ */
+interface ProjectActionParams {
+  orgId: string
+  actorId: string
+  action: string
+  targetAppId: string
+  details: Record<string, unknown>
+}
+
+async function logProjectAction(
+  db: Env['DB'],
+  params: ProjectActionParams
+): Promise<void> {
+  await db.prepare(`
+    INSERT INTO team_audit_log (id, organization_id, user_id, event, metadata, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).bind(
+    crypto.randomUUID(),
+    params.orgId,
+    params.actorId,
+    params.action,
+    JSON.stringify({
+      targetAppId: params.targetAppId,
+      ...params.details,
+    }),
+    Math.floor(Date.now() / 1000)
+  ).run()
+}
+
 // Mount project members routes
 appsRoutes.route('/', projectMembersRouter)
 
 // Mount API keys routes
 appsRoutes.route('/:appId/keys', apiKeysRoutes)
+
+// Mount health config routes
+appsRoutes.route('/:appId/health-config', healthConfigRoutes)

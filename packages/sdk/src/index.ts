@@ -9,6 +9,8 @@ export { Storage } from './storage'
 export { Updater } from './updater'
 export { RollbackManager } from './rollback-manager'
 export { CrashDetector } from './crash-detector'
+export { VersionGuard } from './version-guard'
+export { BundleValidator } from './bundle-validator'
 
 // React hooks
 export { useBundleNudge, useCodePush } from './hooks'
@@ -43,6 +45,28 @@ export {
   DEFAULT_RETRY_COUNT,
   DEFAULT_RETRY_DELAY_MS,
 } from './health-check'
+
+// HealthMonitor - integrates with CrashDetector dual-flag verification
+export { HealthMonitor } from './health-monitor'
+export type {
+  CriticalEvent,
+  CriticalEndpoint,
+  HealthMonitorConfig,
+} from './health-monitor'
+
+// Health config fetcher - fetches config from API
+export {
+  HealthConfigFetcher,
+  createHealthConfigFetcher,
+  DEFAULT_HEALTH_CONFIG,
+  CONFIG_FETCH_TIMEOUT_MS,
+} from './health-config'
+export type {
+  HealthConfig,
+  HealthConfigFetcherConfig,
+  CriticalEvent as HealthConfigEvent,
+  CriticalEndpoint as HealthConfigEndpoint,
+} from './health-config'
 
 export type { BundleNudgeCallbacks } from './bundlenudge'
 export type {
@@ -124,6 +148,12 @@ export {
   getNativeInfo,
 } from './native'
 export type { RestartOptions, NativeInfo } from './native'
+
+// Version guard types
+export type { AppVersionInfo, VersionGuardConfig } from './version-guard'
+
+// Bundle validation types
+export type { BundleValidatorConfig, ValidationResult } from './bundle-validator'
 
 // Targeting & variants
 export {

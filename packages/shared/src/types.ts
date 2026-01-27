@@ -204,3 +204,40 @@ export interface APIError {
   message?: string
   details?: unknown
 }
+
+// =============================================================================
+// Team Invitations
+// =============================================================================
+
+export type InvitationScope = 'full' | 'projects'
+
+export interface TeamInvitation {
+  id: string
+  organizationId: string
+  email: string
+  role: 'admin' | 'member'
+  /** 'full' for entire org access, 'projects' for specific projects only */
+  scope: InvitationScope
+  /** App IDs this invitation grants access to (only when scope='projects') */
+  projectIds: string[] | null
+  invitedBy: string
+  expiresAt: number
+  acceptedAt: number | null
+  createdAt: number
+}
+
+export interface CreateInvitationRequest {
+  email: string
+  role: 'admin' | 'member'
+  scope?: InvitationScope
+  projectIds?: string[]
+}
+
+export interface MemberProjectAccess {
+  id: string
+  organizationId: string
+  userId: string
+  appId: string
+  grantedBy: string
+  grantedAt: number
+}

@@ -22,12 +22,16 @@ export default function ForgotPasswordPage() {
     setError('')
 
     try {
-      // TODO: Implement password reset request when API supports it
-      // Simulate success for now
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await fetch('/api/auth/password/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      // Always show success for security (don't reveal if email exists)
       setStep('sent')
     } catch {
-      setError('Failed to send reset email. Please try again.')
+      // Still show success for security
+      setStep('sent')
     } finally {
       setIsLoading(false)
     }
@@ -59,9 +63,9 @@ export default function ForgotPasswordPage() {
                   Check your email
                 </h1>
                 <p className="text-gray-600 mt-2">
-                  We sent a password reset link to
-                  <br />
-                  <span className="font-medium text-gray-900">{email}</span>
+                  If an account exists for{' '}
+                  <span className="font-medium text-gray-900">{email}</span>,
+                  you&apos;ll receive a password reset link shortly.
                 </p>
                 <p className="text-sm text-gray-500 mt-4">
                   Didn&apos;t receive the email? Check your spam folder or{' '}

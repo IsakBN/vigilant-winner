@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Save, Trash2 } from 'lucide-react'
 import { useApp, useUpdateApp, useDeleteApp, useRegenerateApiKey } from '@/hooks/useApp'
+import { useHealthConfig } from '@/hooks/useHealthConfig'
 import { ApiKeyManager } from '@/components/apps/ApiKeyManager'
+import { HealthConfigEditor } from '@/components/apps/HealthConfigEditor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -205,6 +207,8 @@ export default function AppSettingsPage() {
   const updateApp = useUpdateApp(appId)
   const deleteApp = useDeleteApp(appId)
   const regenerateKey = useRegenerateApiKey(appId)
+  const healthConfig = useHealthConfig(appId)
+  const [generatedApiKey, setGeneratedApiKey] = useState<string | null>(null)
 
   const handleUpdateName = async (name: string) => {
     await updateApp.mutateAsync({ name })
@@ -216,7 +220,8 @@ export default function AppSettingsPage() {
   }
 
   const handleRegenerateKey = async () => {
-    await regenerateKey.mutateAsync()
+    const result = await regenerateKey.mutateAsync()
+    setGeneratedApiKey(result.apiKey)
   }
 
   if (error) {
@@ -232,8 +237,8 @@ export default function AppSettingsPage() {
     )
   }
 
-  // Mock API key - in real app this would come from the API
-  const mockApiKey = 'bnk_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+  // Use generated key or app's existing key (may be masked)
+  const displayApiKey = generatedApiKey ?? app?.apiKey ?? null
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -252,10 +257,18 @@ export default function AppSettingsPage() {
 
       {/* API Key Manager */}
       <ApiKeyManager
-        apiKey={mockApiKey}
+        apiKey={displayApiKey}
         isLoading={isLoading}
         isRegenerating={regenerateKey.isPending}
         onRegenerate={handleRegenerateKey}
+      />
+
+      {/* Health Config Editor */}
+      <HealthConfigEditor
+        config={healthConfig.config}
+        isLoading={healthConfig.isLoading}
+        isSaving={healthConfig.isSaving}
+        onSave={healthConfig.saveConfig}
       />
 
       {/* Danger Zone */}

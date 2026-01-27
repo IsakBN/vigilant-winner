@@ -6,6 +6,9 @@
 
 import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core'
 
+// Import users from auth schema for foreign key references
+import { users } from './schema-auth'
+
 /**
  * Applications table
  * Stores registered apps that can receive OTA updates
@@ -169,6 +172,60 @@ export const subscriptions = sqliteTable('subscriptions', {
   stripeSubIdx: index('subscriptions_stripe_sub_idx').on(table.stripeSubscriptionId),
 }))
 
+// ============================================
+// Invoice Tables
+// ============================================
+
+/**
+ * Invoices table
+ * Stores Stripe invoice records for billing history
+ *
+ * @agent billing-system
+ * @created 2026-01-26
+ */
+export const invoices = sqliteTable('invoices', {
+  id: text('id').primaryKey(), // Stripe invoice ID (in_xxx)
+  userId: text('user_id').notNull(),
+  subscriptionId: text('subscription_id').references(() => subscriptions.id),
+  stripeCustomerId: text('stripe_customer_id').notNull(),
+  stripeInvoiceUrl: text('stripe_invoice_url'), // Hosted invoice URL
+  stripePdfUrl: text('stripe_pdf_url'), // PDF download URL
+  status: text('status', {
+    enum: ['draft', 'open', 'paid', 'uncollectible', 'void'],
+  }).notNull(),
+  currency: text('currency').notNull().default('usd'),
+  amountDue: integer('amount_due').notNull(), // In cents
+  amountPaid: integer('amount_paid').notNull().default(0),
+  periodStart: integer('period_start', { mode: 'timestamp' }),
+  periodEnd: integer('period_end', { mode: 'timestamp' }),
+  paidAt: integer('paid_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  userIdx: index('invoices_user_idx').on(table.userId),
+  customerIdx: index('invoices_customer_idx').on(table.stripeCustomerId),
+  statusIdx: index('invoices_status_idx').on(table.status),
+  createdIdx: index('invoices_created_idx').on(table.createdAt),
+}))
+
+/**
+ * Stripe webhook events table
+ * Tracks processed webhooks for idempotency
+ *
+ * @agent billing-system
+ * @created 2026-01-26
+ */
+export const stripeWebhookEvents = sqliteTable('stripe_webhook_events', {
+  id: text('id').primaryKey(), // Stripe event ID (evt_xxx)
+  type: text('type').notNull(),
+  processed: integer('processed', { mode: 'boolean' }).default(false),
+  error: text('error'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  typeIdx: index('stripe_webhook_events_type_idx').on(table.type),
+  processedIdx: index('stripe_webhook_events_processed_idx').on(table.processed),
+}))
+
 /**
  * Organizations (Teams) table
  * Teams/workspaces for collaborative access
@@ -206,6 +263,10 @@ export const organizationMembers = sqliteTable('organization_members', {
 /**
  * Team invitations table
  * Pending invitations to join a team
+ *
+ * @agent per-project-invitations
+ * @modified 2026-01-27
+ * @description Added scope and projectIds for per-project access control
  */
 export const teamInvitations = sqliteTable('team_invitations', {
   id: text('id').primaryKey(),
@@ -214,6 +275,10 @@ export const teamInvitations = sqliteTable('team_invitations', {
   role: text('role', { enum: ['admin', 'member'] }).notNull(),
   token: text('token').notNull().unique(),
   invitedBy: text('invited_by').notNull(),
+  /** Invitation scope: 'full' for entire org access, 'projects' for specific projects only */
+  scope: text('scope', { enum: ['full', 'projects'] }).notNull().default('full'),
+  /** JSON array of app IDs if scope='projects', NULL if scope='full' */
+  projectIds: text('project_ids', { mode: 'json' }).$type<string[] | null>(),
   expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
   acceptedAt: integer('accepted_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
@@ -221,6 +286,7 @@ export const teamInvitations = sqliteTable('team_invitations', {
   orgIdx: index('team_invitations_org_idx').on(table.organizationId),
   tokenIdx: index('team_invitations_token_idx').on(table.token),
   emailIdx: index('team_invitations_email_idx').on(table.email),
+  scopeIdx: index('team_invitations_scope_idx').on(table.scope),
 }))
 
 /**
@@ -237,6 +303,28 @@ export const projectMembers = sqliteTable('project_members', {
   appIdx: index('project_members_app_idx').on(table.appId),
   userIdx: index('project_members_user_idx').on(table.userId),
   appUserIdx: index('project_members_app_user_idx').on(table.appId, table.userId),
+}))
+
+/**
+ * Member project access table
+ * Tracks which specific projects an org member has access to
+ * Used when a member is invited with scope='projects' instead of full org access
+ *
+ * @agent per-project-invitations
+ * @created 2026-01-27
+ */
+export const memberProjectAccess = sqliteTable('member_project_access', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull(),
+  appId: text('app_id').notNull().references(() => apps.id, { onDelete: 'cascade' }),
+  grantedBy: text('granted_by').notNull(),
+  grantedAt: integer('granted_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  orgIdx: index('member_project_access_org_idx').on(table.organizationId),
+  userIdx: index('member_project_access_user_idx').on(table.userId),
+  appIdx: index('member_project_access_app_idx').on(table.appId),
+  orgUserAppIdx: index('member_project_access_org_user_app_idx').on(table.organizationId, table.userId, table.appId),
 }))
 
 /**
@@ -551,6 +639,7 @@ export const iosBuilds = sqliteTable('ios_builds', {
   bundleId: text('bundle_id').notNull(),
   teamId: text('team_id'),
   provisioningProfile: text('provisioning_profile'),
+  workerId: text('worker_id'),
   artifactUrl: text('artifact_url'),
   artifactSize: integer('artifact_size'),
   logs: text('logs'),
@@ -588,6 +677,7 @@ export const androidBuilds = sqliteTable('android_builds', {
   flavor: text('flavor'),
   packageName: text('package_name').notNull(),
   keystoreAlias: text('keystore_alias'),
+  workerId: text('worker_id'),
   artifactUrl: text('artifact_url'),
   artifactSize: integer('artifact_size'),
   artifactType: text('artifact_type', { enum: ['apk', 'aab'] }).notNull().default('apk'),
@@ -601,6 +691,36 @@ export const androidBuilds = sqliteTable('android_builds', {
   statusIdx: index('android_builds_status_idx').on(table.status),
   createdIdx: index('android_builds_created_idx').on(table.createdAt),
   appVersionCodeIdx: index('android_builds_app_version_code_idx').on(table.appId, table.version, table.versionCode),
+}))
+
+// ============================================
+// Worker Nodes Tables
+// ============================================
+
+/**
+ * Worker nodes table
+ * Tracks build worker status for job distribution
+ *
+ * @agent queue-system
+ * @created 2026-01-26
+ */
+export const workerNodes = sqliteTable('worker_nodes', {
+  id: text('id').primaryKey(),
+  nodePool: text('node_pool'), // e.g., 'ios-macos', 'android-linux'
+  hostname: text('hostname'),
+  status: text('status', {
+    enum: ['online', 'busy', 'offline', 'draining'],
+  }).notNull().default('offline'),
+  currentBuildId: text('current_build_id'),
+  lastHeartbeatAt: integer('last_heartbeat_at', { mode: 'timestamp' }),
+  totalBuilds: integer('total_builds').default(0),
+  failedBuilds: integer('failed_builds').default(0),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  statusIdx: index('worker_nodes_status_idx').on(table.status),
+  poolIdx: index('worker_nodes_pool_idx').on(table.nodePool),
+  heartbeatIdx: index('worker_nodes_heartbeat_idx').on(table.lastHeartbeatAt),
 }))
 
 // ============================================
@@ -629,3 +749,139 @@ export const healthReports = sqliteTable('health_reports', {
   createdIdx: index('health_reports_created_idx').on(table.createdAt),
   appCreatedIdx: index('health_reports_app_created_idx').on(table.appId, table.createdAt),
 }))
+
+/**
+ * Rollback reports table
+ * Stores rollback telemetry from SDK devices for release monitoring
+ *
+ * @agent wave5d-rollback
+ * @created 2026-01-26
+ */
+export const rollbackReports = sqliteTable('rollback_reports', {
+  id: text('id').primaryKey(),
+  deviceId: text('device_id').notNull(),
+  releaseId: text('release_id').notNull().references(() => releases.id),
+  reason: text('reason', {
+    enum: ['crash_detected', 'health_check_failed', 'manual', 'hash_mismatch'],
+  }).notNull(),
+  failedEvents: text('failed_events', { mode: 'json' }), // JSON array of strings
+  failedEndpoints: text('failed_endpoints', { mode: 'json' }), // JSON array of objects
+  previousVersion: text('previous_version'),
+  timestamp: integer('timestamp').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  deviceIdx: index('rollback_reports_device_idx').on(table.deviceId),
+  releaseIdx: index('rollback_reports_release_idx').on(table.releaseId),
+  reasonIdx: index('rollback_reports_reason_idx').on(table.reason),
+  timestampIdx: index('rollback_reports_timestamp_idx').on(table.timestamp),
+  createdIdx: index('rollback_reports_created_idx').on(table.createdAt),
+}))
+
+// ============================================
+// Scheduled Emails Table
+// ============================================
+
+/**
+ * Scheduled emails table
+ * Stores emails to be sent at a future time (e.g., follow-up emails)
+ *
+ * @agent scheduled-emails
+ * @created 2026-01-27
+ */
+export const scheduledEmails = sqliteTable('scheduled_emails', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(),
+  template: text('template').notNull(), // 'follow_up', 'inactive_reminder', etc.
+  scheduledFor: integer('scheduled_for').notNull(), // Unix timestamp (ms)
+  sentAt: integer('sent_at'), // NULL until sent (Unix timestamp ms)
+  failedAt: integer('failed_at'), // If sending failed (Unix timestamp ms)
+  failureReason: text('failure_reason'),
+  metadata: text('metadata', { mode: 'json' }), // JSON for template-specific data
+  createdAt: integer('created_at').notNull(), // Unix timestamp (ms)
+}, (table) => ({
+  userIdx: index('scheduled_emails_user_idx').on(table.userId),
+  templateIdx: index('scheduled_emails_template_idx').on(table.template),
+  scheduledForIdx: index('scheduled_emails_scheduled_for_idx').on(table.scheduledFor),
+  sentIdx: index('scheduled_emails_sent_idx').on(table.sentAt),
+  failedIdx: index('scheduled_emails_failed_idx').on(table.failedAt),
+}))
+
+// ============================================
+// Newsletter Tables
+// ============================================
+
+/**
+ * Newsletter subscribers table
+ * Stores email subscribers for marketing communications
+ *
+ * @agent newsletter-system
+ * @created 2026-01-27
+ */
+export const newsletterSubscribers = sqliteTable('newsletter_subscribers', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  name: text('name'),
+  subscribedAt: integer('subscribed_at', { mode: 'timestamp' }).notNull(),
+  unsubscribedAt: integer('unsubscribed_at', { mode: 'timestamp' }),
+  source: text('source'), // 'signup', 'landing_page', 'import'
+}, (table) => ({
+  emailIdx: index('newsletter_subscribers_email_idx').on(table.email),
+  subscribedIdx: index('newsletter_subscribers_subscribed_idx').on(table.subscribedAt),
+  sourceIdx: index('newsletter_subscribers_source_idx').on(table.source),
+}))
+
+/**
+ * Newsletter campaigns table
+ * Stores email campaigns and their metadata
+ *
+ * @agent newsletter-system
+ * @created 2026-01-27
+ */
+export const newsletterCampaigns = sqliteTable('newsletter_campaigns', {
+  id: text('id').primaryKey(),
+  subject: text('subject').notNull(),
+  content: text('content').notNull(), // HTML content
+  previewText: text('preview_text'),
+  status: text('status', {
+    enum: ['draft', 'scheduled', 'sending', 'sent'],
+  }).notNull().default('draft'),
+  scheduledFor: integer('scheduled_for', { mode: 'timestamp' }),
+  sentAt: integer('sent_at', { mode: 'timestamp' }),
+  recipientCount: integer('recipient_count'),
+  openCount: integer('open_count').default(0),
+  clickCount: integer('click_count').default(0),
+  createdBy: text('created_by').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }),
+}, (table) => ({
+  statusIdx: index('newsletter_campaigns_status_idx').on(table.status),
+  createdIdx: index('newsletter_campaigns_created_idx').on(table.createdAt),
+  scheduledIdx: index('newsletter_campaigns_scheduled_idx').on(table.scheduledFor),
+}))
+
+// ============================================
+// Re-export Auth Schema
+// ============================================
+
+export {
+  users,
+  emailVerificationTokens,
+  passwordResetTokens,
+  userSessions,
+  usersRelations,
+  emailVerificationTokensRelations,
+  passwordResetTokensRelations,
+  userSessionsRelations,
+} from './schema-auth'
+
+export type {
+  User,
+  NewUser,
+  EmailVerificationToken,
+  NewEmailVerificationToken,
+  PasswordResetToken,
+  NewPasswordResetToken,
+  UserSession,
+  NewUserSession,
+} from './schema-auth'

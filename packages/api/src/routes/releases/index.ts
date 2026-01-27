@@ -18,6 +18,7 @@ import {
 } from '@bundlenudge/shared'
 import { authMiddleware, type AuthUser } from '../../middleware/auth'
 import { checkStorageLimitWithAddition } from '../../lib/subscription-limits'
+import { broadcastReleaseRollout } from '../../lib/realtime'
 import type { Env } from '../../types/env'
 
 interface ReleaseRow {
@@ -50,6 +51,9 @@ interface AuthVariables {
 }
 
 export const releasesRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>()
+
+// Alias for backward compatibility with main router
+export { releasesRoutes as releasesRouter }
 
 // All routes require authentication
 releasesRoutes.use('*', authMiddleware)
@@ -418,6 +422,14 @@ releasesRoutes.patch(
     const updated = await c.env.DB.prepare(
       'SELECT * FROM releases WHERE id = ?'
     ).bind(releaseId).first<ReleaseRow>()
+
+    // Broadcast rollout update to connected clients
+    if (updated) {
+      await broadcastReleaseRollout(c.env, user.id, releaseId, {
+        rolloutPercentage: updated.rollout_percentage,
+        status: updated.status,
+      })
+    }
 
     return c.json({ release: updated })
   }

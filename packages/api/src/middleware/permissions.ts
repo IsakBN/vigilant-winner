@@ -195,6 +195,30 @@ export function requireProjectPermission(
       )
     }
 
+    // Case 3a: Check if user has project-scoped access (not full org access)
+    // Users with project-scoped invitations must have explicit project access
+    const projectAccess = await c.env.DB.prepare(`
+      SELECT id FROM member_project_access
+      WHERE organization_id = ? AND user_id = ? AND app_id = ?
+    `).bind(app.organization_id, user.id, appId).first()
+
+    // Check if user was invited with scope='projects' by seeing if they have any
+    // member_project_access entries for this org (but not necessarily this app)
+    const hasAnyProjectAccess = await c.env.DB.prepare(`
+      SELECT id FROM member_project_access
+      WHERE organization_id = ? AND user_id = ?
+      LIMIT 1
+    `).bind(app.organization_id, user.id).first()
+
+    // If user has project-scoped access entries but not for this specific app,
+    // they don't have access to this app
+    if (hasAnyProjectAccess && !projectAccess) {
+      return c.json(
+        { error: ERROR_CODES.FORBIDDEN, message: 'No access to this project' },
+        403
+      )
+    }
+
     // Get default project role based on org role
     const defaultProjectRole = getDefaultProjectRole(orgMember.role)
     const projectPerms = PROJECT_PERMISSIONS[defaultProjectRole]

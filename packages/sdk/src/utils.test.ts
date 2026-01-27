@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/unbound-method */
+ 
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { generateDeviceId, compareSemver, retry, sleep } from './utils'
 
