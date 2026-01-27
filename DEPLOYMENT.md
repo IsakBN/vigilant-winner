@@ -419,20 +419,101 @@ UPDATE subscription_plans SET stripe_price_id = 'price_YOUR_TEAM_PRICE_ID' WHERE
 
 ### 6.1 Vercel Deployment (Recommended)
 
-1. Connect your GitHub repository to Vercel
-2. Set the root directory to `packages/dashboard`
-3. Configure environment variables:
+#### Step-by-Step Vercel Setup
 
+**Step 1: Install Vercel CLI**
 ```bash
-NEXT_PUBLIC_API_URL=https://api.bundlenudge.com
+npm install -g vercel
+vercel login
 ```
 
-4. Deploy settings:
+**Step 2: Link Repository**
+```bash
+cd packages/dashboard
+vercel link
+# Select your Vercel account
+# Create new project: bundlenudge-dashboard
+```
+
+**Step 3: Configure Project Settings**
+
+In Vercel Dashboard ([vercel.com/dashboard](https://vercel.com/dashboard)):
+
+1. Go to **Project Settings** > **General**
+   - **Root Directory**: `packages/dashboard`
    - **Framework Preset**: Next.js
+   - **Node.js Version**: 20.x
+
+2. Go to **Project Settings** > **Build & Development**
    - **Build Command**: `pnpm build`
    - **Output Directory**: `.next`
+   - **Install Command**: `pnpm install`
 
-### 6.2 Cloudflare Pages Deployment
+**Step 4: Set Environment Variables**
+
+In Vercel Dashboard > **Settings** > **Environment Variables**:
+
+| Variable | Value | Environments |
+|----------|-------|--------------|
+| `NEXT_PUBLIC_API_URL` | `https://api.bundlenudge.com` | Production, Preview |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | `pk_live_...` | Production |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | `pk_test_...` | Preview |
+
+Or via CLI:
+```bash
+vercel env add NEXT_PUBLIC_API_URL production
+# Enter: https://api.bundlenudge.com
+
+vercel env add NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY production
+# Enter: pk_live_...
+```
+
+**Step 5: Deploy**
+```bash
+# Preview deployment
+vercel
+
+# Production deployment
+vercel --prod
+```
+
+**Step 6: Configure Custom Domain**
+
+1. In Vercel Dashboard > **Settings** > **Domains**
+2. Add `app.bundlenudge.com`
+3. Vercel will provide DNS records to add:
+   ```
+   Type: CNAME
+   Name: app
+   Value: cname.vercel-dns.com
+   ```
+4. Add the record in Cloudflare (with proxy OFF - gray cloud)
+5. Wait for SSL certificate provisioning
+
+### 6.2 Docs Site Deployment (Vercel)
+
+The docs site (`packages/docs`) follows the same process:
+
+```bash
+cd packages/docs
+vercel link
+# Project name: bundlenudge-docs
+```
+
+Environment variables for docs:
+| Variable | Value |
+|----------|-------|
+| `NEXT_PUBLIC_API_URL` | `https://api.bundlenudge.com` |
+| `NEXT_PUBLIC_DASHBOARD_URL` | `https://app.bundlenudge.com` |
+
+Deploy:
+```bash
+vercel --prod
+```
+
+Add custom domain `docs.bundlenudge.com` in Vercel settings.
+
+### 6.3 Cloudflare Pages Deployment (Alternative)
 
 ```bash
 cd packages/dashboard
@@ -444,11 +525,13 @@ pnpm build
 wrangler pages deploy .next --project-name=bundlenudge-dashboard
 ```
 
-### 6.3 Dashboard Environment Variables
+### 6.4 Dashboard Environment Variables Reference
 
-| Variable | Description |
-|----------|-------------|
-| `NEXT_PUBLIC_API_URL` | BundleNudge API URL (`https://api.bundlenudge.com`) |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEXT_PUBLIC_API_URL` | Yes | BundleNudge API URL |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Yes | Stripe publishable key |
+| `NEXT_PUBLIC_GITHUB_CLIENT_ID` | No | For OAuth (handled by API) |
 
 ---
 
@@ -657,22 +740,114 @@ wrangler tail bundlenudge-api
 
 ---
 
+## 11. CI/CD with GitHub Actions
+
+### 11.1 API Deployment Workflow
+
+Create `.github/workflows/deploy-api.yml`:
+
+```yaml
+name: Deploy API
+
+on:
+  push:
+    branches: [main]
+    paths: ['packages/api/**']
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm --filter @bundlenudge/api test
+
+      - name: Deploy to Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: packages/api
+```
+
+### 11.2 Dashboard Deployment Workflow
+
+Vercel automatically deploys on push when connected to GitHub. For manual control:
+
+```yaml
+name: Deploy Dashboard
+
+on:
+  push:
+    branches: [main]
+    paths: ['packages/dashboard/**']
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: packages/dashboard
+          vercel-args: '--prod'
+```
+
+### 11.3 Required GitHub Secrets
+
+| Secret | Description | Where to get |
+|--------|-------------|--------------|
+| `CLOUDFLARE_API_TOKEN` | Wrangler deploy token | Cloudflare Dashboard > API Tokens |
+| `VERCEL_TOKEN` | Vercel API token | Vercel > Settings > Tokens |
+| `VERCEL_ORG_ID` | Vercel organization ID | `.vercel/project.json` |
+| `VERCEL_PROJECT_ID` | Vercel project ID | `.vercel/project.json` |
+
+---
+
 ## Quick Reference
 
 ### Deployment Commands
 
 ```bash
-# Deploy API
+# Deploy API to Cloudflare Workers
 cd packages/api && wrangler deploy
 
-# Deploy Dashboard (Vercel)
+# Deploy Dashboard to Vercel
 cd packages/dashboard && vercel --prod
 
-# Deploy Worker (Fly.io)
+# Deploy Docs to Vercel
+cd packages/docs && vercel --prod
+
+# Deploy Worker to Fly.io
 cd packages/worker && fly deploy
 
-# Run migrations
-cd packages/api && pnpm drizzle-kit push
+# Run D1 migrations
+cd packages/api && wrangler d1 execute bundlenudge-db --remote --file=./drizzle/migrations/0001_*.sql
+
+# View Worker logs
+wrangler tail bundlenudge-api
+
+# Check secrets
+wrangler secret list
 ```
 
 ### Useful URLs
