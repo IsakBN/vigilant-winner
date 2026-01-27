@@ -116,12 +116,14 @@ updatesRouter.post(
 
     // Get all active releases for this app (limited to newest 10)
     // Filter by channel if one was found, otherwise get all releases
+    // Include releases with NULL channel_id for backwards compatibility
     // We iterate through them to find the first that matches targeting rules
     // @agent remediate-multi-release-resolution, wave4-channels
     const releases = channel
       ? await c.env.DB.prepare(`
           SELECT * FROM releases
-          WHERE app_id = ? AND status = 'active' AND bundle_url != '' AND channel_id = ?
+          WHERE app_id = ? AND status = 'active' AND bundle_url != ''
+            AND (channel_id = ? OR channel_id IS NULL)
           ORDER BY created_at DESC
           LIMIT 10
         `).bind(body.appId, channel.id).all<ReleaseRow>()

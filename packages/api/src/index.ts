@@ -46,7 +46,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 
-import { updatesRouter } from './routes/updates'
+import { updatesRouter } from './routes/updates/index'
 import { devicesRouter, deviceManagementRouter, rollbackRouter, rollbackReportsRouter } from './routes/devices/index'
 import { releasesRouter } from './routes/releases/index'
 import { telemetryRouter } from './routes/telemetry'

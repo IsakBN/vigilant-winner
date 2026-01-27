@@ -128,6 +128,7 @@ apiKeysRoutes.get(
     const apiKeys = keys.results.map(k => ({
       id: k.id,
       name: k.name,
+      prefix: k.key_prefix,
       keyPrefix: k.key_prefix,
       permissions: JSON.parse(k.permissions) as ApiKeyPermission[],
       createdAt: k.created_at,
@@ -135,7 +136,7 @@ apiKeysRoutes.get(
       revokedAt: k.revoked_at,
     }))
 
-    return c.json({ apiKeys })
+    return c.json({ keys: apiKeys })
   }
 )
 
@@ -164,6 +165,18 @@ apiKeysRoutes.post(
       )
     }
 
+    // Check for duplicate name
+    const existingKey = await c.env.DB.prepare(
+      'SELECT id FROM api_keys WHERE app_id = ? AND name = ? AND revoked_at IS NULL'
+    ).bind(appId, body.name).first()
+
+    if (existingKey) {
+      return c.json(
+        { error: ERROR_CODES.CONFLICT, message: 'API key with this name already exists' },
+        409
+      )
+    }
+
     const apiKey = generateApiKey()
     const keyId = crypto.randomUUID()
     const keyHash = await hashApiKey(apiKey)
@@ -186,12 +199,15 @@ apiKeysRoutes.post(
 
     return c.json(
       {
-        id: keyId,
-        name: body.name,
-        apiKey, // Only returned once at creation
-        keyPrefix,
-        permissions: body.permissions ?? DEFAULT_PERMISSIONS,
-        createdAt: now,
+        key: {
+          id: keyId,
+          name: body.name,
+          prefix: keyPrefix,
+          keyPrefix,
+          permissions: body.permissions ?? DEFAULT_PERMISSIONS,
+          createdAt: now,
+        },
+        fullKey: apiKey, // Only returned once at creation
       },
       201
     )

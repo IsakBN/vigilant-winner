@@ -315,11 +315,12 @@ appsRoutes.delete('/:appId', async (c) => {
   }
 
   // Only direct owner or organization owner can delete
+  // Return 404 to not reveal whether the app exists (security best practice)
   if (!isDirectOwner && !isOrgOwner) {
-    return c.json({
-      error: 'OWNER_REQUIRED',
-      message: 'Only the organization owner can delete projects',
-    }, 403)
+    return c.json(
+      { error: ERROR_CODES.APP_NOT_FOUND, message: 'App not found' },
+      404
+    )
   }
 
   const now = Math.floor(Date.now() / 1000)

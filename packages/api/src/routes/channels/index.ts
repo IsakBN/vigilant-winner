@@ -54,6 +54,7 @@ function formatChannel(row: ChannelRow) {
     displayName: row.display_name,
     description: row.description,
     isDefault: Boolean(row.is_default),
+    is_default: row.is_default, // Backwards compatibility
     rolloutPercentage: row.rollout_percentage,
     targetingRules: row.targeting_rules ? (JSON.parse(row.targeting_rules) as unknown) : null,
     activeReleaseId: row.active_release_id,
