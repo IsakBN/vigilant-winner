@@ -37,6 +37,14 @@ export const RATE_LIMITS = {
   auth: { limit: 10, windowSeconds: 60 },
 } as const
 
+/** Higher rate limits for development/testing */
+export const DEV_RATE_LIMITS = {
+  updates: { limit: 1000, windowSeconds: 60 },
+  telemetry: { limit: 1000, windowSeconds: 60 },
+  devices: { limit: 1000, windowSeconds: 60 },
+  auth: { limit: 1000, windowSeconds: 60 },
+} as const
+
 export type RateLimitType = keyof typeof RATE_LIMITS
 
 // =============================================================================
@@ -147,12 +155,14 @@ interface RateLimitVariables {
 export function createRateLimitMiddleware(
   type: RateLimitType
 ): MiddlewareHandler<{ Bindings: Env; Variables: RateLimitVariables }> {
-  const config = RATE_LIMITS[type]
-
   return createMiddleware<{
     Bindings: Env
     Variables: RateLimitVariables
   }>(async (c, next) => {
+    // Use higher limits in development mode for E2E testing
+    const isDev = c.env.ENVIRONMENT === 'development'
+    const config = isDev ? DEV_RATE_LIMITS[type] : RATE_LIMITS[type]
+
     // Get identifier: prefer device ID from header, fallback to IP
     const deviceId = c.req.header('X-Device-ID')
     const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For')

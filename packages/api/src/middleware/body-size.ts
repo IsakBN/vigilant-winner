@@ -41,14 +41,19 @@ const PAYLOAD_TOO_LARGE_ERROR = {
 export function createBodySizeMiddleware(maxBytes: number): MiddlewareHandler<{ Bindings: Env }> {
   return createMiddleware<{ Bindings: Env }>(async (c, next) => {
     // Check Content-Length header first (fast path)
+    // If Content-Length is present and valid, we can skip body reading
     const contentLength = c.req.header('Content-Length')
     if (contentLength) {
       const length = parseInt(contentLength, 10)
-      if (!isNaN(length) && length > maxBytes) {
-        return c.json(
-          { ...PAYLOAD_TOO_LARGE_ERROR, maxBytes },
-          413
-        )
+      if (!isNaN(length)) {
+        if (length > maxBytes) {
+          return c.json(
+            { ...PAYLOAD_TOO_LARGE_ERROR, maxBytes },
+            413
+          )
+        }
+        // Content-Length is present and within limits, skip body reading
+        return next()
       }
     }
 
