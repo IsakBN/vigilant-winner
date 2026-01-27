@@ -8,6 +8,7 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
+import { Building2 } from 'lucide-react'
 import {
     Table,
     TableBody,
@@ -23,9 +24,10 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-    Skeleton,
 } from '@/components/ui'
+import { EmptyState, ErrorState } from '@/components/shared'
 import { useAdminOrgs, useSuspendOrg, useReactivateOrg } from '@/hooks/useAdmin'
+import { OrgTableSkeleton } from './OrgTableSkeleton'
 import type { AdminOrg, OrgPlan } from '@/lib/api'
 
 interface OrgTableProps {
@@ -36,7 +38,7 @@ export function OrgTable({ onOrgClick }: OrgTableProps) {
     const [search, setSearch] = useState('')
     const [planFilter, setPlanFilter] = useState<OrgPlan | 'all'>('all')
 
-    const { organizations, total, isLoading, isError, error } = useAdminOrgs({
+    const { organizations, total, isLoading, isError, error, refetch } = useAdminOrgs({
         search: search || undefined,
         plan: planFilter,
     })
@@ -72,11 +74,10 @@ export function OrgTable({ onOrgClick }: OrgTableProps) {
 
     if (isError) {
         return (
-            <div className="text-center py-8">
-                <p className="text-destructive">
-                    Failed to load organizations: {error?.message}
-                </p>
-            </div>
+            <ErrorState
+                message={error?.message ?? 'Failed to load organizations'}
+                onRetry={() => void refetch()}
+            />
         )
     }
 
@@ -132,8 +133,12 @@ export function OrgTable({ onOrgClick }: OrgTableProps) {
                     ))}
                     {organizations.length === 0 && (
                         <TableRow>
-                            <TableCell colSpan={6} className="text-center py-8">
-                                No organizations found
+                            <TableCell colSpan={6}>
+                                <EmptyState
+                                    icon={Building2}
+                                    title="No organizations found"
+                                    variant="minimal"
+                                />
                             </TableCell>
                         </TableRow>
                     )}
@@ -211,29 +216,5 @@ function StatusBadge({ isActive }: { isActive: boolean }) {
         <Badge variant={isActive ? 'default' : 'destructive'}>
             {isActive ? 'Active' : 'Suspended'}
         </Badge>
-    )
-}
-
-function OrgTableSkeleton() {
-    return (
-        <div className="space-y-4">
-            <div className="flex gap-4">
-                <Skeleton className="h-10 flex-1" />
-                <Skeleton className="h-10 w-[160px]" />
-            </div>
-            <Skeleton className="h-4 w-48" />
-            <div className="border rounded-md">
-                {Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-4 p-4 border-b last:border-b-0">
-                        <Skeleton className="h-4 flex-1" />
-                        <Skeleton className="h-6 w-16" />
-                        <Skeleton className="h-4 w-12" />
-                        <Skeleton className="h-4 w-12" />
-                        <Skeleton className="h-6 w-16" />
-                        <Skeleton className="h-8 w-20" />
-                    </div>
-                ))}
-            </div>
-        </div>
     )
 }

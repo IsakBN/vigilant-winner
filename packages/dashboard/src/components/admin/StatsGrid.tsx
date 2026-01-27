@@ -104,7 +104,7 @@ function StatCard({ title, value, subtext, icon: Icon, color, bgColor }: StatCar
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-text-light">
+        <CardTitle className="text-sm font-medium text-muted-foreground">
           {title}
         </CardTitle>
         <div className={`p-2 rounded-md ${bgColor}`}>
@@ -113,7 +113,7 @@ function StatCard({ title, value, subtext, icon: Icon, color, bgColor }: StatCar
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold text-text-dark">{value}</div>
-        <p className="text-xs text-text-light mt-1">{subtext}</p>
+        <p className="text-xs text-muted-foreground mt-1">{subtext}</p>
       </CardContent>
     </Card>
   )

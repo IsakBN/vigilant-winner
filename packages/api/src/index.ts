@@ -69,6 +69,7 @@ import { bundlesRouter } from './routes/bundles'
 import { iosBuildRoutes, androidBuildsRouter } from './routes/builds'
 import { workerRoutes } from './routes/worker'
 import { realtimeRouter } from './routes/realtime'
+import { testersRouter } from './routes/testers'
 import {
   rateLimitUpdates,
   rateLimitDevices,
@@ -155,7 +156,7 @@ app.all('/api/auth/*', async (c) => {
     'https://bundlenudge.com',
     'http://localhost:3000',
     'http://localhost:3001',
-  ].filter(Boolean) as string[]
+  ].filter(Boolean)
 
   const isAllowed = origin && allowedOrigins.includes(origin)
 
@@ -227,6 +228,7 @@ app.route('/v1/apps', iosBuildRoutes)
 app.route('/v1/apps', androidBuildsRouter)
 app.route('/v1', workerRoutes)
 app.route('/v1/realtime', realtimeRouter)
+app.route('/v1/testers', testersRouter)
 
 // Admin routes (OTP-based auth, no rate limiting on auth routes themselves)
 app.use('/v1/admin-auth/*', rateLimitAuth)

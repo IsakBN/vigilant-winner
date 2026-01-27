@@ -358,3 +358,22 @@ export type {
     ListAdminAppsParams,
     AdminAppsResponse,
 } from './types/admin'
+
+// Re-export A/B tests API
+export { abTests } from './ab-tests'
+export type {
+    ABTestStatus,
+    ConfidenceLevel,
+    VariantMetrics,
+    ABTestVariant,
+    ABTestResults,
+    AdoptionStats,
+    RolloutProgress,
+    VersionDistribution,
+    ABTestSummary,
+    ABTestListResponse,
+    CreateABTestVariant,
+    CreateABTestRequest,
+    CreateABTestResponse,
+} from './types/ab-tests'
+export { getConfidenceLevel, getConfidenceLabel } from './types/ab-tests'

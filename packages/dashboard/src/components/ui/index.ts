@@ -1,4 +1,7 @@
 // UI Components barrel export
+export { Avatar } from "./avatar"
+export type { AvatarProps } from "./avatar"
+
 export { Button, buttonVariants } from "./button"
 export type { ButtonProps } from "./button"
 

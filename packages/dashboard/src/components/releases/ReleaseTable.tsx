@@ -58,7 +58,7 @@ function RolloutProgress({ percentage }: { percentage: number }) {
                     style={{ width: `${percentage}%` }}
                 />
             </div>
-            <span className="text-xs font-mono text-neutral-500 w-10 text-right">
+            <span className="text-xs font-mono text-muted-foreground w-10 text-right">
                 {percentage}%
             </span>
         </div>
@@ -75,7 +75,7 @@ function formatDate(timestamp: number): string {
 
 function SortIcon({ field, sortBy, sortOrder }: { field: SortField; sortBy?: SortField; sortOrder?: SortOrder }) {
     if (sortBy !== field) {
-        return <ArrowUpDown className="w-3.5 h-3.5 text-neutral-400" />
+        return <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground" />
     }
     return sortOrder === 'asc' ? (
         <ArrowUp className="w-3.5 h-3.5 text-primary" />
@@ -163,7 +163,7 @@ export function ReleaseTable({
                             <StatusBadge status={release.status} />
                         </TableCell>
                         <TableCell>
-                            <span className="text-sm text-neutral-600 capitalize">
+                            <span className="text-sm text-muted-foreground capitalize">
                                 {release.channel}
                             </span>
                         </TableCell>
@@ -171,7 +171,7 @@ export function ReleaseTable({
                             <RolloutProgress percentage={release.rolloutPercentage} />
                         </TableCell>
                         <TableCell className="text-right">
-                            <span className="text-sm text-neutral-500">
+                            <span className="text-sm text-muted-foreground">
                                 {formatDate(release.createdAt)}
                             </span>
                         </TableCell>

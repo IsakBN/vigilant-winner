@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AuditLogTable, AuditLogFilters } from '@/components/admin'
+import { ErrorState } from '@/components/shared'
 import { useAuditLogs, useExportAuditLogs } from '@/hooks/useAdmin'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { ListAuditLogsParams } from '@/lib/api'
@@ -23,7 +24,7 @@ export default function AdminAuditPage() {
         limit: DEFAULT_LIMIT,
     })
 
-    const { data, isLoading, error } = useAuditLogs(filters)
+    const { data, isLoading, error, refetch } = useAuditLogs(filters)
     const exportLogs = useExportAuditLogs()
 
     const handleFiltersChange = (newFilters: ListAuditLogsParams) => {
@@ -49,9 +50,10 @@ export default function AdminAuditPage() {
     if (error) {
         return (
             <div className="p-6">
-                <div className="text-destructive">
-                    Failed to load audit logs. Please try again.
-                </div>
+                <ErrorState
+                    message={error.message ?? 'Failed to load audit logs'}
+                    onRetry={() => void refetch()}
+                />
             </div>
         )
     }

@@ -79,7 +79,7 @@ function MemberAvatar({ name, avatarUrl }: { name: string | null; avatarUrl: str
     }
 
     return (
-        <div className="w-8 h-8 rounded-full bg-neutral-100 text-neutral-600 flex items-center justify-center text-sm font-medium">
+        <div className="w-8 h-8 rounded-full bg-neutral-100 text-muted-foreground flex items-center justify-center text-sm font-medium">
             {initial}
         </div>
     )
@@ -120,7 +120,7 @@ export function MemberTable({
 
     if (members.length === 0) {
         return (
-            <div className="text-center py-12 text-text-light">
+            <div className="text-center py-12 text-muted-foreground">
                 No team members found.
             </div>
         )
@@ -156,10 +156,10 @@ export function MemberTable({
                                         <div className="font-medium text-text-dark">
                                             {member.name ?? 'Unknown'}
                                             {isCurrentUser && (
-                                                <span className="ml-2 text-xs text-text-light">(you)</span>
+                                                <span className="ml-2 text-xs text-muted-foreground">(you)</span>
                                             )}
                                         </div>
-                                        <div className="text-sm text-text-light">
+                                        <div className="text-sm text-muted-foreground">
                                             {member.email}
                                         </div>
                                     </div>
@@ -178,7 +178,7 @@ export function MemberTable({
                                     </Badge>
                                 )}
                             </TableCell>
-                            <TableCell className="text-text-light">
+                            <TableCell className="text-muted-foreground">
                                 {formatDate(member.createdAt)}
                             </TableCell>
                             {canManageMembers && (
