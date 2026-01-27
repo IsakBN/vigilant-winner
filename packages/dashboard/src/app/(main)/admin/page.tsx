@@ -1,7 +1,15 @@
 'use client'
 
-import { useAdminStats, useSystemHealth, useRecentActivity } from '@/hooks/useAdmin'
-import { StatsGrid, HealthIndicators, ActivityFeed } from '@/components/admin'
+import { useAdminStats, useRecentActivity } from '@/hooks/useAdmin'
+import { useOtaMetrics, useBuildQueue, useApiHealth, useStorageMetrics } from '@/hooks/useAdminOps'
+import {
+  StatsGrid,
+  ActivityFeed,
+  SystemStatusBar,
+  KeyMetricsRow,
+  OtaVolumeChart,
+  AlertsSection,
+} from '@/components/admin'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { RefreshCw } from 'lucide-react'
@@ -9,17 +17,21 @@ import { RefreshCw } from 'lucide-react'
 /**
  * Admin dashboard home page
  *
- * Displays platform-wide stats, system health, and recent activity
+ * Displays comprehensive operational snapshot with system status,
+ * key metrics, OTA volume chart, activity feed, and alerts.
  */
 export default function AdminDashboardPage() {
   const { data: stats, isLoading: statsLoading, dataUpdatedAt } = useAdminStats()
-  const { data: healthData, isLoading: healthLoading } = useSystemHealth({ limit: 10 })
-  const { data: activityData, isLoading: activityLoading } = useRecentActivity({
-    limit: 10,
-  })
+  const { data: activityData, isLoading: activityLoading } = useRecentActivity({ limit: 10 })
+  const { data: otaMetrics, isLoading: otaLoading } = useOtaMetrics('24h')
+  const { data: buildQueue, isLoading: buildLoading } = useBuildQueue()
+  const { data: apiHealth, isLoading: apiLoading } = useApiHealth()
+  const { data: storage, isLoading: storageLoading } = useStorageMetrics()
+
+  const opsLoading = otaLoading || buildLoading || apiLoading || storageLoading
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
@@ -33,17 +45,43 @@ export default function AdminDashboardPage() {
         )}
       </div>
 
-      {/* Stats grid */}
+      {/* System Status Bar */}
+      <SystemStatusBar
+        apiHealth={apiHealth}
+        buildQueue={buildQueue}
+        storage={storage}
+        isLoading={opsLoading}
+      />
+
+      {/* Key Metrics Row */}
+      <KeyMetricsRow
+        otaMetrics={otaMetrics}
+        buildQueue={buildQueue}
+        apiHealth={apiHealth}
+        storage={storage}
+        stats={stats}
+        isLoading={statsLoading || opsLoading}
+      />
+
+      {/* Alerts Section */}
+      <AlertsSection
+        buildQueue={buildQueue}
+        storage={storage}
+        apiHealth={apiHealth}
+        isLoading={opsLoading}
+      />
+
+      {/* Charts Row */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <OtaVolumeChart hourlyData={otaMetrics?.hourlyBreakdown} isLoading={otaLoading} />
+        <ActivityFeed items={activityData?.items} isLoading={activityLoading} />
+      </div>
+
+      {/* Stats grid - existing */}
       <StatsGrid data={stats} isLoading={statsLoading} />
 
       {/* Subscription breakdown */}
       {stats && <SubscriptionBreakdown data={stats.subscriptions.byPlan} />}
-
-      {/* Two column layout for health and activity */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <HealthIndicators alerts={healthData?.items} isLoading={healthLoading} />
-        <ActivityFeed items={activityData?.items} isLoading={activityLoading} />
-      </div>
     </div>
   )
 }
@@ -61,7 +99,7 @@ function CacheIndicator({ generatedAt, updatedAt }: CacheIndicatorProps) {
     <div className="flex items-center gap-2 text-xs text-text-light">
       <RefreshCw className="w-3 h-3" />
       <span>
-        Cached {age > 0 ? `${age}s` : 'just now'} (fetched {localAge}s ago)
+        Cached {age > 0 ? `${String(age)}s` : 'just now'} (fetched {String(localAge)}s ago)
       </span>
     </div>
   )
@@ -129,7 +167,7 @@ function SubscriptionBreakdown({ data }: SubscriptionBreakdownProps) {
               <div
                 key={plan}
                 className={barColor}
-                style={{ width: `${percentage}%` }}
+                style={{ width: `${String(percentage)}%` }}
               />
             )
           })}

@@ -38,10 +38,10 @@ function PauseIcon({ className = "w-6 h-6" }: { className?: string }) {
 
 export function StagedRollouts() {
   return (
-    <section className="container-fluid py-24 bg-warm-green/10 rounded-tl-[6rem] rounded-br-3xl my-8 shadow-lg">
+    <section className="container-fluid py-16 bg-warm-green/10 rounded-tl-[6rem] rounded-br-3xl my-6 shadow-lg">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2 bg-warm-green/30 text-green-700 text-sm font-bold px-4 py-2 rounded-full mb-6">
             <SlidersIcon className="w-5 h-5" />
             STAGED ROLLOUTS
@@ -143,53 +143,53 @@ export function StagedRollouts() {
           </div>
 
           {/* Right: Features list */}
-          <div className="space-y-8">
-            <div className="flex gap-5">
-              <div className="w-14 h-14 bg-pastel-blue/30 rounded-2xl flex items-center justify-center flex-shrink-0">
-                <DeviceIcon className="w-7 h-7 text-blue-600" />
+          <div className="space-y-5">
+            <div className="flex gap-4">
+              <div className="w-12 h-12 bg-pastel-blue/30 rounded-xl flex items-center justify-center flex-shrink-0">
+                <DeviceIcon className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <h3 className="text-2xl font-bold mb-2 text-text-dark">Device Targeting</h3>
-                <p className="text-lg text-text-light leading-relaxed">
+                <h3 className="text-xl font-bold mb-1 text-text-dark">Device Targeting</h3>
+                <p className="text-base text-text-light leading-relaxed">
                   Roll out to specific device types first. iOS-only, Android-only,
                   or specific models. Test on older devices before going wide.
                 </p>
               </div>
             </div>
 
-            <div className="flex gap-5">
-              <div className="w-14 h-14 bg-warm-green/30 rounded-2xl flex items-center justify-center flex-shrink-0">
-                <GlobeIcon className="w-7 h-7 text-green-600" />
+            <div className="flex gap-4">
+              <div className="w-12 h-12 bg-warm-green/30 rounded-xl flex items-center justify-center flex-shrink-0">
+                <GlobeIcon className="w-6 h-6 text-green-600" />
               </div>
               <div>
-                <h3 className="text-2xl font-bold mb-2 text-text-dark">Timezone Targeting</h3>
-                <p className="text-lg text-text-light leading-relaxed">
+                <h3 className="text-xl font-bold mb-1 text-text-dark">Timezone Targeting</h3>
+                <p className="text-base text-text-light leading-relaxed">
                   Release during business hours in each region. Deploy to Europe
                   in the morning, US in the afternoon. Your support team stays ready.
                 </p>
               </div>
             </div>
 
-            <div className="flex gap-5">
-              <div className="w-14 h-14 bg-soft-yellow/50 rounded-2xl flex items-center justify-center flex-shrink-0">
-                <PercentIcon className="w-7 h-7 text-amber-600" />
+            <div className="flex gap-4">
+              <div className="w-12 h-12 bg-soft-yellow/50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <PercentIcon className="w-6 h-6 text-amber-600" />
               </div>
               <div>
-                <h3 className="text-2xl font-bold mb-2 text-text-dark">Percentage Rollouts</h3>
-                <p className="text-lg text-text-light leading-relaxed">
+                <h3 className="text-xl font-bold mb-1 text-text-dark">Percentage Rollouts</h3>
+                <p className="text-base text-text-light leading-relaxed">
                   Start with 1% of users. Monitor crashes and metrics. Then 10%,
                   25%, 50%, 100%. Gradual confidence at every step.
                 </p>
               </div>
             </div>
 
-            <div className="flex gap-5">
-              <div className="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center flex-shrink-0">
-                <PauseIcon className="w-7 h-7 text-red-500" />
+            <div className="flex gap-4">
+              <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <PauseIcon className="w-6 h-6 text-red-500" />
               </div>
               <div>
-                <h3 className="text-2xl font-bold mb-2 text-text-dark">Instant Pause</h3>
-                <p className="text-lg text-text-light leading-relaxed">
+                <h3 className="text-xl font-bold mb-1 text-text-dark">Instant Pause</h3>
+                <p className="text-base text-text-light leading-relaxed">
                   See something wrong? Pause the rollout immediately. No new users
                   get the update until you're ready to continue.
                 </p>

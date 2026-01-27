@@ -2,11 +2,11 @@ import { LightningIcon, ShieldCheckIcon, SlidersIcon } from '../icons'
 
 export function Features() {
   return (
-    <section id="features" className="container-fluid py-24 bg-neutral-100 rounded-tr-[7rem] rounded-bl-3xl my-8 shadow-md">
-      <h2 className="text-5xl font-extrabold mb-16 text-center text-neutral-900">
+    <section id="features" className="container-fluid py-16 bg-neutral-100 rounded-tr-[7rem] rounded-bl-3xl my-6 shadow-md">
+      <h2 className="text-4xl font-extrabold mb-10 text-center text-neutral-900">
         Built for Your Development Flow
       </h2>
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Feature 1: Skip the App Store */}
         <FeatureCard
           icon={<LightningIcon />}
@@ -68,12 +68,12 @@ function FeatureCard({ icon, title, description, footer, elevated }: FeatureCard
   const shadowClass = elevated ? 'shadow-lg hover:shadow-xl' : 'shadow hover:shadow-lg'
 
   return (
-    <div className={`p-10 bg-white rounded-2xl ${shadowClass} border border-neutral-200 hover:border-bright-accent transition-all duration-300 group`}>
-      <span className="text-neutral-400 group-hover:text-bright-accent mb-6 block text-5xl transition-colors feature-icon">
+    <div className={`p-6 bg-white rounded-2xl ${shadowClass} border border-neutral-200 hover:border-bright-accent transition-all duration-300 group`}>
+      <span className="text-neutral-400 group-hover:text-bright-accent mb-4 block text-4xl transition-colors feature-icon">
         {icon}
       </span>
-      <h3 className="text-2xl font-bold mb-4 text-neutral-900">{title}</h3>
-      <p className="text-lg text-neutral-600 leading-relaxed mb-6">
+      <h3 className="text-xl font-bold mb-3 text-neutral-900">{title}</h3>
+      <p className="text-base text-neutral-600 leading-relaxed mb-4">
         {description}
       </p>
       {footer}

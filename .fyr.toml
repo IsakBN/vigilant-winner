@@ -1,0 +1,37 @@
+[index]
+languages = []
+ignore = [
+    "target/**",
+    "node_modules/**",
+    ".git/**",
+    "*.min.js",
+]
+include = []
+
+[references]
+use_lsp = true
+lsp_timeout_ms = 5000
+default_confidence = "Probable"
+
+[search]
+default_limit = 10
+timeout_ms = 200
+
+[search.weights]
+semantic = 0.3499999940395355
+keyword = 0.25
+structural = 0.20000000298023224
+graph = 0.10000000149011612
+importance = 0.10000000149011612
+
+[embedding]
+model = "all-MiniLM-L3-v2"
+quantization = "Auto"
+chunk_tokens = 384
+overlap_tokens = 64
+
+[server]
+socket_path = "/tmp/ci.sock"
+http_enabled = false
+http_port = 3333
+http_bind = "127.0.0.1"

@@ -28,10 +28,16 @@ export function createAuth(env: Env): ReturnType<typeof betterAuth> {
   const pool = new Pool({ connectionString: env.DATABASE_URL })
   const db = drizzle(pool, { schema })
 
+  const isProduction = !env.API_URL?.includes('localhost')
+
   return betterAuth({
     database: drizzleAdapter(db, {
       provider: 'pg',
+      schema,
     }),
+    baseURL: env.API_URL || 'http://localhost:8787',
+    basePath: '/api/auth',
+    secret: env.BETTER_AUTH_SECRET,
     emailAndPassword: {
       enabled: true,
     },
@@ -53,12 +59,33 @@ export function createAuth(env: Env): ReturnType<typeof betterAuth> {
     session: {
       expiresIn: SESSION_EXPIRY_SECONDS,
       updateAge: SESSION_UPDATE_AGE_SECONDS,
+      cookieCache: {
+        enabled: true,
+        maxAge: 60 * 5, // 5 minutes
+      },
     },
     trustedOrigins: [
       env.DASHBOARD_URL,
       env.API_URL,
+      'https://bundlenudge.com',
+      'https://www.bundlenudge.com',
+      'https://app.bundlenudge.com',
+      'http://localhost:3000',
+      'http://localhost:3001',
     ],
-    secret: env.BETTER_AUTH_SECRET,
+    // Cross-subdomain cookie support for api.bundlenudge.com -> www.bundlenudge.com
+    advanced: {
+      crossSubDomainCookies: {
+        enabled: isProduction,
+        domain: '.bundlenudge.com',
+      },
+      defaultCookieAttributes: {
+        sameSite: isProduction ? 'none' : 'lax',
+        secure: isProduction,
+        httpOnly: true,
+        path: '/',
+      },
+    },
   })
 }
 

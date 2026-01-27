@@ -9,6 +9,8 @@ import com.facebook.react.bridge.*
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import org.json.JSONObject
 import java.io.File
+import java.io.FileInputStream
+import java.security.MessageDigest
 
 /**
  * BundleNudge Native Module for Android
@@ -74,7 +76,60 @@ class BundleNudgeModule(reactContext: ReactApplicationContext) : ReactContextBas
                 "$BUNDLES_DIR/$currentVersion/bundle.js"
             )
 
-            return if (bundlePath.exists()) bundlePath.absolutePath else null
+            if (!bundlePath.exists()) return null
+
+            // Validate hash before returning
+            if (!validateBundleHashStatic(bundlePath.absolutePath, context)) {
+                Log.e(TAG, "Bundle failed hash validation, falling back to embedded")
+                return null
+            }
+
+            return bundlePath.absolutePath
+        }
+
+        /**
+         * Validate bundle hash matches stored hash (static version for companion object)
+         * Returns true if valid or no hash stored (legacy), false if mismatch
+         */
+        private fun validateBundleHashStatic(bundlePath: String, context: Context): Boolean {
+            val metadata = loadMetadata(context) ?: return true
+            val expectedHash = metadata.optString("currentVersionHash", null)
+
+            if (expectedHash.isNullOrEmpty()) {
+                // No hash stored - skip validation (legacy bundle)
+                return true
+            }
+
+            val file = File(bundlePath)
+            if (!file.exists()) {
+                Log.e(TAG, "Cannot read bundle for hash validation: $bundlePath")
+                return false
+            }
+
+            return try {
+                val digest = MessageDigest.getInstance("SHA-256")
+                FileInputStream(file).use { fis ->
+                    val buffer = ByteArray(8192)
+                    var bytesRead: Int
+                    while (fis.read(buffer).also { bytesRead = it } != -1) {
+                        digest.update(buffer, 0, bytesRead)
+                    }
+                }
+                val actualHash = digest.digest().joinToString("") { "%02x".format(it) }
+
+                if (actualHash != expectedHash) {
+                    Log.e(TAG, "Hash mismatch! Expected: $expectedHash, Got: $actualHash")
+                    // Remove corrupt bundle
+                    file.delete()
+                    false
+                } else {
+                    Log.d(TAG, "Bundle hash validated successfully")
+                    true
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Hash validation failed: ${e.message}")
+                false
+            }
         }
 
         private fun getPendingBundlePath(context: Context): String? {
@@ -257,6 +312,7 @@ class BundleNudgeModule(reactContext: ReactApplicationContext) : ReactContextBas
             metadata.remove("currentVersion")
             metadata.remove("currentVersionHash")
             metadata.remove("pendingVersion")
+            metadata.remove("pendingVersionHash")
             metadata.remove("previousVersion")
             metadata.put("crashCount", 0)
             metadata.remove("lastCrashTime")
@@ -330,6 +386,16 @@ class BundleNudgeModule(reactContext: ReactApplicationContext) : ReactContextBas
             val bundleFile = File(bundleDir, "bundle.js")
             bundleFile.writeBytes(data)
 
+            // Calculate hash and save to metadata
+            val hash = calculateFileHash(bundleFile)
+            if (hash != null) {
+                val metadata = loadMetadata(reactApplicationContext) ?: JSONObject()
+                metadata.put("pendingVersion", sanitizedVersion)
+                metadata.put("pendingVersionHash", hash)
+                saveMetadata(metadata)
+                Log.d(TAG, "Bundle saved with hash: $hash")
+            }
+
             Log.d(TAG, "Bundle saved to: ${bundleFile.absolutePath}")
             promise.resolve(bundleFile.absolutePath)
         } catch (e: Exception) {
@@ -338,7 +404,57 @@ class BundleNudgeModule(reactContext: ReactApplicationContext) : ReactContextBas
         }
     }
 
+    /**
+     * Calculate SHA-256 hash of a file
+     * @param path Absolute path to the file
+     */
+    @ReactMethod
+    fun hashFile(path: String, promise: Promise) {
+        try {
+            val file = File(path)
+            if (!file.exists()) {
+                promise.reject("E_FILE_NOT_FOUND", "File not found: $path", null)
+                return
+            }
+
+            val digest = MessageDigest.getInstance("SHA-256")
+            FileInputStream(file).use { fis ->
+                val buffer = ByteArray(8192)
+                var bytesRead: Int
+                while (fis.read(buffer).also { bytesRead = it } != -1) {
+                    digest.update(buffer, 0, bytesRead)
+                }
+            }
+
+            val hash = digest.digest().joinToString("") { "%02x".format(it) }
+            promise.resolve(hash)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to hash file: ${e.message}")
+            promise.reject("E_HASH_FAILED", "Failed to hash file: ${e.message}", e)
+        }
+    }
+
     // MARK: - Private Helpers
+
+    /**
+     * Calculate SHA-256 hash of a file
+     */
+    private fun calculateFileHash(file: File): String? {
+        return try {
+            val digest = MessageDigest.getInstance("SHA-256")
+            FileInputStream(file).use { fis ->
+                val buffer = ByteArray(8192)
+                var bytesRead: Int
+                while (fis.read(buffer).also { bytesRead = it } != -1) {
+                    digest.update(buffer, 0, bytesRead)
+                }
+            }
+            digest.digest().joinToString("") { "%02x".format(it) }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to calculate file hash: ${e.message}")
+            null
+        }
+    }
 
     private fun hasPendingUpdate(): Boolean {
         val metadata = loadMetadata(reactApplicationContext) ?: return false
@@ -349,6 +465,7 @@ class BundleNudgeModule(reactContext: ReactApplicationContext) : ReactContextBas
     private fun applyPendingUpdate() {
         val metadata = loadMetadata(reactApplicationContext) ?: return
         val pendingVersion = metadata.optString("pendingVersion", null) ?: return
+        val pendingHash = metadata.optString("pendingVersionHash", null)
 
         Log.d(TAG, "Applying pending update: $pendingVersion")
 
@@ -358,6 +475,13 @@ class BundleNudgeModule(reactContext: ReactApplicationContext) : ReactContextBas
         }
         metadata.put("currentVersion", pendingVersion)
         metadata.remove("pendingVersion")
+
+        // Move pending hash to current hash
+        if (!pendingHash.isNullOrEmpty()) {
+            metadata.put("currentVersionHash", pendingHash)
+        }
+        metadata.remove("pendingVersionHash")
+
         metadata.put("crashCount", 0)
         metadata.remove("lastCrashTime")
 

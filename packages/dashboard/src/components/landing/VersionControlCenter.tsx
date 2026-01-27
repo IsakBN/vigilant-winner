@@ -39,10 +39,10 @@ function CheckCircleIcon({ className = "w-6 h-6" }: { className?: string }) {
 
 export function VersionControlCenter() {
   return (
-    <section className="container-fluid py-24 bg-pastel-blue/20 rounded-tr-[6rem] rounded-bl-3xl my-8 shadow-lg">
+    <section className="container-fluid py-16 bg-pastel-blue/20 rounded-tr-[6rem] rounded-bl-3xl my-6 shadow-lg">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2 bg-pastel-blue/40 text-blue-700 text-sm font-bold px-4 py-2 rounded-full mb-6">
             <EyeIcon className="w-5 h-5" />
             VERSION CONTROL CENTER
@@ -56,7 +56,7 @@ export function VersionControlCenter() {
         </div>
 
         {/* Main dashboard visualization */}
-        <div className="bg-cream-bg rounded-3xl shadow-xl border border-pastel-blue/30 overflow-hidden mb-16">
+        <div className="bg-cream-bg rounded-3xl shadow-xl border border-pastel-blue/30 overflow-hidden mb-10">
           {/* Window chrome */}
           <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
             <div className="flex gap-2">
@@ -164,8 +164,8 @@ export function VersionControlCenter() {
         </div>
 
         {/* Auto-rollback section */}
-        <div className="bg-gradient-to-br from-warm-green/10 via-cream-bg to-red-50/30 rounded-3xl p-8 md:p-12 border border-warm-green/30">
-          <div className="text-center mb-10">
+        <div className="bg-gradient-to-br from-warm-green/10 via-cream-bg to-red-50/30 rounded-3xl p-6 md:p-8 border border-warm-green/30">
+          <div className="text-center mb-6">
             <div className="inline-flex items-center gap-2 bg-warm-green/30 text-green-700 text-sm font-bold px-4 py-2 rounded-full mb-4">
               <ShieldCheckIcon className="w-5 h-5" />
               AUTO ROLLBACK

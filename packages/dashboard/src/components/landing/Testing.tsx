@@ -1,7 +1,7 @@
 export function Testing() {
   return (
-    <section className="container-fluid py-24 bg-soft-yellow/30 rounded-bl-[7rem] rounded-tr-3xl my-8 shadow-xl shadow-soft-yellow/10">
-      <div className="text-center mb-16 space-y-4">
+    <section className="container-fluid py-16 bg-soft-yellow/30 rounded-bl-[7rem] rounded-tr-3xl my-6 shadow-xl shadow-soft-yellow/10">
+      <div className="text-center mb-10 space-y-3">
         <div className="inline-flex items-center gap-2 bg-soft-yellow/50 text-amber-700 text-sm font-bold px-4 py-2 rounded-full">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -149,61 +149,61 @@ export function Testing() {
         </div>
 
         {/* Right: Features list */}
-        <div className="space-y-8">
-          <div className="flex gap-5">
-            <div className="w-14 h-14 bg-pastel-blue/30 rounded-2xl flex items-center justify-center flex-shrink-0">
-              <svg className="w-7 h-7 text-bright-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="space-y-5">
+          <div className="flex gap-4">
+            <div className="w-12 h-12 bg-pastel-blue/30 rounded-xl flex items-center justify-center flex-shrink-0">
+              <svg className="w-6 h-6 text-bright-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
             <div>
-              <h3 className="text-2xl font-bold mb-2 text-text-dark">Branch-Based Builds</h3>
-              <p className="text-lg text-text-light leading-relaxed">
+              <h3 className="text-xl font-bold mb-1 text-text-dark">Branch-Based Builds</h3>
+              <p className="text-base text-text-light leading-relaxed">
                 Connect any branch from your repo. Push code, get a testable build automatically.
                 Feature branches, hotfixes, experiments - all instantly available for testing.
               </p>
             </div>
           </div>
 
-          <div className="flex gap-5">
-            <div className="w-14 h-14 bg-soft-yellow/50 rounded-2xl flex items-center justify-center flex-shrink-0">
-              <svg className="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex gap-4">
+            <div className="w-12 h-12 bg-soft-yellow/50 rounded-xl flex items-center justify-center flex-shrink-0">
+              <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
               </svg>
             </div>
             <div>
-              <h3 className="text-2xl font-bold mb-2 text-text-dark">iOS & Android Builds</h3>
-              <p className="text-lg text-text-light leading-relaxed">
+              <h3 className="text-xl font-bold mb-1 text-text-dark">iOS & Android Builds</h3>
+              <p className="text-base text-text-light leading-relaxed">
                 Generate signed <strong>.ipa</strong> files for iOS and <strong>.apk/.aab</strong> for Android.
                 Ad-hoc distribution, TestFlight uploads, or internal testing - we handle the builds.
               </p>
             </div>
           </div>
 
-          <div className="flex gap-5">
-            <div className="w-14 h-14 bg-warm-green/30 rounded-2xl flex items-center justify-center flex-shrink-0">
-              <svg className="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex gap-4">
+            <div className="w-12 h-12 bg-warm-green/30 rounded-xl flex items-center justify-center flex-shrink-0">
+              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
               </svg>
             </div>
             <div>
-              <h3 className="text-2xl font-bold mb-2 text-text-dark">QR Code Distribution</h3>
-              <p className="text-lg text-text-light leading-relaxed">
+              <h3 className="text-xl font-bold mb-1 text-text-dark">QR Code Distribution</h3>
+              <p className="text-base text-text-light leading-relaxed">
                 Share builds with your team instantly. Scan a QR code, install the app.
                 No TestFlight invites, no Play Store internal testing setup.
               </p>
             </div>
           </div>
 
-          <div className="flex gap-5">
-            <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center flex-shrink-0">
-              <svg className="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex gap-4">
+            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
+              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
             </div>
             <div>
-              <h3 className="text-2xl font-bold mb-2 text-text-dark">Tester Management</h3>
-              <p className="text-lg text-text-light leading-relaxed">
+              <h3 className="text-xl font-bold mb-1 text-text-dark">Tester Management</h3>
+              <p className="text-base text-text-light leading-relaxed">
                 Invite testers by email. Manage device UDIDs for iOS ad-hoc builds.
                 Track who has installed which version.
               </p>

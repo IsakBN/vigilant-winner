@@ -55,3 +55,5 @@ packages/sdk/ios/Pods/
 packages/sdk/android/.gradle/
 packages/sdk/android/build/
 packages/sdk/android/local.properties
+.vercel
+.env*.local

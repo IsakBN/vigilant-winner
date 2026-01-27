@@ -7,7 +7,6 @@ import { Pricing } from '@/components/landing/Pricing'
 import { StagedRollouts } from '@/components/landing/StagedRollouts'
 import { VersionControlCenter } from '@/components/landing/VersionControlCenter'
 import { Testing } from '@/components/landing/Testing'
-import { OpenSource } from '@/components/landing/OpenSource'
 import { Footer } from '@/components/landing/Footer'
 
 // Force dynamic rendering for auth-aware navbar
@@ -26,7 +25,6 @@ export default function HomePage() {
         <StagedRollouts />
         <VersionControlCenter />
         <Testing />
-        <OpenSource />
       </main>
       <Footer />
     </>

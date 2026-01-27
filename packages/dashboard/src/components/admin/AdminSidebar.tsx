@@ -6,13 +6,22 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   Users,
-  AppWindow,
+  Building2,
   CreditCard,
-  Settings,
+  AppWindow,
+  Mail,
   Flag,
   X,
   Shield,
-  Mail,
+  CloudUpload,
+  Hammer,
+  Activity,
+  HardDrive,
+  ScrollText,
+  Database,
+  Settings,
+  ClipboardList,
+  Cog,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -21,14 +30,57 @@ interface AdminSidebarProps {
   onClose: () => void
 }
 
-const NAV_ITEMS = [
-  { href: '/admin', icon: LayoutDashboard, label: 'Overview' },
-  { href: '/admin/users', icon: Users, label: 'Users' },
-  { href: '/admin/apps', icon: AppWindow, label: 'Apps' },
-  { href: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions' },
-  { href: '/admin/newsletter', icon: Mail, label: 'Newsletter' },
-  { href: '/admin/feature-flags', icon: Flag, label: 'Feature Flags' },
-  { href: '/admin/settings', icon: Settings, label: 'Settings' },
+interface NavItem {
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+}
+
+interface NavGroup {
+  title: string
+  items: NavItem[]
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    title: 'Overview',
+    items: [{ href: '/admin', icon: LayoutDashboard, label: 'Dashboard' }],
+  },
+  {
+    title: 'Users & Accounts',
+    items: [
+      { href: '/admin/users', icon: Users, label: 'Users' },
+      { href: '/admin/organizations', icon: Building2, label: 'Organizations' },
+      { href: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions' },
+    ],
+  },
+  {
+    title: 'Content',
+    items: [
+      { href: '/admin/apps', icon: AppWindow, label: 'Apps' },
+      { href: '/admin/newsletter', icon: Mail, label: 'Newsletter' },
+      { href: '/admin/feature-flags', icon: Flag, label: 'Feature Flags' },
+    ],
+  },
+  {
+    title: 'Operations',
+    items: [
+      { href: '/admin/updates', icon: CloudUpload, label: 'OTA Updates' },
+      { href: '/admin/builds', icon: Hammer, label: 'Build Queue' },
+      { href: '/admin/api-health', icon: Activity, label: 'API Health' },
+      { href: '/admin/storage', icon: HardDrive, label: 'Storage' },
+      { href: '/admin/logs', icon: ScrollText, label: 'System Logs' },
+    ],
+  },
+  {
+    title: 'System',
+    items: [
+      { href: '/admin/database', icon: Database, label: 'Database' },
+      { href: '/admin/config', icon: Settings, label: 'Config' },
+      { href: '/admin/settings', icon: Cog, label: 'Settings' },
+      { href: '/admin/audit', icon: ClipboardList, label: 'Audit' },
+    ],
+  },
 ]
 
 /**
@@ -85,25 +137,36 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map((item) => {
-          const isActive =
-            item.href === '/admin'
-              ? pathname === '/admin'
-              : pathname.startsWith(item.href)
+      <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.title}>
+            <div className="px-3 mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-text-light">
+                {group.title}
+              </span>
+            </div>
+            <div className="space-y-1">
+              {group.items.map((item) => {
+                const isActive =
+                  item.href === '/admin'
+                    ? pathname === '/admin'
+                    : pathname.startsWith(item.href)
 
-          return (
-            <NavLink
-              key={item.label}
-              href={item.href}
-              active={isActive}
-              onClick={onClose}
-            >
-              <item.icon className="w-5 h-5" />
-              {item.label}
-            </NavLink>
-          )
-        })}
+                return (
+                  <NavLink
+                    key={item.label}
+                    href={item.href}
+                    active={isActive}
+                    onClick={onClose}
+                  >
+                    <item.icon className="w-5 h-5" />
+                    {item.label}
+                  </NavLink>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Back to dashboard link */}

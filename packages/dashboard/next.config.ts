@@ -4,9 +4,8 @@ import path from 'path'
 const nextConfig: NextConfig = {
   // Enable React strict mode for development
   reactStrictMode: true,
-  // Explicitly set the output file tracing root to this directory
-  // This fixes issues with Vercel detecting the wrong workspace root
-  outputFileTracingRoot: path.join(__dirname, './'),
+  // Set output file tracing root to monorepo root for proper dependency resolution
+  outputFileTracingRoot: path.join(__dirname, '../../'),
 
   // Redirects for old URLs
   // Using temporary redirects (307) to allow changing destinations later if needed

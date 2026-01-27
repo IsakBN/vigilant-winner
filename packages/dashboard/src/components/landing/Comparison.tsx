@@ -2,8 +2,8 @@ import { ClockIcon, LightningIcon } from "../icons"
 
 export function Comparison() {
   return (
-    <section className="container-fluid py-24 bg-warm-green/20 rounded-tl-[6rem] rounded-br-3xl my-8 shadow-xl shadow-warm-green/10">
-      <div className="text-center mb-16 space-y-4">
+    <section className="container-fluid py-16 bg-warm-green/20 rounded-tl-[6rem] rounded-br-3xl my-6 shadow-xl shadow-warm-green/10">
+      <div className="text-center mb-10 space-y-3">
         <h2 className="text-5xl font-extrabold tracking-tight text-text-dark">
           Two Ways to Ship
         </h2>
@@ -43,9 +43,6 @@ export function Comparison() {
 
         {/* The BundleNudge Way */}
         <ComparisonCard variant="new">
-          <div className="absolute top-0 right-0 bg-bright-accent px-5 py-2 text-sm text-white font-bold uppercase tracking-wider rounded-bl-xl shadow-md">
-            Recommended
-          </div>
           <ComparisonHeader
             icon={<LightningIcon className="w-8 h-8" />}
             title="The BundleNudge Way"
@@ -83,7 +80,7 @@ function ComparisonCard({ children, variant }: { children: React.ReactNode; vari
     : 'bg-gradient-to-br from-red-100/30 to-red-50/10'
 
   return (
-    <div className={`${baseClass} p-10 rounded-2xl relative overflow-hidden`}>
+    <div className={`${baseClass} p-6 rounded-2xl relative overflow-hidden`}>
       <div className={`absolute inset-0 ${gradientClass} rounded-2xl`} />
       <div className="relative z-10 h-full flex flex-col">
         {children}
@@ -100,18 +97,18 @@ function ComparisonHeader({ icon, title, variant }: { icon: React.ReactNode; tit
   const titleClass = isNew ? 'text-bright-accent' : 'text-red-700'
 
   return (
-    <div className="flex items-center gap-4 mb-8">
-      <span className={`${iconClass} p-4 rounded-full text-3xl shadow-md flex items-center justify-center`}>
+    <div className="flex items-center gap-3 mb-6">
+      <span className={`${iconClass} p-3 rounded-full text-2xl shadow-md flex items-center justify-center`}>
         {icon}
       </span>
-      <h3 className={`text-3xl font-extrabold ${titleClass}`}>{title}</h3>
+      <h3 className={`text-2xl font-extrabold ${titleClass}`}>{title}</h3>
     </div>
   )
 }
 
 function ComparisonList({ children, variant }: { children: React.ReactNode; variant: Variant }) {
   const textClass = variant === 'new' ? 'text-text-dark font-medium' : 'text-text-light'
-  return <ul className={`space-y-5 text-lg ${textClass} flex-1`}>{children}</ul>
+  return <ul className={`space-y-3 text-base ${textClass} flex-1`}>{children}</ul>
 }
 
 function ComparisonItem({ children, step, variant }: { children: React.ReactNode; step: number; variant: Variant }) {
@@ -128,7 +125,7 @@ function ComparisonItem({ children, step, variant }: { children: React.ReactNode
 
 function ComparisonFooter({ children, variant }: { children: React.ReactNode; variant: Variant }) {
   const borderClass = variant === 'new' ? 'border-bright-accent/30' : 'border-red-200'
-  return <div className={`mt-8 pt-6 border-t ${borderClass}`}>{children}</div>
+  return <div className={`mt-6 pt-4 border-t ${borderClass}`}>{children}</div>
 }
 
 function TerminalDemo() {
