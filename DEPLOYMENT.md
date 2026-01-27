@@ -57,78 +57,97 @@ You will need:
 
 ## 2. Cloudflare Setup
 
-### 2.1 Create D1 Database
+**IMPORTANT:** Resources must be created in this order:
+1. Worker (must exist first to bind resources)
+2. D1 Database
+3. R2 Bucket
+4. KV Namespaces
+5. Queues
+
+### 2.1 Create the Worker First
+
+```bash
+cd packages/api
+
+# Deploy the worker first (creates the worker)
+# This will fail on first run due to missing bindings - that's OK
+wrangler deploy --name bundlenudge-prod || true
+
+# Or create with a minimal config first
+```
+
+### 2.2 Create D1 Database
 
 ```bash
 # Create production database
-wrangler d1 create bundlenudge-db
+wrangler d1 create bundlenudge-prod-db
 
 # Note the database_id from the output
 # Example: database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 ```
 
-### 2.2 Create R2 Bucket
+### 2.3 Create R2 Bucket
 
 ```bash
 # Create bucket for bundle storage
-wrangler r2 bucket create bundlenudge-bundles
+wrangler r2 bucket create bundlenudge-prod-bundles
 
 # Verify creation
 wrangler r2 bucket list
 ```
 
-### 2.3 Create KV Namespaces
+### 2.4 Create KV Namespaces
 
 ```bash
 # Rate limiting KV
-wrangler kv:namespace create "RATE_LIMIT"
+wrangler kv:namespace create "RATE_LIMIT" --preview false
 # Note the id from output
 
 # Cache KV (for admin dashboard, etc.)
-wrangler kv:namespace create "CACHE"
+wrangler kv:namespace create "CACHE" --preview false
 # Note the id from output
 ```
 
-### 2.4 Create Queues
+### 2.5 Create Queues
 
 BundleNudge uses priority queues for fair build processing (P0=Enterprise, P1=Team, P2=Pro, P3=Free):
 
 ```bash
 # Priority 0 - Enterprise (highest priority)
-wrangler queues create bundlenudge-builds-p0
+wrangler queues create bundlenudge-prod-builds-p0
 
 # Priority 1 - Team
-wrangler queues create bundlenudge-builds-p1
+wrangler queues create bundlenudge-prod-builds-p1
 
 # Priority 2 - Pro
-wrangler queues create bundlenudge-builds-p2
+wrangler queues create bundlenudge-prod-builds-p2
 
 # Priority 3 - Free (lowest priority)
-wrangler queues create bundlenudge-builds-p3
+wrangler queues create bundlenudge-prod-builds-p3
 
 # Dead Letter Queue (failed jobs)
-wrangler queues create bundlenudge-builds-dlq
+wrangler queues create bundlenudge-prod-builds-dlq
 ```
 
-### 2.5 Update wrangler.toml
+### 2.6 Update wrangler.toml
 
-Update `packages/api/wrangler.toml` with your actual IDs:
+Create `packages/api/wrangler.prod.toml` with your actual IDs:
 
 ```toml
-name = "bundlenudge-api"
+name = "bundlenudge-prod"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
 # D1 Database
 [[d1_databases]]
 binding = "DB"
-database_name = "bundlenudge-db"
+database_name = "bundlenudge-prod-db"
 database_id = "YOUR_D1_DATABASE_ID"
 
 # R2 Bucket for bundles
 [[r2_buckets]]
 binding = "BUNDLES"
-bucket_name = "bundlenudge-bundles"
+bucket_name = "bundlenudge-prod-bundles"
 
 # KV for rate limiting
 [[kv_namespaces]]
@@ -143,38 +162,52 @@ id = "YOUR_CACHE_KV_ID"
 # Priority Queues
 [[queues.producers]]
 binding = "BUILD_QUEUE_P0"
-queue = "bundlenudge-builds-p0"
+queue = "bundlenudge-prod-builds-p0"
 
 [[queues.producers]]
 binding = "BUILD_QUEUE_P1"
-queue = "bundlenudge-builds-p1"
+queue = "bundlenudge-prod-builds-p1"
 
 [[queues.producers]]
 binding = "BUILD_QUEUE_P2"
-queue = "bundlenudge-builds-p2"
+queue = "bundlenudge-prod-builds-p2"
 
 [[queues.producers]]
 binding = "BUILD_QUEUE_P3"
-queue = "bundlenudge-builds-p3"
+queue = "bundlenudge-prod-builds-p3"
 
 [[queues.producers]]
 binding = "BUILD_QUEUE_DLQ"
-queue = "bundlenudge-builds-dlq"
+queue = "bundlenudge-prod-builds-dlq"
+
+# Durable Objects
+[durable_objects]
+bindings = [
+  { name = "REALTIME", class_name = "RealtimeDO" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RealtimeDO"]
+
+# Cron triggers
+[triggers]
+crons = ["0 * * * *"]
 
 [vars]
 ENVIRONMENT = "production"
 ```
 
-### 2.6 Deploy the Worker
+### 2.7 Deploy the Worker
 
 ```bash
 cd packages/api
 
-# Deploy to production
-wrangler deploy
+# Deploy to production using prod config
+wrangler deploy --config wrangler.prod.toml
 
 # The output will show your worker URL:
-# https://bundlenudge-api.your-subdomain.workers.dev
+# https://bundlenudge-prod.your-subdomain.workers.dev
 ```
 
 ---
@@ -207,7 +240,7 @@ cd packages/api
 pnpm drizzle-kit generate
 
 # Push to D1 (remote)
-wrangler d1 execute bundlenudge-db --remote --file=./drizzle/0000_*.sql
+wrangler d1 execute bundlenudge-prod-db --remote --file=./drizzle/0000_*.sql
 
 # Or use Drizzle push for development
 pnpm drizzle-kit push
@@ -218,7 +251,7 @@ pnpm drizzle-kit push
 After migrations, seed the required subscription plans:
 
 ```bash
-wrangler d1 execute bundlenudge-db --remote --command "
+wrangler d1 execute bundlenudge-prod-db --remote --command "
 INSERT INTO subscription_plans (id, name, display_name, price_cents, mau_limit, storage_gb, bundle_retention, features, is_active, created_at)
 VALUES
   ('plan_free', 'free', 'Free', 0, 1000, 1, 7, '{\"hasAnalytics\":false,\"hasWebhooks\":false}', 1, unixepoch()),
@@ -336,7 +369,7 @@ openssl rand -hex 32
 4. Update the `subscription_plans` table with Stripe price IDs:
 
 ```bash
-wrangler d1 execute bundlenudge-db --remote --command "
+wrangler d1 execute bundlenudge-prod-db --remote --command "
 UPDATE subscription_plans SET stripe_price_id = 'price_YOUR_PRO_PRICE_ID' WHERE name = 'pro';
 UPDATE subscription_plans SET stripe_price_id = 'price_YOUR_TEAM_PRICE_ID' WHERE name = 'team';
 "
@@ -592,13 +625,13 @@ In Cloudflare DNS, add a CNAME or use Workers Routes:
 ```
 Type: CNAME
 Name: api
-Target: bundlenudge-api.your-subdomain.workers.dev
+Target: bundlenudge-prod.your-subdomain.workers.dev
 Proxy: Yes (orange cloud)
 ```
 
 Or configure a Workers Route:
 - Route: `api.bundlenudge.com/*`
-- Worker: `bundlenudge-api`
+- Worker: `bundlenudge-prod`
 
 ### 8.2 Dashboard Domain
 
@@ -668,7 +701,7 @@ curl -X POST https://api.bundlenudge.com/v1/auth/forgot-password \
 
 ```bash
 # Check D1 is accessible
-wrangler d1 execute bundlenudge-db --remote --command "SELECT COUNT(*) FROM subscription_plans;"
+wrangler d1 execute bundlenudge-prod-db --remote --command "SELECT COUNT(*) FROM subscription_plans;"
 ```
 
 ### R2 Storage
@@ -682,7 +715,7 @@ wrangler r2 object list bundlenudge-bundles
 
 ```bash
 # Create first admin user (run from local with wrangler)
-wrangler d1 execute bundlenudge-db --remote --command "
+wrangler d1 execute bundlenudge-prod-db --remote --command "
 INSERT INTO admins (id, email, name, password_hash, role, created_at, updated_at)
 VALUES ('admin_1', 'admin@bundlenudge.com', 'Admin', 'REPLACE_WITH_BCRYPT_HASH', 'super_admin', unixepoch(), unixepoch());
 "
@@ -695,7 +728,7 @@ VALUES ('admin_1', 'admin@bundlenudge.com', 'Admin', 'REPLACE_WITH_BCRYPT_HASH',
 ### 10.1 Cloudflare Analytics
 
 Workers analytics are available at:
-- [Cloudflare Dashboard](https://dash.cloudflare.com) > Workers > bundlenudge-api > Analytics
+- [Cloudflare Dashboard](https://dash.cloudflare.com) > Workers > bundlenudge-prod > Analytics
 
 Monitor:
 - Request count
@@ -735,7 +768,7 @@ Configure alerts for:
 View worker logs in real-time:
 
 ```bash
-wrangler tail bundlenudge-api
+wrangler tail bundlenudge-prod
 ```
 
 ---
@@ -829,7 +862,7 @@ jobs:
 
 ```bash
 # Deploy API to Cloudflare Workers
-cd packages/api && wrangler deploy
+cd packages/api && wrangler deploy --config wrangler.prod.toml
 
 # Deploy Dashboard to Vercel
 cd packages/dashboard && vercel --prod
@@ -841,10 +874,10 @@ cd packages/docs && vercel --prod
 cd packages/worker && fly deploy
 
 # Run D1 migrations
-cd packages/api && wrangler d1 execute bundlenudge-db --remote --file=./drizzle/migrations/0001_*.sql
+cd packages/api && wrangler d1 execute bundlenudge-prod-db --remote --file=./drizzle/migrations/0001_*.sql
 
 # View Worker logs
-wrangler tail bundlenudge-api
+wrangler tail bundlenudge-prod
 
 # Check secrets
 wrangler secret list
