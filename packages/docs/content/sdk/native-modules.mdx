@@ -1,0 +1,373 @@
+---
+title: "Native Modules"
+description: "Understanding the iOS and Android native modules"
+order: 4
+---
+
+# Native Modules
+
+BundleNudge includes native modules for both iOS and Android that handle critical operations that can't be done in JavaScript alone. This page explains what they do and how to set them up correctly.
+
+## What the Native Modules Do
+
+The native modules are responsible for:
+
+1. **Bundle Loading**: Providing the correct bundle URL to React Native at startup
+2. **App Restart**: Reloading the app with a new bundle
+3. **File Storage**: Safely storing downloaded bundles
+4. **Hash Verification**: Verifying bundle integrity using SHA-256
+5. **Crash Detection**: Detecting crash loops before JavaScript loads
+6. **Metadata Management**: Persisting version and crash data
+
+Without the native modules, the SDK falls back to a JavaScript-only mode that can't actually apply updates.
+
+## Checking Native Module Availability
+
+You can check if native modules are properly linked:
+
+```typescript
+import { getBundleNudgeStatus } from '@bundlenudge/sdk'
+
+const status = getBundleNudgeStatus()
+if (!status.isNativeAvailable) {
+  console.warn('BundleNudge native module not linked!')
+}
+```
+
+## iOS Setup
+
+### Module Location
+
+The iOS native module is in:
+- `@bundlenudge/sdk/ios/BundleNudge.swift`
+- `@bundlenudge/sdk/ios/BundleNudge.m` (Objective-C bridge)
+
+### Required Changes
+
+#### 1. Update AppDelegate
+
+Your AppDelegate must use BundleNudge's bundle URL:
+
+**Swift:**
+```swift
+import BundleNudge
+
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate {
+
+  override func sourceURL(for bridge: RCTBridge!) -> URL! {
+    // Check for BundleNudge bundle first
+    if let bundleURL = BundleNudge.bundleURL() {
+      return bundleURL
+    }
+
+    // Fall back to embedded bundle
+    #if DEBUG
+    return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
+    #else
+    return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
+    #endif
+  }
+}
+```
+
+**Objective-C:**
+```objc
+#import <BundleNudge/BundleNudge.h>
+
+- (NSURL *)sourceURLForBridge:(RCTBridge *)bridge {
+  NSURL *bundleURL = [BundleNudge bundleURL];
+  if (bundleURL) {
+    return bundleURL;
+  }
+
+  #if DEBUG
+  return [[RCTBundleURLProvider sharedSettings] jsBundleURLForBundleRoot:@"index"];
+  #else
+  return [[NSBundle mainBundle] URLForResource:@"main" withExtension:@"jsbundle"];
+  #endif
+}
+```
+
+#### 2. Install CocoaPods
+
+```bash
+cd ios && pod install
+```
+
+### iOS Native APIs
+
+The module exposes these native methods (called from JavaScript):
+
+| Method | Description |
+|--------|-------------|
+| `getConfiguration()` | Returns app version, build number, bundle ID |
+| `getCurrentBundleInfo()` | Returns current/pending/previous version info |
+| `getBundlePath()` | Returns the active bundle file path |
+| `notifyAppReady()` | Marks the current update as successful |
+| `restartApp(onlyIfPending)` | Restarts with new bundle |
+| `clearUpdates()` | Removes all downloaded bundles |
+| `saveBundleToStorage(version, data)` | Saves a bundle to disk |
+| `hashFile(path)` | Calculates SHA-256 hash of a file |
+
+### iOS Static Methods
+
+These are called from native code (AppDelegate):
+
+```swift
+// Get bundle URL (returns OTA bundle or nil)
+BundleNudge.bundleURL() -> URL?
+
+// Get BundleNudge directory path
+BundleNudge.bundleNudgePath() -> String
+```
+
+### iOS Storage Location
+
+Bundles are stored in:
+```
+Documents/bundlenudge/bundles/{version}/bundle.js
+```
+
+Metadata is stored in:
+```
+Documents/bundlenudge/metadata.json
+```
+
+## Android Setup
+
+### Module Location
+
+The Android native module is in:
+- `@bundlenudge/sdk/android/src/main/java/com/bundlenudge/BundleNudgeModule.kt`
+- `@bundlenudge/sdk/android/src/main/java/com/bundlenudge/BundleNudgePackage.kt`
+
+### Required Changes
+
+#### 1. Update MainApplication
+
+Your MainApplication must use BundleNudge's bundle path:
+
+**Kotlin:**
+```kotlin
+import com.bundlenudge.BundleNudgeModule
+
+class MainApplication : Application(), ReactApplication {
+
+  override val reactNativeHost: ReactNativeHost =
+    object : DefaultReactNativeHost(this) {
+
+      override fun getJSBundleFile(): String? {
+        // Returns OTA bundle path or null (uses embedded)
+        return BundleNudgeModule.getBundlePath(applicationContext)
+      }
+
+      override fun getUseDeveloperSupport(): Boolean = BuildConfig.DEBUG
+
+      override fun getPackages(): List<ReactPackage> = PackageList(this).packages
+    }
+}
+```
+
+**Java:**
+```java
+import com.bundlenudge.BundleNudgeModule;
+
+public class MainApplication extends Application implements ReactApplication {
+
+  private final ReactNativeHost mReactNativeHost =
+    new DefaultReactNativeHost(this) {
+
+      @Nullable
+      @Override
+      protected String getJSBundleFile() {
+        return BundleNudgeModule.getBundlePath(getApplicationContext());
+      }
+
+      @Override
+      public boolean getUseDeveloperSupport() {
+        return BuildConfig.DEBUG;
+      }
+
+      @Override
+      protected List<ReactPackage> getPackages() {
+        return new PackageList(this).getPackages();
+      }
+    };
+}
+```
+
+#### 2. Sync Gradle
+
+Run Gradle sync in Android Studio or:
+
+```bash
+cd android && ./gradlew clean && cd ..
+```
+
+### Android Native APIs
+
+The module exposes the same methods as iOS:
+
+| Method | Description |
+|--------|-------------|
+| `getConfiguration()` | Returns app version, build number, package name |
+| `getCurrentBundleInfo()` | Returns current/pending/previous version info |
+| `getBundlePath()` | Returns the active bundle file path |
+| `notifyAppReady()` | Marks the current update as successful |
+| `restartApp(onlyIfPending)` | Restarts with new bundle |
+| `clearUpdates()` | Removes all downloaded bundles |
+| `saveBundleToStorage(version, data)` | Saves a bundle to disk |
+| `hashFile(path)` | Calculates SHA-256 hash of a file |
+
+### Android Static Methods
+
+These are called from native code (MainApplication):
+
+```kotlin
+// Get bundle path (returns OTA bundle or null)
+BundleNudgeModule.getBundlePath(context: Context): String?
+
+// Get BundleNudge directory
+BundleNudgeModule.getBundleNudgePath(context: Context): File
+```
+
+### Android Storage Location
+
+Bundles are stored in:
+```
+/data/data/{package}/files/bundlenudge/bundles/{version}/bundle.js
+```
+
+Metadata is stored in:
+```
+/data/data/{package}/files/bundlenudge/metadata.json
+```
+
+## Bundle Verification
+
+Both iOS and Android perform SHA-256 hash verification when loading bundles:
+
+1. When a bundle is downloaded, its hash is calculated and stored
+2. On app startup, the stored bundle's hash is verified
+3. If hash doesn't match, the bundle is deleted and the embedded bundle is used
+
+This prevents:
+- Corrupted bundles from crashing the app
+- Tampered bundles from being loaded
+- Incomplete downloads from being used
+
+### How Hash Verification Works
+
+```
+Download Complete
+       |
+       v
++-------------------+
+| Calculate SHA-256 |
+| hash of bundle    |
++-------------------+
+       |
+       v
++-------------------+
+| Store hash in     |
+| metadata.json     |
++-------------------+
+       |
+       v
+       |
+   [ Next App Start ]
+       |
+       v
++-------------------+
+| Read bundle from  |
+| disk              |
++-------------------+
+       |
+       v
++-------------------+
+| Calculate hash    |
+| of stored bundle  |
++-------------------+
+       |
+       v
++-------------------+
+| Compare with      |    Mismatch?   +-------------------+
+| stored hash       | -------------> | Delete bundle,    |
++-------------------+                | use embedded      |
+       |                             +-------------------+
+       | Match
+       v
++-------------------+
+| Load bundle       |
++-------------------+
+```
+
+## Crash Detection Internals
+
+The native modules detect crash loops by tracking app starts:
+
+### Crash Detection Flow
+
+1. On every app start during verification, timestamp is recorded in metadata
+2. If multiple starts happen within `crashWindowMs`, it's a crash loop
+3. Native code checks this BEFORE loading JavaScript
+4. If threshold exceeded, native code loads the previous bundle instead
+
+```kotlin
+// Simplified Android crash detection logic
+fun shouldRollback(): Boolean {
+    val metadata = loadMetadata()
+    val crashCount = metadata.getInt("crashCount")
+    val lastCrash = metadata.getLong("lastCrashTime")
+    val now = System.currentTimeMillis()
+
+    if (now - lastCrash < CRASH_WINDOW_MS) {
+        return crashCount >= CRASH_THRESHOLD
+    }
+    return false
+}
+```
+
+This happens before JavaScript loads, so even if your JS crashes immediately, the native code can still detect and recover.
+
+## Path Traversal Protection
+
+Both modules sanitize version strings to prevent path traversal attacks:
+
+```kotlin
+// Version validation
+private val versionPattern = Regex("^[a-zA-Z0-9._-]+$")
+
+private fun sanitizeVersion(version: String): String {
+    return version
+        .replace(Regex("[/\\\\]"), "_")  // Remove path separators
+        .replace("..", "")                // Remove parent directory refs
+}
+
+private fun isValidVersion(version: String): Boolean {
+    return versionPattern.matches(version)
+}
+```
+
+Invalid versions like `../../../etc/passwd` are rejected with an error.
+
+## Fallback Behavior
+
+When native modules aren't available (e.g., Expo Go), the SDK provides a fallback:
+
+```typescript
+// What the fallback module does:
+{
+  getConfiguration: () => ({ appVersion: '1.0.0', buildNumber: '1', bundleId: 'unknown' }),
+  getCurrentBundleInfo: () => null,
+  getBundlePath: () => null,
+  notifyAppReady: () => true,
+  restartApp: () => false,      // Can't restart without native
+  clearUpdates: () => false,    // Can't clear without native
+  saveBundleToStorage: () => '', // Can't save without native
+  hashFile: () => '',           // Can't hash without native
+}
+```
+
+In fallback mode, the SDK initializes but can't actually apply updates. This is useful for testing the API integration without native modules.

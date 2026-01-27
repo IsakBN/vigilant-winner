@@ -1,0 +1,275 @@
+---
+title: "Releases"
+description: "Create, manage, and monitor releases for your React Native app updates"
+order: 2
+---
+
+# Releases
+
+Releases are versioned bundles of your JavaScript code that get pushed to users. Each release contains your compiled React Native bundle and can be deployed to specific channels.
+
+## Creating a Release
+
+To create a new release:
+
+1. Navigate to your app in the dashboard
+2. Click the **Releases** tab
+3. Click **New Release** in the top right
+
+[Screenshot: New Release Button]
+
+### Release Form
+
+Fill out the release details:
+
+#### Version
+
+Enter a version number in semantic versioning format:
+
+- `1.0.0` - Standard version
+- `2.1.0-beta.1` - Pre-release version
+- `1.0.0+build.123` - Version with build metadata
+
+The version must be unique within your app.
+
+#### Description (Optional)
+
+Add release notes describing what changed in this version. This is shown to users during updates and helps your team track changes.
+
+```
+- Fixed crash on profile screen
+- Improved loading performance
+- Added dark mode support
+```
+
+#### Channel
+
+Select which channel to deploy to:
+
+- **production** - Default channel for all users
+- **staging** - Internal testing
+- **beta** - Beta testers
+
+[See Channels documentation](/dashboard/channels) for setting up additional channels.
+
+#### Mandatory Update
+
+Toggle this option to force users to update before using the app.
+
+**Use sparingly** - Mandatory updates interrupt the user experience. Reserve them for:
+
+- Critical security fixes
+- Breaking API changes
+- Features that require server-side updates
+
+[Screenshot: Release Form]
+
+### Uploading Your Bundle
+
+After filling out the form:
+
+1. Drag and drop your `.jsbundle` file, or click to browse
+2. Wait for the upload to complete
+3. Click **Create Release**
+
+The bundle will be processed and verified before becoming available.
+
+---
+
+## Release States
+
+Each release has a status that indicates its current state:
+
+### Processing
+
+The release is being verified and prepared for distribution.
+
+- Bundle integrity is checked
+- Signature is verified
+- Metadata is extracted
+
+Releases typically process in under a minute.
+
+### Active
+
+The release is live and being distributed to devices based on:
+
+- Channel assignment
+- Rollout percentage
+- Targeting rules
+
+Active releases show green status badges in the dashboard.
+
+### Disabled
+
+The release has been manually disabled and won't be distributed to any devices.
+
+Common reasons to disable:
+
+- Bug discovered after deployment
+- Temporary pause for investigation
+- Superseded by newer version
+
+Disabled releases show a yellow status badge.
+
+---
+
+## Staged Rollouts
+
+Staged rollouts let you gradually deploy updates to a percentage of users, reducing risk.
+
+### How Rollout Percentage Works
+
+When you set a rollout percentage:
+
+- `10%` - Only 10% of eligible devices receive the update
+- `50%` - Half of eligible devices receive the update
+- `100%` - All eligible devices receive the update (full rollout)
+
+Devices are assigned consistently, so the same device will always be in or out of the rollout group until you change the percentage.
+
+### Adjusting Rollout
+
+To change the rollout percentage:
+
+1. Go to your release's detail page
+2. Find the **Rollout** section
+3. Use the slider or enter a value directly
+4. Use the preset buttons (10%, 25%, 50%, 100%) for common values
+
+[Screenshot: Rollout Slider]
+
+### Rollout Best Practices
+
+1. **Start small** - Begin with 10% to catch issues early
+2. **Monitor metrics** - Watch error rates before expanding
+3. **Expand gradually** - Move to 25%, then 50%, then 100%
+4. **Be ready to pause** - If problems arise, set to 0%
+
+---
+
+## Release Notes
+
+Release notes help users understand what's new and help your team track changes.
+
+### Writing Good Release Notes
+
+- Keep them concise but informative
+- Use bullet points for multiple changes
+- Highlight breaking changes prominently
+- Include relevant ticket or PR numbers
+
+### Updating Release Notes
+
+To update notes after creation:
+
+1. Click on the release to open its detail page
+2. Click the **Edit** button
+3. Update the description field
+4. Click **Save**
+
+---
+
+## Viewing Metrics
+
+Each release has detailed metrics showing its performance:
+
+[Screenshot: Release Stats]
+
+### Adoption Rate
+
+The percentage of eligible devices now running this release. Calculated as:
+
+```
+(Devices on this release / Total eligible devices) x 100
+```
+
+A healthy release should see steady adoption growth.
+
+### Total Downloads
+
+The number of times this release bundle has been downloaded. Multiple downloads from the same device (e.g., after app reinstall) are counted separately.
+
+### Active Devices
+
+The number of unique devices currently running this release and actively checking for updates.
+
+### Error Rate
+
+The percentage of downloads that resulted in errors:
+
+- Download failures
+- Verification failures
+- Apply failures
+
+A healthy release should have an error rate under 1%.
+
+### Understanding the Metrics
+
+| Metric | Good | Warning | Investigate |
+|--------|------|---------|-------------|
+| Adoption | Steady growth | Slow uptake | Declining |
+| Error Rate | < 1% | 1-5% | > 5% |
+
+---
+
+## Rollback from Dashboard
+
+If a release causes problems, you can rollback from the dashboard.
+
+### Triggering a Rollback
+
+1. Go to the problematic release's detail page
+2. Click the **more options** menu (three dots)
+3. Select **Rollback**
+4. Confirm in the dialog
+
+[Screenshot: Rollback Confirmation Dialog]
+
+### What Happens During Rollback
+
+1. The current release is disabled
+2. Devices check for updates on their next sync
+3. They receive the previous active release
+4. Metrics are logged for the rollback event
+
+### Automatic vs Manual Rollback
+
+BundleNudge supports two types of rollback:
+
+**Automatic Rollback** - The SDK detects crashes within seconds of applying an update and automatically reverts to the previous version. Configure this in [Health Settings](/dashboard/apps#health-configuration).
+
+**Manual Rollback** - You trigger a rollback from the dashboard when you notice issues through metrics or user reports.
+
+---
+
+## Managing Releases
+
+### Enabling/Disabling Releases
+
+To temporarily disable a release:
+
+1. Find the release in the list or detail page
+2. Click the **power icon** to toggle status
+3. Or use the dropdown menu and select **Disable**
+
+Disabled releases remain in your history but aren't distributed.
+
+### Deleting Releases
+
+To permanently delete a release:
+
+1. Open the release detail page
+2. Click the dropdown menu
+3. Select **Delete**
+4. Confirm in the dialog
+
+**Warning**: Deleted releases cannot be recovered. Devices running deleted releases will receive the next available version on their next update check.
+
+---
+
+## Next Steps
+
+- [Set up channels](/dashboard/channels) for staged deployments
+- [Configure health checks](/dashboard/apps#health-configuration) for automatic rollback
+- [Invite team members](/dashboard/teams) to collaborate on releases

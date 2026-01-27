@@ -1,0 +1,338 @@
+---
+title: "Core Concepts"
+description: "Understand the mental model behind BundleNudge: bundles, releases, channels, rollbacks, and binary version compatibility."
+order: 3
+---
+
+# Core Concepts
+
+Before diving deeper, let's make sure we share the same mental model. Understanding these concepts will help you use BundleNudge effectively and debug issues when they arise.
+
+## Bundles
+
+A **bundle** is a compiled JavaScript file that contains your React Native app's code and assets. When you run `react-native bundle`, you're creating a bundle.
+
+```bash
+# This creates a bundle
+npx react-native bundle \
+  --platform ios \
+  --dev false \
+  --entry-file index.js \
+  --bundle-output main.jsbundle
+```
+
+The resulting `main.jsbundle` file is what your app executes. It includes:
+
+- All your JavaScript/TypeScript code (transpiled)
+- Inline requires and dependencies
+- Some assets (images, fonts) embedded as base64
+
+When BundleNudge delivers an update, we're replacing this bundle file on the device. The native shell stays the same—only the JavaScript changes.
+
+### Bundle Hash
+
+Every bundle has a unique SHA-256 hash that serves as its fingerprint. This hash is used to:
+
+- Verify the download wasn't corrupted
+- Detect tampering
+- Deduplicate identical bundles
+- Track which version a device is running
+
+```
+Bundle: main.jsbundle
+Hash:   sha256:a1b2c3d4e5f6...
+Size:   2.4 MB
+```
+
+## Releases
+
+A **release** is a bundle that you've uploaded to BundleNudge and made available for devices to download. Think of it as a published version.
+
+Each release has:
+
+| Property | Description |
+|----------|-------------|
+| **Version** | Human-readable identifier (e.g., "1.2.0" or "hotfix-login") |
+| **Bundle** | The compiled JavaScript file |
+| **Target Version** | Which binary versions this release is compatible with |
+| **Channel** | Where this release is deployed (production, staging, etc.) |
+| **Status** | Active, paused, or rolled back |
+| **Metadata** | Release notes, deployment percentage, etc. |
+
+```
+Release: v1.2.0
+├── Bundle Hash: sha256:a1b2c3...
+├── Target Binary: 1.0.x
+├── Channel: production
+├── Status: active
+├── Rollout: 100%
+└── Created: 2024-01-15 10:30:00
+```
+
+### Release Lifecycle
+
+A release goes through several states:
+
+```
+Created ──▶ Active ──▶ Superseded
+              │
+              ▼
+           Paused ──▶ Rolled Back
+```
+
+- **Active**: Devices will receive this update
+- **Paused**: Temporarily stopped; devices keep their current version
+- **Rolled Back**: Devices revert to the previous release
+- **Superseded**: A newer release has replaced this one
+
+## Channels
+
+A **channel** is a deployment target. It lets you push different bundles to different groups of users.
+
+Every app has at least three default channels:
+
+| Channel | Purpose |
+|---------|---------|
+| **production** | Your live users |
+| **staging** | Internal testing before release |
+| **development** | Local development and CI |
+
+You can create custom channels for more advanced workflows:
+
+```
+├── production      (100% of users)
+├── staging         (QA team)
+├── beta            (beta testers)
+├── canary          (1% of production, early adopters)
+└── feature-x       (specific feature flag group)
+```
+
+### How Channels Work
+
+When the SDK checks for updates, it requests from a specific channel:
+
+```tsx
+BundleNudge.initialize({
+  appId: 'your-app-id',
+  channel: 'production', // default
+});
+```
+
+Different devices can be on different channels. This enables:
+
+- **Staged rollouts**: Deploy to `canary` first, then `production`
+- **Beta testing**: Let beta users opt into the `beta` channel
+- **Feature flags**: Route specific users to a `feature-x` channel
+- **A/B testing**: Split users between channels randomly
+
+## Rollback
+
+**Rollback** is the safety mechanism that protects users from bad updates. If something goes wrong, the app automatically reverts to the previous working version.
+
+### Automatic Rollback
+
+BundleNudge tracks whether your app successfully starts after applying an update. Here's how it works:
+
+```
+Apply Update
+      │
+      ▼
+┌─────────────────┐
+│  Start App      │
+│  with new       │
+│  bundle         │
+└────────┬────────┘
+         │
+    ┌────┴────┐
+    │ Crash   │  Yes ──▶ Increment crash count
+    │ on      │          │
+    │ launch? │          ▼
+    └────┬────┘     ┌────────────┐
+         │         │ Crashes    │  Yes ──▶ ROLLBACK
+         │ No      │ >= 3 in    │
+         │         │ 10 sec?    │
+         ▼         └────┬───────┘
+┌─────────────────┐      │ No
+│ notifyAppReady  │      ▼
+│ called?         │  Wait for next launch
+└────────┬────────┘
+         │ Yes
+         ▼
+   Update Verified
+   (Safe to keep)
+```
+
+The key is calling `notifyAppReady()`:
+
+```tsx
+useEffect(() => {
+  // Call this after your app is fully loaded
+  // If the app crashes before this, it triggers rollback
+  BundleNudge.getInstance().notifyAppReady();
+}, []);
+```
+
+### Manual Rollback
+
+You can also trigger rollback manually from the dashboard or programmatically:
+
+```tsx
+// Roll back to previous version
+await BundleNudge.getInstance().rollback();
+```
+
+This is useful if you discover a bug that doesn't cause crashes but still needs immediate reverting.
+
+### Rollback Settings
+
+Configure how aggressive the rollback detection is:
+
+```tsx
+BundleNudge.initialize({
+  appId: 'your-app-id',
+
+  // How long the "verification window" lasts (default: 60 seconds)
+  // If app crashes within this window, it counts toward rollback
+  verificationWindowMs: 60000,
+
+  // How many crashes before rollback triggers (default: 3)
+  crashThreshold: 3,
+
+  // Time window for counting crashes (default: 10 seconds)
+  // 3 crashes in 10 seconds = rollback
+  crashWindowMs: 10000,
+});
+```
+
+## Binary Version Compatibility
+
+This is crucial: **not every bundle works with every binary version**.
+
+Your React Native app has two version numbers:
+
+1. **Binary version**: The version in your app store listing (e.g., "2.1.0")
+2. **Bundle version**: The JavaScript code version
+
+If your binary is "2.0.0" and you ship a bundle that uses a native API added in "2.1.0", the app will crash. BundleNudge prevents this with **target version matching**.
+
+### How It Works
+
+When you create a release, you specify which binary versions it's compatible with:
+
+```bash
+bundlenudge release \
+  --bundle main.jsbundle \
+  --target-version "2.0.x"  # Compatible with any 2.0.x binary
+```
+
+The SDK reports the device's binary version when checking for updates. BundleNudge only returns releases that match.
+
+### Version Patterns
+
+You can use patterns for flexibility:
+
+| Pattern | Matches |
+|---------|---------|
+| `2.0.0` | Exactly 2.0.0 |
+| `2.0.x` | Any 2.0.x (2.0.0, 2.0.1, 2.0.99) |
+| `2.x.x` | Any 2.x.x (2.0.0, 2.5.3, 2.99.99) |
+| `>=2.0.0` | 2.0.0 and above |
+| `>=2.0.0 <3.0.0` | 2.x.x range |
+
+### Example Scenario
+
+```
+Binary: 2.0.0 (in App Store)
+      │
+      ├── Bundle A (target: 2.0.x) ✓ Compatible
+      ├── Bundle B (target: 2.0.x) ✓ Compatible
+      └── Bundle C (target: 2.1.x) ✗ Not compatible
+
+Binary: 2.1.0 (new App Store release)
+      │
+      ├── Bundle A (target: 2.0.x) ✗ Not compatible*
+      ├── Bundle B (target: 2.0.x) ✗ Not compatible*
+      └── Bundle C (target: 2.1.x) ✓ Compatible
+
+* Unless explicitly marked as backward-compatible
+```
+
+### Best Practice
+
+Adopt a versioning strategy:
+
+1. **Major binary updates** (1.x → 2.x): Usually require new bundles
+2. **Minor binary updates** (2.0 → 2.1): May require new bundles if native APIs change
+3. **Patch binary updates** (2.0.0 → 2.0.1): Usually compatible with existing bundles
+
+We recommend targeting `major.minor.x` for most releases:
+
+```bash
+# Target all 2.1.x binaries
+bundlenudge release --target-version "2.1.x"
+```
+
+## Putting It All Together
+
+Here's how everything connects:
+
+```
+┌─────────────────────────────────────────────────────┐
+│                   BundleNudge Cloud                 │
+│                                                     │
+│  ┌─────────────────────────────────────────────┐   │
+│  │                   App                         │   │
+│  │                                               │   │
+│  │  ┌─────────────┐  ┌─────────────┐            │   │
+│  │  │  Channel:   │  │  Channel:   │            │   │
+│  │  │  production │  │  staging    │            │   │
+│  │  │             │  │             │            │   │
+│  │  │  Release    │  │  Release    │            │   │
+│  │  │  v2.1.0     │  │  v2.2.0-rc  │            │   │
+│  │  │  ├─ Bundle  │  │  ├─ Bundle  │            │   │
+│  │  │  ├─ Target  │  │  ├─ Target  │            │   │
+│  │  │  └─ Status  │  │  └─ Status  │            │   │
+│  │  └─────────────┘  └─────────────┘            │   │
+│  └───────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────┐
+│                   User's Device                     │
+│                                                     │
+│  ┌──────────────────────────────────────────────┐  │
+│  │  React Native App (Binary v2.1.0)             │  │
+│  │                                               │  │
+│  │  ┌──────────────┐  ┌──────────────┐          │  │
+│  │  │ Native Shell │  │ JS Bundle    │          │  │
+│  │  │ (unchanged)  │  │ (updatable)  │          │  │
+│  │  └──────────────┘  └──────────────┘          │  │
+│  │                                               │  │
+│  │  BundleNudge SDK:                            │  │
+│  │  ├── Channel: production                     │  │
+│  │  ├── Current: v2.1.0                         │  │
+│  │  ├── Previous: v2.0.5 (for rollback)         │  │
+│  │  └── Status: verified                        │  │
+│  └──────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────┘
+```
+
+## Quick Reference
+
+| Concept | Definition |
+|---------|------------|
+| **Bundle** | Compiled JavaScript file that runs in your app |
+| **Release** | A published bundle available for download |
+| **Channel** | Deployment target (production, staging, etc.) |
+| **Rollback** | Automatic or manual revert to previous working version |
+| **Binary Version** | App store version (2.1.0) |
+| **Target Version** | Which binary versions a release supports |
+
+## Next Steps
+
+Now that you understand the core concepts:
+
+- [Configure the SDK](/sdk/configuration) — all options explained
+- [Set up CI/CD](/sdk/ci-cd) — automate releases
+- [Use the dashboard](/dashboard/overview) — manage your apps
+- [Advanced rollout strategies](/dashboard/rollouts) — gradual deployments

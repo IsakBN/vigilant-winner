@@ -1,0 +1,47 @@
+{
+  "name": "BundleNudge",
+  "version": "1.0.0",
+  "description": "OTA updates for React Native apps",
+  "type": "llm-knowledge-pack",
+  "generatedAt": "2026-01-27T00:00:00Z",
+  "source": "docs.bundlenudge.com",
+  "contents": {
+    "README.md": {
+      "purpose": "Entry point for LLMs - read first",
+      "topics": ["overview", "quick-reference", "navigation"]
+    },
+    "sdk-integration.md": {
+      "purpose": "Complete SDK integration guide",
+      "topics": ["installation", "configuration", "channels", "rollback", "native-modules", "ci-cd"]
+    },
+    "api-reference.md": {
+      "purpose": "REST API documentation",
+      "topics": ["authentication", "endpoints", "webhooks", "errors", "rate-limits"]
+    },
+    "troubleshooting.md": {
+      "purpose": "Debug and fix common issues",
+      "topics": ["update-issues", "network-errors", "verification", "crashes", "native-module-issues"]
+    }
+  },
+  "keywords": [
+    "react-native",
+    "ota-updates",
+    "code-push",
+    "hot-update",
+    "javascript-bundle",
+    "hermes",
+    "rollback",
+    "mobile-deployment"
+  ],
+  "compatibility": {
+    "reactNative": ">=0.73.0",
+    "platforms": ["ios", "android"],
+    "expo": ">=50.0.0"
+  },
+  "links": {
+    "docs": "https://docs.bundlenudge.com",
+    "dashboard": "https://app.bundlenudge.com",
+    "api": "https://api.bundlenudge.com",
+    "npm": "https://www.npmjs.com/package/@bundlenudge/sdk"
+  }
+}

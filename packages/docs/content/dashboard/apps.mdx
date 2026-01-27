@@ -1,0 +1,176 @@
+---
+title: "Managing Apps"
+description: "Create, configure, and manage your React Native apps in the BundleNudge dashboard"
+order: 1
+---
+
+# Managing Apps
+
+Apps are the foundation of BundleNudge. Each app you create corresponds to a React Native application that will receive over-the-air updates.
+
+## Creating an App
+
+To create your first app:
+
+1. Navigate to your dashboard at `dashboard.bundlenudge.com`
+2. Click the **Create App** button in the top right corner
+3. In the modal that appears, you'll need to provide:
+
+[Screenshot: Create App Modal]
+
+### Platform Selection
+
+Choose the platform for your app:
+
+- **iOS** - For iPhone and iPad apps
+- **Android** - For Android devices
+
+You'll create separate apps for each platform, even if they share the same codebase.
+
+### App Name
+
+Enter a descriptive name for your app (e.g., "My Awesome App - iOS"). This name is for your reference in the dashboard and won't be visible to end users.
+
+- Maximum 100 characters
+- Choose something that helps you identify the app at a glance
+
+### Bundle ID (Optional)
+
+Enter your app's bundle identifier:
+
+- **iOS**: Your Bundle Identifier (e.g., `com.company.myapp`)
+- **Android**: Your Application ID (e.g., `com.company.myapp`)
+
+This should match the identifier in your app's native configuration. While optional during creation, providing it helps with verification and organization.
+
+Click **Create App** to finish. You'll be taken to the setup page with instructions for integrating the SDK.
+
+---
+
+## App Settings
+
+To access settings for an existing app:
+
+1. Go to your dashboard
+2. Click on the app you want to configure
+3. Click the **Settings** tab in the app navigation
+
+[Screenshot: App Settings Page]
+
+### General Settings
+
+The general settings section lets you update:
+
+- **App Name** - Rename your app
+- **Bundle ID** - Add or update the bundle identifier
+- **Platform** - View the platform (cannot be changed after creation)
+
+### Health Configuration
+
+Health checks help BundleNudge automatically detect and rollback problematic updates. Configure:
+
+#### Critical Events
+
+Events that must fire within a timeout after app start to consider the update healthy.
+
+1. Click **Add Event** in the Critical Events section
+2. Enter an event name (e.g., `app_ready`, `user_authenticated`)
+3. Set the timeout in seconds (default: 30)
+4. Toggle **Required** if this event must fire
+
+[Screenshot: Health Config Editor]
+
+#### Critical Endpoints
+
+API endpoints that are checked after your app reports ready.
+
+1. Click **Add Endpoint** in the Critical Endpoints section
+2. Select the HTTP method (GET, POST, etc.)
+3. Enter the URL to check
+4. Specify expected status codes (e.g., `200, 201`)
+5. Toggle **Required** if this endpoint must succeed
+
+Click **Save Configuration** when done.
+
+---
+
+## API Keys
+
+API keys authenticate your React Native app with BundleNudge servers.
+
+### Generating an API Key
+
+If you haven't generated a key yet:
+
+1. Go to your app's **Settings** tab
+2. Find the **API Key** section
+3. Click **Generate API Key**
+
+[Screenshot: API Key Manager - No Key]
+
+Your new key will be displayed. Copy it immediately and store it securely.
+
+### Viewing Your API Key
+
+By default, your API key is masked for security. To reveal it:
+
+1. Click the **eye icon** next to the masked key
+2. The full key will be displayed
+3. Click the eye icon again to hide it
+
+### Copying Your API Key
+
+Click the **Copy** button to copy the API key to your clipboard.
+
+### Regenerating an API Key
+
+If your key is compromised or you need a fresh one:
+
+1. Click the **Regenerate** button
+2. Confirm in the dialog that appears
+3. Your old key will be invalidated immediately
+
+**Warning**: Any apps using the old key will stop receiving updates until you update them with the new key.
+
+### Security Best Practices
+
+- **Never commit API keys** to version control
+- Use environment variables in your app
+- Regenerate keys if they may have been exposed
+- Keep keys secret from public repositories
+
+---
+
+## Deleting an App
+
+Only the account owner can delete apps. This action is permanent.
+
+To delete an app:
+
+1. Go to the app's **Settings** tab
+2. Scroll to the **Danger Zone** section at the bottom
+3. Click **Delete App**
+4. Type the app name to confirm
+5. Click **Delete Permanently**
+
+[Screenshot: Delete App Confirmation]
+
+**What happens when you delete an app:**
+
+- All releases are permanently deleted
+- All channels are removed
+- Historical metrics are lost
+- Devices will no longer receive updates
+- The app ID becomes unavailable
+
+Consider disabling the app or archiving releases instead if you might need the data later.
+
+---
+
+## Next Steps
+
+Once your app is created:
+
+1. [Install the SDK](/sdk/installation) in your React Native project
+2. [Create your first release](/dashboard/releases) to push an update
+3. [Set up channels](/dashboard/channels) for staged rollouts

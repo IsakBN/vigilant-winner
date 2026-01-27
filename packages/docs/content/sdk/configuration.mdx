@@ -1,0 +1,396 @@
+---
+title: "Configuration"
+description: "All SDK configuration options and best practices"
+order: 2
+---
+
+# Configuration
+
+BundleNudge offers flexible configuration to control how updates are checked, downloaded, and installed. This guide covers all available options.
+
+## Basic Configuration
+
+The simplest setup just needs your app ID:
+
+```typescript
+import { setupBundleNudge } from '@bundlenudge/sdk'
+
+await setupBundleNudge({
+  appId: 'your-app-id',
+})
+```
+
+## Full Configuration Options
+
+Here's every option available with their default values:
+
+```typescript
+import { setupBundleNudge } from '@bundlenudge/sdk'
+
+await setupBundleNudge({
+  // Required
+  appId: 'your-app-id',
+
+  // API Configuration
+  apiUrl: 'https://api.bundlenudge.com',  // Custom API URL (self-hosted)
+
+  // Update Behavior
+  checkOnLaunch: true,           // Check for updates when app starts
+  checkOnForeground: true,       // Check when app comes to foreground
+  installMode: 'nextLaunch',     // 'immediate' or 'nextLaunch'
+  minimumCheckInterval: 60,      // Minimum seconds between update checks
+
+  // Rollback Protection
+  verificationWindowMs: 60000,   // Time to verify update (60 seconds)
+  crashThreshold: 3,             // Crashes before rollback
+  crashWindowMs: 10000,          // Time window for crash counting
+
+  // Debugging
+  debug: false,                  // Enable verbose logging
+
+  // Callbacks (setupBundleNudge specific)
+  checkOnStart: true,            // Check immediately on setup
+  installOnNextRestart: true,    // Download for next restart
+  onUpdateAvailable: (update) => {},
+  onDownloadProgress: (percent) => {},
+  onUpdateInstalled: () => {},
+  onError: (error) => {},
+})
+```
+
+## Configuration Details
+
+### appId (required)
+
+Your unique app identifier from the BundleNudge dashboard. This identifies which app should receive updates.
+
+```typescript
+{
+  appId: 'app_abc123xyz'
+}
+```
+
+### apiUrl
+
+Override the API URL for self-hosted deployments or testing:
+
+```typescript
+// Self-hosted
+{
+  apiUrl: 'https://bundlenudge.your-company.com'
+}
+
+// Local development
+{
+  apiUrl: 'http://localhost:8787'
+}
+```
+
+### checkOnLaunch
+
+Whether to automatically check for updates when the app launches. Defaults to `true`.
+
+```typescript
+// Disable automatic checks
+{
+  checkOnLaunch: false
+}
+```
+
+When disabled, you'll need to manually trigger update checks:
+
+```typescript
+import { BundleNudge } from '@bundlenudge/sdk'
+
+const instance = BundleNudge.getInstance()
+const update = await instance.checkForUpdate()
+```
+
+### checkOnForeground
+
+Whether to check for updates when the app returns from background. Defaults to `true`.
+
+```typescript
+// Only check on launch, not on foreground
+{
+  checkOnLaunch: true,
+  checkOnForeground: false
+}
+```
+
+### installMode
+
+Controls when downloaded updates are applied:
+
+- `'nextLaunch'` (default): Update is applied on next app restart
+- `'immediate'`: App restarts immediately after download
+
+```typescript
+// Apply updates immediately (disruptive)
+{
+  installMode: 'immediate'
+}
+
+// Apply on next natural restart (recommended)
+{
+  installMode: 'nextLaunch'
+}
+```
+
+### minimumCheckInterval
+
+Minimum seconds between update checks to prevent excessive API calls. Defaults to `60`.
+
+```typescript
+// Allow checks every 5 minutes
+{
+  minimumCheckInterval: 300
+}
+
+// Allow more frequent checks for testing
+{
+  minimumCheckInterval: 10
+}
+```
+
+### Rollback Configuration
+
+These options control the automatic rollback protection:
+
+```typescript
+{
+  // Window for marking update as successful (default: 60 seconds)
+  verificationWindowMs: 60000,
+
+  // Number of crashes to trigger rollback (default: 3)
+  crashThreshold: 3,
+
+  // Time window for counting crashes (default: 10 seconds)
+  crashWindowMs: 10000
+}
+```
+
+See [Rollback Protection](/sdk/rollback-protection) for details.
+
+### debug
+
+Enable verbose logging for troubleshooting:
+
+```typescript
+{
+  debug: true
+}
+```
+
+This logs:
+- Update check requests and responses
+- Download progress
+- Bundle verification
+- Crash detection events
+
+## Environment-Specific Configuration
+
+Use different settings for development and production:
+
+```typescript
+import { setupBundleNudge } from '@bundlenudge/sdk'
+
+const isDev = __DEV__
+
+await setupBundleNudge({
+  appId: isDev ? 'dev-app-id' : 'prod-app-id',
+  apiUrl: isDev ? 'http://localhost:8787' : undefined,
+  debug: isDev,
+  minimumCheckInterval: isDev ? 10 : 60,
+})
+```
+
+Or use environment variables:
+
+```typescript
+import Config from 'react-native-config'
+
+await setupBundleNudge({
+  appId: Config.BUNDLENUDGE_APP_ID,
+  apiUrl: Config.BUNDLENUDGE_API_URL,
+  debug: Config.BUNDLENUDGE_DEBUG === 'true',
+})
+```
+
+## TypeScript Types
+
+The SDK exports all types for TypeScript projects:
+
+```typescript
+import type {
+  BundleNudgeConfig,
+  UpdateStatus,
+  UpdateInfo,
+  DownloadProgress,
+  UpdateCheckResult,
+} from '@bundlenudge/sdk'
+
+// Main configuration type
+interface BundleNudgeConfig {
+  appId: string
+  apiUrl?: string
+  debug?: boolean
+  checkOnLaunch?: boolean
+  checkOnForeground?: boolean
+  installMode?: 'immediate' | 'nextLaunch'
+  minimumCheckInterval?: number
+  verificationWindowMs?: number
+  crashThreshold?: number
+  crashWindowMs?: number
+}
+
+// Update status states
+type UpdateStatus =
+  | 'idle'
+  | 'checking'
+  | 'downloading'
+  | 'installing'
+  | 'up-to-date'
+  | 'update-available'
+  | 'error'
+
+// Update information
+interface UpdateInfo {
+  version: string
+  bundleUrl: string
+  bundleSize: number
+  bundleHash: string
+  releaseId: string
+  releaseNotes?: string
+}
+
+// Download progress
+interface DownloadProgress {
+  bytesDownloaded: number
+  totalBytes: number
+  percentage: number
+}
+```
+
+## Using the React Hook
+
+For React components, use the `useBundleNudge` hook:
+
+```typescript
+import { useBundleNudge } from '@bundlenudge/sdk'
+
+function UpdateBanner() {
+  const {
+    status,
+    updateAvailable,
+    updateInfo,
+    downloadProgress,
+    error,
+    currentVersion,
+    checkForUpdate,
+    downloadAndApply,
+    sync,
+  } = useBundleNudge()
+
+  if (updateAvailable) {
+    return (
+      <View>
+        <Text>Update available: {updateInfo?.version}</Text>
+        <Button title="Download" onPress={downloadAndApply} />
+      </View>
+    )
+  }
+
+  return null
+}
+```
+
+## Direct API Usage
+
+For more control, use the `BundleNudge` class directly:
+
+```typescript
+import { BundleNudge } from '@bundlenudge/sdk'
+
+// Get the singleton instance
+const bundleNudge = BundleNudge.getInstance()
+
+// Check for updates
+const update = await bundleNudge.checkForUpdate()
+
+// Download and install
+if (update) {
+  await bundleNudge.downloadAndInstall(update)
+}
+
+// One-step sync
+await bundleNudge.sync()
+
+// Get current version
+const version = bundleNudge.getCurrentVersion()
+
+// Notify the SDK that your app has rendered successfully
+await bundleNudge.notifyAppReady()
+
+// Manual rollback
+if (bundleNudge.canRollback()) {
+  await bundleNudge.rollback()
+}
+```
+
+## Best Practices
+
+### Always call notifyAppReady
+
+After your main UI renders, call `notifyAppReady()` to confirm the update is working:
+
+```typescript
+function App() {
+  useEffect(() => {
+    // Call after initial render
+    BundleNudge.getInstance().notifyAppReady()
+  }, [])
+
+  return <MainApp />
+}
+```
+
+### Use nextLaunch install mode
+
+Unless you have a specific reason, use `'nextLaunch'` to avoid disrupting users:
+
+```typescript
+{
+  installMode: 'nextLaunch'
+}
+```
+
+### Configure health monitoring
+
+For critical apps, configure health checks to catch issues before marking updates as verified:
+
+```typescript
+const bundleNudge = BundleNudge.getInstance()
+
+// Track critical events
+bundleNudge.trackEvent('main_screen_loaded')
+bundleNudge.trackEvent('user_authenticated')
+
+// Track API endpoints
+bundleNudge.trackEndpoint('GET', '/api/user', 200)
+```
+
+### Handle errors gracefully
+
+Always provide an error handler:
+
+```typescript
+await setupBundleNudge({
+  appId: 'your-app-id',
+  onError: (error) => {
+    // Log to your error tracking service
+    console.error('BundleNudge error:', error.message)
+    // Don't crash the app - updates are optional
+  },
+})
+```

@@ -1,0 +1,564 @@
+---
+title: "Webhooks"
+description: "Receive real-time notifications for BundleNudge events"
+order: 3
+---
+
+# Webhooks
+
+Webhooks allow you to receive real-time HTTP notifications when events occur in your BundleNudge apps. Use webhooks to trigger CI/CD pipelines, update dashboards, send alerts, or integrate with other services.
+
+## Available Events
+
+| Event | Description |
+|-------|-------------|
+| `release.created` | A new release was created |
+| `release.activated` | A release was activated (status changed to active) |
+| `release.paused` | A release was paused |
+| `release.rolled_back` | A release was rolled back |
+| `release.rollout_updated` | Rollout percentage was changed |
+| `device.first_seen` | A new device registered with the app |
+| `device.updated` | Device information was updated |
+| `update.downloaded` | A device downloaded an update |
+| `update.installed` | A device successfully installed an update |
+| `update.failed` | An update installation failed |
+| `crash.detected` | A crash was detected after an update |
+
+## Setting Up Webhooks
+
+### Via Dashboard
+
+1. Navigate to your app in the [BundleNudge Dashboard](https://app.bundlenudge.com)
+2. Go to **Settings** > **Webhooks**
+3. Click **Add Webhook**
+4. Enter your endpoint URL
+5. Select the events you want to receive
+6. Click **Create**
+
+Your webhook secret will be displayed once - save it securely for signature verification.
+
+### Via API
+
+```bash
+curl -X POST https://api.bundlenudge.com/v1/apps/{appId}/webhooks \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://your-server.com/webhooks/bundlenudge",
+    "events": ["release.created", "release.activated", "crash.detected"]
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "webhook": {
+    "id": "wh_123",
+    "url": "https://your-server.com/webhooks/bundlenudge",
+    "events": ["release.created", "release.activated", "crash.detected"],
+    "secret": "whsec_abc123...",
+    "isActive": true,
+    "createdAt": 1706400000
+  }
+}
+```
+
+## Payload Format
+
+All webhook payloads follow this structure:
+
+```json
+{
+  "id": "evt_550e8400-e29b-41d4-a716-446655440000",
+  "event": "release.created",
+  "timestamp": 1706400000,
+  "appId": "550e8400-e29b-41d4-a716-446655440000",
+  "data": {
+    // Event-specific data
+  }
+}
+```
+
+### Event Payloads
+
+#### release.created
+
+```json
+{
+  "id": "evt_...",
+  "event": "release.created",
+  "timestamp": 1706400000,
+  "appId": "app_123",
+  "data": {
+    "release": {
+      "id": "rel_456",
+      "version": "1.2.0",
+      "bundleSize": 524288,
+      "bundleHash": "sha256:abc123...",
+      "releaseNotes": "Bug fixes",
+      "status": "paused",
+      "rolloutPercentage": 100,
+      "minAppVersion": "1.0.0",
+      "maxAppVersion": null,
+      "createdAt": 1706400000
+    }
+  }
+}
+```
+
+#### release.activated
+
+```json
+{
+  "id": "evt_...",
+  "event": "release.activated",
+  "timestamp": 1706400000,
+  "appId": "app_123",
+  "data": {
+    "release": {
+      "id": "rel_456",
+      "version": "1.2.0",
+      "status": "active",
+      "rolloutPercentage": 100
+    },
+    "previousStatus": "paused"
+  }
+}
+```
+
+#### release.rolled_back
+
+```json
+{
+  "id": "evt_...",
+  "event": "release.rolled_back",
+  "timestamp": 1706400000,
+  "appId": "app_123",
+  "data": {
+    "release": {
+      "id": "rel_456",
+      "version": "1.2.0",
+      "status": "rolled_back"
+    },
+    "reason": "High crash rate detected",
+    "rolledBackBy": "user_789"
+  }
+}
+```
+
+#### release.rollout_updated
+
+```json
+{
+  "id": "evt_...",
+  "event": "release.rollout_updated",
+  "timestamp": 1706400000,
+  "appId": "app_123",
+  "data": {
+    "release": {
+      "id": "rel_456",
+      "version": "1.2.0"
+    },
+    "previousPercentage": 25,
+    "newPercentage": 50
+  }
+}
+```
+
+#### device.first_seen
+
+```json
+{
+  "id": "evt_...",
+  "event": "device.first_seen",
+  "timestamp": 1706400000,
+  "appId": "app_123",
+  "data": {
+    "device": {
+      "id": "device_abc",
+      "platform": "ios",
+      "osVersion": "17.2",
+      "deviceModel": "iPhone 15",
+      "appVersion": "1.0.0",
+      "locale": "en_US",
+      "timezone": "America/New_York"
+    }
+  }
+}
+```
+
+#### update.installed
+
+```json
+{
+  "id": "evt_...",
+  "event": "update.installed",
+  "timestamp": 1706400000,
+  "appId": "app_123",
+  "data": {
+    "deviceId": "device_abc",
+    "release": {
+      "id": "rel_456",
+      "version": "1.2.0"
+    },
+    "previousVersion": "1.1.0",
+    "downloadDuration": 1500,
+    "installDuration": 200
+  }
+}
+```
+
+#### crash.detected
+
+```json
+{
+  "id": "evt_...",
+  "event": "crash.detected",
+  "timestamp": 1706400000,
+  "appId": "app_123",
+  "data": {
+    "deviceId": "device_abc",
+    "release": {
+      "id": "rel_456",
+      "version": "1.2.0"
+    },
+    "crashCount": 3,
+    "autoRollbackTriggered": true
+  }
+}
+```
+
+## Verifying Signatures
+
+Every webhook request includes a signature in the `X-BundleNudge-Signature` header. Always verify this signature to ensure the request came from BundleNudge.
+
+The signature is an HMAC-SHA256 hash of the request body using your webhook secret.
+
+### Signature Format
+
+```
+X-BundleNudge-Signature: sha256=abc123...
+```
+
+### Verification Examples
+
+#### Node.js
+
+```javascript
+import crypto from 'crypto';
+
+function verifyWebhookSignature(payload, signature, secret) {
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(payload, 'utf8')
+    .digest('hex');
+
+  const providedSignature = signature.replace('sha256=', '');
+
+  return crypto.timingSafeEqual(
+    Buffer.from(expectedSignature, 'hex'),
+    Buffer.from(providedSignature, 'hex')
+  );
+}
+
+// Express.js example
+app.post('/webhooks/bundlenudge', express.raw({ type: 'application/json' }), (req, res) => {
+  const signature = req.headers['x-bundlenudge-signature'];
+  const payload = req.body.toString();
+
+  if (!verifyWebhookSignature(payload, signature, process.env.WEBHOOK_SECRET)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  const event = JSON.parse(payload);
+
+  // Process the event
+  switch (event.event) {
+    case 'release.created':
+      handleReleaseCreated(event.data);
+      break;
+    case 'crash.detected':
+      handleCrashDetected(event.data);
+      break;
+    // ... handle other events
+  }
+
+  res.status(200).json({ received: true });
+});
+```
+
+#### Python
+
+```python
+import hmac
+import hashlib
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+WEBHOOK_SECRET = os.environ['WEBHOOK_SECRET']
+
+def verify_signature(payload, signature, secret):
+    expected = hmac.new(
+        secret.encode('utf-8'),
+        payload,
+        hashlib.sha256
+    ).hexdigest()
+
+    provided = signature.replace('sha256=', '')
+
+    return hmac.compare_digest(expected, provided)
+
+@app.route('/webhooks/bundlenudge', methods=['POST'])
+def handle_webhook():
+    signature = request.headers.get('X-BundleNudge-Signature')
+    payload = request.get_data()
+
+    if not verify_signature(payload, signature, WEBHOOK_SECRET):
+        return jsonify({'error': 'Invalid signature'}), 401
+
+    event = request.get_json()
+
+    if event['event'] == 'release.created':
+        handle_release_created(event['data'])
+    elif event['event'] == 'crash.detected':
+        handle_crash_detected(event['data'])
+
+    return jsonify({'received': True}), 200
+```
+
+#### Go
+
+```go
+package main
+
+import (
+    "crypto/hmac"
+    "crypto/sha256"
+    "encoding/hex"
+    "encoding/json"
+    "io"
+    "net/http"
+    "os"
+    "strings"
+)
+
+func verifySignature(payload []byte, signature, secret string) bool {
+    mac := hmac.New(sha256.New, []byte(secret))
+    mac.Write(payload)
+    expected := hex.EncodeToString(mac.Sum(nil))
+
+    provided := strings.TrimPrefix(signature, "sha256=")
+
+    return hmac.Equal([]byte(expected), []byte(provided))
+}
+
+func webhookHandler(w http.ResponseWriter, r *http.Request) {
+    signature := r.Header.Get("X-BundleNudge-Signature")
+    payload, _ := io.ReadAll(r.Body)
+
+    if !verifySignature(payload, signature, os.Getenv("WEBHOOK_SECRET")) {
+        http.Error(w, "Invalid signature", http.StatusUnauthorized)
+        return
+    }
+
+    var event map[string]interface{}
+    json.Unmarshal(payload, &event)
+
+    // Process event...
+
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(map[string]bool{"received": true})
+}
+```
+
+## Example Handlers
+
+### Slack Notification on Release
+
+```javascript
+async function handleReleaseActivated(data) {
+  const { release } = data;
+
+  await fetch(process.env.SLACK_WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      text: `New release activated: v${release.version}`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*Release v${release.version}* is now live!\n\nRollout: ${release.rolloutPercentage}%`,
+          },
+        },
+      ],
+    }),
+  });
+}
+```
+
+### Auto-Rollback on High Crash Rate
+
+```javascript
+async function handleCrashDetected(data) {
+  const { release, crashCount, deviceId } = data;
+
+  // Alert on-call engineer
+  if (crashCount >= 5) {
+    await sendPagerDutyAlert({
+      severity: 'critical',
+      summary: `High crash rate on release ${release.version}`,
+      details: { releaseId: release.id, crashCount },
+    });
+  }
+
+  // Log to monitoring
+  await logToDatadog({
+    metric: 'bundlenudge.crash_detected',
+    tags: [`release:${release.version}`, `device:${deviceId}`],
+  });
+}
+```
+
+### CI/CD Integration
+
+```javascript
+async function handleReleaseCreated(data) {
+  const { release } = data;
+
+  // Trigger automated tests
+  await fetch('https://api.github.com/repos/owner/repo/dispatches', {
+    method: 'POST',
+    headers: {
+      'Authorization': `token ${process.env.GITHUB_TOKEN}`,
+      'Accept': 'application/vnd.github.v3+json',
+    },
+    body: JSON.stringify({
+      event_type: 'bundlenudge-release',
+      client_payload: {
+        releaseId: release.id,
+        version: release.version,
+      },
+    }),
+  });
+}
+```
+
+## Best Practices
+
+### Respond Quickly
+
+Return a `200` response within 5 seconds. Process events asynchronously if they take longer:
+
+```javascript
+app.post('/webhooks/bundlenudge', async (req, res) => {
+  // Verify signature...
+
+  // Acknowledge immediately
+  res.status(200).json({ received: true });
+
+  // Process asynchronously
+  setImmediate(() => processEvent(event));
+});
+```
+
+### Handle Duplicates
+
+Webhooks may occasionally be delivered more than once. Use the `id` field for idempotency:
+
+```javascript
+const processedEvents = new Set();
+
+async function processEvent(event) {
+  if (processedEvents.has(event.id)) {
+    return; // Already processed
+  }
+
+  processedEvents.add(event.id);
+
+  // Process the event...
+}
+```
+
+For production, store processed event IDs in a database with TTL.
+
+### Retry Logic
+
+BundleNudge will retry failed webhook deliveries:
+
+| Attempt | Delay |
+|---------|-------|
+| 1 | Immediate |
+| 2 | 1 minute |
+| 3 | 5 minutes |
+| 4 | 30 minutes |
+| 5 | 2 hours |
+
+After 5 failed attempts, the webhook is marked as failing and an alert email is sent.
+
+### Secure Your Endpoint
+
+1. **Always verify signatures** - Never skip signature verification
+2. **Use HTTPS** - Webhook URLs must use HTTPS
+3. **Whitelist IPs** (optional) - BundleNudge sends webhooks from: `104.18.0.0/16`
+
+## Managing Webhooks
+
+### List Webhooks
+
+```bash
+curl https://api.bundlenudge.com/v1/apps/{appId}/webhooks \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+### Update Webhook
+
+```bash
+curl -X PATCH https://api.bundlenudge.com/v1/apps/{appId}/webhooks/{webhookId} \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "events": ["release.created", "release.activated"],
+    "isActive": true
+  }'
+```
+
+### Delete Webhook
+
+```bash
+curl -X DELETE https://api.bundlenudge.com/v1/apps/{appId}/webhooks/{webhookId} \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+### View Delivery History
+
+```bash
+curl https://api.bundlenudge.com/v1/apps/{appId}/webhooks/{webhookId}/events \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+Response shows recent deliveries with status:
+
+```json
+{
+  "events": [
+    {
+      "id": "evt_123",
+      "event": "release.created",
+      "status": "delivered",
+      "statusCode": 200,
+      "createdAt": 1706400000
+    },
+    {
+      "id": "evt_124",
+      "event": "crash.detected",
+      "status": "failed",
+      "statusCode": 500,
+      "errorMessage": "Connection refused",
+      "createdAt": 1706400060
+    }
+  ]
+}
+```

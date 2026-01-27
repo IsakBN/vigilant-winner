@@ -1,0 +1,486 @@
+---
+title: "Cloudflare Workers Deployment"
+description: "Deploy the BundleNudge API to Cloudflare Workers"
+order: 2
+---
+
+# Cloudflare Workers Deployment
+
+This guide walks you through deploying the BundleNudge API to Cloudflare Workers, including setting up D1 database, R2 storage, and KV namespaces.
+
+## Prerequisites
+
+Before starting, ensure you have:
+
+- Cloudflare account with Workers Paid plan ($5/month)
+- Node.js 18+ installed
+- pnpm 8+ installed
+- Wrangler CLI installed: `npm install -g wrangler`
+
+## Step 1: Clone the Repository
+
+```bash
+git clone https://github.com/bundlenudge/bundlenudge.git
+cd bundlenudge
+pnpm install
+```
+
+## Step 2: Authenticate with Cloudflare
+
+```bash
+wrangler login
+```
+
+This opens a browser window to authorize the CLI.
+
+Verify authentication:
+
+```bash
+wrangler whoami
+```
+
+## Step 3: Create D1 Database
+
+D1 is Cloudflare's serverless SQLite database.
+
+```bash
+# Create the database
+wrangler d1 create bundlenudge-db
+
+# Output:
+# ✅ Successfully created DB 'bundlenudge-db'
+# Created at: 2024-01-15T10:30:00.000Z
+# database_id: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
+Save the `database_id` - you'll need it for configuration.
+
+### Configure D1 in wrangler.toml
+
+Edit `packages/api/wrangler.toml`:
+
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "bundlenudge-db"
+database_id = "your-database-id-here"  # Replace with your ID
+```
+
+## Step 4: Create R2 Bucket
+
+R2 is Cloudflare's S3-compatible object storage with zero egress fees.
+
+```bash
+# Create the bucket
+wrangler r2 bucket create bundlenudge-bundles
+
+# Output:
+# ✅ Created bucket "bundlenudge-bundles"
+```
+
+### Configure R2 in wrangler.toml
+
+```toml
+[[r2_buckets]]
+binding = "BUNDLES"
+bucket_name = "bundlenudge-bundles"
+```
+
+### Optional: Enable Public Access
+
+If you want bundles to be publicly downloadable (recommended for performance):
+
+```bash
+wrangler r2 bucket public-access --bucket bundlenudge-bundles enable
+```
+
+Or use a custom domain:
+
+```bash
+wrangler r2 bucket domain add --bucket bundlenudge-bundles --domain bundles.yourdomain.com
+```
+
+## Step 5: Create KV Namespaces
+
+KV is used for rate limiting and caching.
+
+```bash
+# Rate limiting namespace
+wrangler kv namespace create "RATE_LIMIT"
+# Output: id = "xxxxxxxx..."
+
+# Cache namespace
+wrangler kv namespace create "CACHE"
+# Output: id = "yyyyyyyy..."
+```
+
+### Configure KV in wrangler.toml
+
+```toml
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "your-rate-limit-namespace-id"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "your-cache-namespace-id"
+```
+
+## Step 6: Set Up Queues (Optional)
+
+Queues are used for priority-based bundle processing. Skip if you don't need tiered processing.
+
+```bash
+# Create priority queues
+wrangler queues create bundlenudge-builds-p0  # Enterprise
+wrangler queues create bundlenudge-builds-p1  # Team
+wrangler queues create bundlenudge-builds-p2  # Pro
+wrangler queues create bundlenudge-builds-p3  # Free
+wrangler queues create bundlenudge-builds-dlq # Dead letter queue
+```
+
+### Configure Queues in wrangler.toml
+
+```toml
+[[queues.producers]]
+binding = "BUILD_QUEUE_P0"
+queue = "bundlenudge-builds-p0"
+
+[[queues.producers]]
+binding = "BUILD_QUEUE_P1"
+queue = "bundlenudge-builds-p1"
+
+[[queues.producers]]
+binding = "BUILD_QUEUE_P2"
+queue = "bundlenudge-builds-p2"
+
+[[queues.producers]]
+binding = "BUILD_QUEUE_P3"
+queue = "bundlenudge-builds-p3"
+
+[[queues.producers]]
+binding = "BUILD_QUEUE_DLQ"
+queue = "bundlenudge-builds-dlq"
+```
+
+## Step 7: Configure Environment Variables
+
+### Public Variables
+
+Edit `packages/api/wrangler.toml`:
+
+```toml
+[vars]
+ENVIRONMENT = "production"
+API_URL = "https://api.yourdomain.com"
+DASHBOARD_URL = "https://app.yourdomain.com"
+```
+
+### Secret Variables
+
+Never commit secrets to version control. Use Wrangler secrets:
+
+```bash
+cd packages/api
+
+# JWT signing secret (generate a secure random string)
+wrangler secret put JWT_SECRET
+# Enter: <paste a 64-character random string>
+
+# Encryption key for sensitive data
+wrangler secret put ENCRYPTION_KEY
+# Enter: <paste a 32-character random string>
+
+# Neon database URL (for auth)
+wrangler secret put DATABASE_URL
+# Enter: postgres://user:pass@host/db?sslmode=require
+
+# Stripe keys (optional, for billing)
+wrangler secret put STRIPE_SECRET_KEY
+wrangler secret put STRIPE_WEBHOOK_SECRET
+
+# Email service (optional)
+wrangler secret put RESEND_API_KEY
+```
+
+### Generate Secure Secrets
+
+Use OpenSSL to generate secure random strings:
+
+```bash
+# 64-character hex string for JWT_SECRET
+openssl rand -hex 32
+
+# 32-character string for ENCRYPTION_KEY
+openssl rand -base64 24
+```
+
+## Step 8: Complete wrangler.toml
+
+Here's a complete example configuration:
+
+```toml
+name = "bundlenudge-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "bundlenudge-db"
+database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# R2 Bucket
+[[r2_buckets]]
+binding = "BUNDLES"
+bucket_name = "bundlenudge-bundles"
+
+# KV Namespaces
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+
+# Priority Queues
+[[queues.producers]]
+binding = "BUILD_QUEUE_P0"
+queue = "bundlenudge-builds-p0"
+
+[[queues.producers]]
+binding = "BUILD_QUEUE_P1"
+queue = "bundlenudge-builds-p1"
+
+[[queues.producers]]
+binding = "BUILD_QUEUE_P2"
+queue = "bundlenudge-builds-p2"
+
+[[queues.producers]]
+binding = "BUILD_QUEUE_P3"
+queue = "bundlenudge-builds-p3"
+
+[[queues.producers]]
+binding = "BUILD_QUEUE_DLQ"
+queue = "bundlenudge-builds-dlq"
+
+# Durable Objects (for realtime features)
+[durable_objects]
+bindings = [
+  { name = "REALTIME", class_name = "RealtimeDO" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RealtimeDO"]
+
+# Cron triggers (for scheduled jobs)
+[triggers]
+crons = ["0 * * * *"]  # Every hour
+
+# Environment variables
+[vars]
+ENVIRONMENT = "production"
+API_URL = "https://api.yourdomain.com"
+DASHBOARD_URL = "https://app.yourdomain.com"
+```
+
+## Step 9: Run Database Migrations
+
+Apply the database schema to D1:
+
+```bash
+cd packages/api
+
+# Run migrations
+wrangler d1 migrations apply bundlenudge-db
+```
+
+If migrations don't exist yet, create them:
+
+```bash
+# Generate migration from schema
+pnpm drizzle-kit generate:sqlite
+
+# Apply
+wrangler d1 migrations apply bundlenudge-db
+```
+
+## Step 10: Deploy
+
+```bash
+cd packages/api
+pnpm build
+wrangler deploy
+```
+
+Output:
+
+```
+✅ Deployed bundlenudge-api
+   https://bundlenudge-api.your-subdomain.workers.dev
+```
+
+## Step 11: Configure Custom Domain (Optional)
+
+### Via Cloudflare Dashboard
+
+1. Go to **Workers & Pages** > **bundlenudge-api**
+2. Click **Settings** > **Triggers**
+3. Add **Custom Domain**: `api.yourdomain.com`
+4. Cloudflare automatically provisions SSL
+
+### Via Wrangler
+
+```bash
+wrangler domains add api.yourdomain.com
+```
+
+## Step 12: Verify Deployment
+
+Test the health endpoint:
+
+```bash
+curl https://api.yourdomain.com/health
+# {"status":"healthy"}
+```
+
+Test authenticated endpoint:
+
+```bash
+curl https://api.yourdomain.com/v1/apps \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+## Environment-Specific Deployments
+
+### Development Environment
+
+Create `wrangler.dev.toml`:
+
+```toml
+name = "bundlenudge-api-dev"
+# ... same structure, different resource IDs
+
+[vars]
+ENVIRONMENT = "development"
+```
+
+Deploy:
+
+```bash
+wrangler deploy --config wrangler.dev.toml
+```
+
+### Staging Environment
+
+```bash
+wrangler deploy --env staging
+```
+
+In wrangler.toml:
+
+```toml
+[env.staging]
+name = "bundlenudge-api-staging"
+[env.staging.vars]
+ENVIRONMENT = "staging"
+```
+
+## Troubleshooting
+
+### "Database not found"
+
+Ensure the `database_id` in wrangler.toml matches your D1 database:
+
+```bash
+wrangler d1 list
+```
+
+### "KV namespace not found"
+
+Verify KV namespace IDs:
+
+```bash
+wrangler kv namespace list
+```
+
+### "Binding not found"
+
+Check that all bindings in wrangler.toml match the code:
+
+- `DB` for D1
+- `BUNDLES` for R2
+- `RATE_LIMIT` for KV
+- `CACHE` for KV
+
+### Logs
+
+View real-time logs:
+
+```bash
+wrangler tail
+```
+
+Or in dashboard: **Workers & Pages** > **bundlenudge-api** > **Logs**
+
+### Rate Limits
+
+If you hit Cloudflare rate limits during deployment:
+
+```bash
+# Wait and retry
+sleep 60 && wrangler deploy
+```
+
+## Local Development
+
+Run the API locally with Miniflare:
+
+```bash
+cd packages/api
+pnpm dev
+```
+
+This starts a local server at `http://localhost:8787` with:
+
+- Local D1 database (SQLite file)
+- Local R2 storage (filesystem)
+- Local KV (in-memory)
+
+### Using Remote Resources Locally
+
+To use production D1 locally for testing:
+
+```bash
+wrangler dev --remote
+```
+
+**Warning:** This uses real production resources. Use with caution.
+
+## Next Steps
+
+Now that the API is deployed:
+
+1. [Set up the database](/docs/self-hosting/database) - Configure auth database
+2. Deploy the dashboard (Next.js app)
+3. Configure your first app and release
+
+## Updating
+
+To update to a new version:
+
+```bash
+git pull origin main
+pnpm install
+cd packages/api
+pnpm build
+wrangler deploy
+```
+
+Run any new migrations:
+
+```bash
+wrangler d1 migrations apply bundlenudge-db
+```

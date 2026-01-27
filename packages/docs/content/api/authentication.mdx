@@ -1,0 +1,280 @@
+---
+title: "Authentication"
+description: "Secure your API requests with BundleNudge API keys"
+order: 1
+---
+
+# Authentication
+
+All BundleNudge API requests require authentication using API keys. This guide covers API key types, how to obtain and use them, and security best practices.
+
+## API Key Types
+
+BundleNudge uses permission-based API keys with two environments:
+
+### Environment Prefixes
+
+| Prefix | Environment | Use Case |
+|--------|-------------|----------|
+| `bn_live_` | Production | Live apps, real users |
+| `bn_test_` | Test/Staging | Development, CI/CD testing |
+
+### Permissions
+
+Each API key can be granted specific permissions:
+
+| Permission | Description |
+|------------|-------------|
+| `release:create` | Create new releases |
+| `release:read` | Read release information |
+| `release:update` | Update release settings (rollout, status) |
+| `release:delete` | Delete releases |
+| `device:read` | Read device information |
+| `update:check` | Check for updates (SDK) |
+
+**Default permissions** for new keys: `release:read`, `update:check`
+
+## Getting Your API Key
+
+### Via Dashboard
+
+1. Navigate to your app in the [BundleNudge Dashboard](https://app.bundlenudge.com)
+2. Go to **Settings** > **API Keys**
+3. Click **Create API Key**
+4. Enter a descriptive name (e.g., "CI/CD Pipeline", "Local Development")
+5. Select the permissions you need
+6. Click **Create**
+
+**Important:** Copy your API key immediately. For security, the full key is only shown once at creation time.
+
+### Via API
+
+```bash
+curl -X POST https://api.bundlenudge.com/v1/apps/{appId}/keys \
+  -H "Authorization: Bearer YOUR_SESSION_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "CI/CD Pipeline",
+    "permissions": ["release:create", "release:read", "release:update"]
+  }'
+```
+
+Response:
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "CI/CD Pipeline",
+  "apiKey": "bn_live_abc12345_Xk9mN2pQ...",
+  "keyPrefix": "bn_live_abc12345",
+  "permissions": ["release:create", "release:read", "release:update"],
+  "createdAt": 1706400000
+}
+```
+
+## Using API Keys
+
+Include your API key in the `Authorization` header with the `Bearer` scheme:
+
+### cURL
+
+```bash
+curl https://api.bundlenudge.com/v1/releases/{appId} \
+  -H "Authorization: Bearer bn_live_abc12345_Xk9mN2pQ..."
+```
+
+### JavaScript/TypeScript
+
+```typescript
+const response = await fetch('https://api.bundlenudge.com/v1/releases/{appId}', {
+  headers: {
+    'Authorization': `Bearer ${process.env.BUNDLENUDGE_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+});
+
+const data = await response.json();
+```
+
+### Node.js with axios
+
+```javascript
+import axios from 'axios';
+
+const client = axios.create({
+  baseURL: 'https://api.bundlenudge.com/v1',
+  headers: {
+    'Authorization': `Bearer ${process.env.BUNDLENUDGE_API_KEY}`,
+  },
+});
+
+const { data } = await client.get(`/releases/${appId}`);
+```
+
+## Key Rotation
+
+Regularly rotating API keys is a security best practice. Here's how to rotate keys without downtime:
+
+### Step 1: Create a New Key
+
+```bash
+curl -X POST https://api.bundlenudge.com/v1/apps/{appId}/keys \
+  -H "Authorization: Bearer YOUR_SESSION_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "CI/CD Pipeline (rotated)",
+    "permissions": ["release:create", "release:read", "release:update"]
+  }'
+```
+
+### Step 2: Update Your Systems
+
+Update environment variables or secrets in your CI/CD, servers, and applications to use the new key.
+
+### Step 3: Revoke the Old Key
+
+Once all systems are updated:
+
+```bash
+curl -X DELETE https://api.bundlenudge.com/v1/apps/{appId}/keys/{oldKeyId} \
+  -H "Authorization: Bearer YOUR_SESSION_TOKEN"
+```
+
+### Viewing Key Usage
+
+You can check when a key was last used:
+
+```bash
+curl https://api.bundlenudge.com/v1/apps/{appId}/keys \
+  -H "Authorization: Bearer YOUR_SESSION_TOKEN"
+```
+
+Response includes `lastUsedAt` for each key:
+
+```json
+{
+  "apiKeys": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "CI/CD Pipeline",
+      "keyPrefix": "bn_live_abc12345",
+      "permissions": ["release:create", "release:read"],
+      "createdAt": 1706400000,
+      "lastUsedAt": 1706486400,
+      "revokedAt": null
+    }
+  ]
+}
+```
+
+## Security Best Practices
+
+### Store Keys Securely
+
+- **Never commit API keys to version control**
+- Use environment variables or secret management services
+- Recommended services: AWS Secrets Manager, HashiCorp Vault, Doppler
+
+```bash
+# .env (add to .gitignore)
+BUNDLENUDGE_API_KEY=bn_live_abc12345_Xk9mN2pQ...
+```
+
+### Use Minimum Permissions
+
+Only grant the permissions each key actually needs:
+
+| Use Case | Recommended Permissions |
+|----------|------------------------|
+| SDK (app updates) | `update:check` |
+| CI/CD deployment | `release:create`, `release:read`, `release:update` |
+| Monitoring/analytics | `release:read`, `device:read` |
+| Full access | All permissions (use sparingly) |
+
+### Separate Keys by Environment
+
+- Use `bn_test_` keys for development and staging
+- Use `bn_live_` keys only in production
+- Never share keys between environments
+
+### Monitor Key Usage
+
+- Regularly review the `lastUsedAt` timestamp for each key
+- Revoke unused keys
+- Set up alerts for unexpected API usage patterns
+
+### Rotate Keys Regularly
+
+- Rotate production keys every 90 days
+- Rotate immediately if a key may have been compromised
+- Revoke keys for departing team members
+
+## Error Responses
+
+### Missing API Key
+
+```json
+{
+  "error": "UNAUTHORIZED",
+  "message": "Missing API key"
+}
+```
+
+**HTTP Status:** 401
+
+### Invalid API Key Format
+
+```json
+{
+  "error": "UNAUTHORIZED",
+  "message": "Invalid API key format"
+}
+```
+
+**HTTP Status:** 401
+
+### Invalid or Unknown API Key
+
+```json
+{
+  "error": "UNAUTHORIZED",
+  "message": "Invalid API key"
+}
+```
+
+**HTTP Status:** 401
+
+### Revoked API Key
+
+```json
+{
+  "error": "UNAUTHORIZED",
+  "message": "API key has been revoked"
+}
+```
+
+**HTTP Status:** 401
+
+### Insufficient Permissions
+
+```json
+{
+  "error": "FORBIDDEN",
+  "message": "Missing required permission(s): release:create"
+}
+```
+
+**HTTP Status:** 403
+
+## Rate Limits
+
+API keys are subject to rate limiting:
+
+| Endpoint Type | Rate Limit |
+|---------------|------------|
+| Update checks (`/v1/updates/*`) | 1000 req/min per app |
+| Device endpoints (`/v1/devices/*`) | 500 req/min per app |
+| Telemetry (`/v1/telemetry/*`) | 2000 req/min per app |
+| Management endpoints | 100 req/min per key |
+
+When rate limited, you'll receive a `429 Too Many Requests` response with a `Retry-After` header.

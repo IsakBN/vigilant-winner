@@ -1,0 +1,306 @@
+---
+title: "Teams"
+description: "Invite team members, manage roles, and control access to your apps"
+order: 4
+---
+
+# Teams
+
+Teams let you collaborate with others on your BundleNudge apps. Invite team members, assign roles, and control who can do what.
+
+## Inviting Team Members
+
+To invite someone to your team:
+
+1. Go to your dashboard
+2. Click **Teams** in the sidebar
+3. Select your team or create one
+4. Click **Invite Member**
+
+[Screenshot: Invite Form]
+
+### Invitation Form
+
+Fill out the invitation:
+
+#### Email Address
+
+Enter the email address of the person you want to invite:
+
+```
+colleague@company.com
+```
+
+They'll receive an email with a link to accept the invitation.
+
+#### Role
+
+Select the role for this team member:
+
+- **Member** - Can view and deploy releases
+- **Admin** - Can manage team settings and members
+
+[See Role Permissions](#roles-owner-admin-member) for detailed capabilities.
+
+Click **Send Invitation** to send the invite.
+
+### Pending Invitations
+
+Invitations that haven't been accepted appear in the **Pending Invites** section.
+
+To manage pending invites:
+
+1. Go to your team's **Invitations** tab
+2. View all pending invitations
+3. Click **Resend** to send another email
+4. Click **Cancel** to revoke the invitation
+
+[Screenshot: Pending Invites List]
+
+**Invitations expire after 7 days.** Resend if the recipient hasn't accepted in time.
+
+---
+
+## Roles: Owner, Admin, Member
+
+BundleNudge has three roles with different permission levels:
+
+### Owner
+
+The account owner has full control:
+
+| Capability | Owner |
+|------------|-------|
+| View apps and releases | Yes |
+| Create apps | Yes |
+| Delete apps | **Yes** |
+| Create releases | Yes |
+| Manage channels | Yes |
+| Invite members | Yes |
+| Remove members | Yes |
+| Change member roles | Yes |
+| Access billing | **Yes** |
+| Delete account | **Yes** |
+
+There is exactly one owner per account. Ownership cannot be transferred.
+
+### Admin
+
+Admins can manage most aspects of the account:
+
+| Capability | Admin |
+|------------|-------|
+| View apps and releases | Yes |
+| Create apps | Yes |
+| Delete apps | No |
+| Create releases | Yes |
+| Manage channels | Yes |
+| Invite members | Yes |
+| Remove members | Yes (except owner) |
+| Change member roles | Yes (except owner) |
+| Access billing | View only |
+| Delete account | No |
+
+Admins are ideal for team leads and senior developers.
+
+### Member
+
+Members have limited capabilities focused on day-to-day work:
+
+| Capability | Member |
+|------------|--------|
+| View apps and releases | Yes |
+| Create apps | No |
+| Delete apps | No |
+| Create releases | Yes |
+| Manage channels | View only |
+| Invite members | No |
+| Remove members | No |
+| Change member roles | No |
+| Access billing | No |
+| Delete account | No |
+
+Members are ideal for developers who need to deploy updates.
+
+### Role Comparison
+
+| Capability | Owner | Admin | Member |
+|------------|-------|-------|--------|
+| View apps | Yes | Yes | Yes |
+| Create releases | Yes | Yes | Yes |
+| Create apps | Yes | Yes | No |
+| Delete apps | Yes | No | No |
+| Manage team | Yes | Yes | No |
+| Billing access | Full | View | No |
+
+---
+
+## Per-Project Access
+
+You can grant team members access to specific apps instead of the entire account.
+
+### Setting Up Project Access
+
+1. Go to your team's **Members** tab
+2. Click on a member to view their details
+3. Find the **App Access** section
+4. Toggle access for individual apps
+
+[Screenshot: Per-Project Access Settings]
+
+### Access Levels
+
+- **All Apps** - Member can access every app in the account
+- **Specific Apps** - Member only sees selected apps
+
+Members with limited access will only see their assigned apps in the dashboard sidebar and cannot discover other apps.
+
+### Use Cases
+
+**Contractor Access:**
+
+Give contractors access only to the project they're working on:
+
+1. Invite with "Member" role
+2. Limit to the specific app
+3. Remove when project completes
+
+**Department Separation:**
+
+Keep marketing apps separate from engineering apps:
+
+1. Create separate app groups
+2. Assign team members to their relevant apps
+3. Prevent accidental deployments to the wrong app
+
+---
+
+## Removing Members
+
+Admins and owners can remove team members.
+
+### How to Remove a Member
+
+1. Go to your team's **Members** tab
+2. Find the member in the list
+3. Click the **Remove** button
+4. Confirm the removal
+
+[Screenshot: Member Table with Remove Button]
+
+### What Happens When Removed
+
+- Member loses access immediately
+- Any pending work is preserved
+- Historical activity logs remain
+- Member can be re-invited later
+
+### Restrictions
+
+- You cannot remove the account owner
+- You cannot remove yourself
+- Admins cannot remove other admins (only the owner can)
+
+---
+
+## Billing and Subscriptions
+
+Billing is managed at the account level by the owner.
+
+### Viewing Your Plan
+
+1. Go to **Settings** in the sidebar
+2. Click **Billing**
+3. View your current plan and usage
+
+[Screenshot: Billing Page]
+
+### Plan Details
+
+Your plan determines:
+
+- Number of apps you can create
+- Monthly active devices limit
+- Number of team members
+- Support level
+
+### Subscription Management
+
+The account owner can:
+
+1. **Upgrade** - Move to a higher tier
+2. **Downgrade** - Move to a lower tier (at period end)
+3. **Cancel** - End subscription (keeps data until period end)
+4. **Update payment** - Change credit card
+
+### Viewing Invoices
+
+1. Go to **Settings** > **Billing**
+2. Click **Invoices**
+3. View or download past invoices
+
+### Usage Tracking
+
+Monitor your usage against plan limits:
+
+- **Active Devices** - Unique devices checking for updates
+- **Team Members** - Current member count vs. limit
+- **Apps** - Number of apps vs. limit
+
+Usage resets monthly on your billing date.
+
+---
+
+## Team Settings
+
+### Changing Member Roles
+
+To change a member's role:
+
+1. Go to the **Members** tab
+2. Find the member in the table
+3. Click the role dropdown (shows current role)
+4. Select the new role
+
+[Screenshot: Role Selector Dropdown]
+
+Changes take effect immediately. The member's permissions update on their next page load.
+
+### Role Change Restrictions
+
+- Only owners can change admin roles
+- You cannot change your own role
+- You cannot change the owner's role
+
+---
+
+## Best Practices
+
+### Team Structure
+
+Recommended role distribution:
+
+- **1 Owner** - Account creator, manages billing
+- **2-3 Admins** - Team leads, manage releases and members
+- **Unlimited Members** - Developers, deploy updates
+
+### Security
+
+1. **Use SSO** if available on your plan
+2. **Audit regularly** - Review member list quarterly
+3. **Limit admins** - Only give admin to those who need it
+4. **Remove promptly** - Revoke access when people leave
+
+### Collaboration
+
+1. **Document channels** - Explain what each channel is for
+2. **Coordinate deployments** - Avoid conflicts with communication
+3. **Use release notes** - Help team members understand changes
+
+---
+
+## Next Steps
+
+- [Create your first app](/dashboard/apps)
+- [Set up releases](/dashboard/releases) for your team
+- [Configure channels](/dashboard/channels) for staged deployments

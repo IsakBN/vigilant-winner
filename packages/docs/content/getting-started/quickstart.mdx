@@ -1,0 +1,260 @@
+---
+title: "Quickstart"
+description: "Get BundleNudge running in your React Native app in 5 minutes. Install the SDK, initialize it, and deploy your first update."
+order: 2
+---
+
+# Quickstart
+
+Let's get BundleNudge running in your React Native app. The whole process takes about 5 minutes.
+
+## Prerequisites
+
+Before you start, make sure you have:
+
+- **React Native 0.73 or higher** (we use the new architecture features)
+- **A BundleNudge account** — [sign up here](https://bundlenudge.com/sign-up) if you don't have one
+- **An app created in the dashboard** — you'll need the App ID
+
+## Step 1: Install the SDK
+
+Add the BundleNudge SDK to your project:
+
+```bash
+# Using npm
+npm install @bundlenudge/sdk
+
+# Using yarn
+yarn add @bundlenudge/sdk
+
+# Using pnpm
+pnpm add @bundlenudge/sdk
+```
+
+### iOS Setup
+
+Run pod install to link the native module:
+
+```bash
+cd ios && pod install && cd ..
+```
+
+### Android Setup
+
+No additional setup needed. The native module auto-links.
+
+## Step 2: Initialize in Your App
+
+Add BundleNudge to your app's entry point. This is typically `App.tsx` or `index.js`.
+
+```tsx
+// App.tsx
+import { useEffect } from 'react';
+import { BundleNudge } from '@bundlenudge/sdk';
+
+// Initialize BundleNudge when your app starts
+BundleNudge.initialize({
+  appId: 'your-app-id-from-dashboard',
+});
+
+export default function App() {
+  useEffect(() => {
+    // Tell BundleNudge the app has loaded successfully
+    // This is important for crash detection and rollback
+    BundleNudge.getInstance().notifyAppReady();
+  }, []);
+
+  return (
+    // Your app content
+  );
+}
+```
+
+Replace `your-app-id-from-dashboard` with your actual App ID from the BundleNudge dashboard.
+
+### Configuration Options
+
+Here's a complete example with all available options:
+
+```tsx
+BundleNudge.initialize({
+  // Required: Your app ID from the dashboard
+  appId: 'your-app-id',
+
+  // Optional: Check for updates on app launch (default: true)
+  checkOnLaunch: true,
+
+  // Optional: Check when app comes to foreground (default: true)
+  checkOnForeground: true,
+
+  // Optional: Install immediately or on next launch (default: 'nextLaunch')
+  installMode: 'nextLaunch', // or 'immediate'
+
+  // Optional: Minimum seconds between update checks (default: 60)
+  minimumCheckInterval: 60,
+
+  // Optional: Enable debug logging (default: false)
+  debug: false,
+}, {
+  // Optional callbacks
+  onStatusChange: (status) => {
+    console.log('Update status:', status);
+  },
+  onDownloadProgress: (progress) => {
+    console.log(`Downloaded ${progress.percentage}%`);
+  },
+  onUpdateAvailable: (update) => {
+    console.log('New version available:', update.version);
+  },
+  onError: (error) => {
+    console.error('Update error:', error);
+  },
+});
+```
+
+## Step 3: Deploy Your First Update
+
+Now let's push an update. First, build your JavaScript bundle:
+
+```bash
+# Build for iOS
+npx react-native bundle \
+  --platform ios \
+  --dev false \
+  --entry-file index.js \
+  --bundle-output ios-bundle.jsbundle
+
+# Build for Android
+npx react-native bundle \
+  --platform android \
+  --dev false \
+  --entry-file index.js \
+  --bundle-output android-bundle.jsbundle
+```
+
+Then upload to BundleNudge using the CLI:
+
+```bash
+# Install the CLI
+npm install -g @bundlenudge/cli
+
+# Login (only needed once)
+bundlenudge login
+
+# Upload your bundle
+bundlenudge release \
+  --app your-app-id \
+  --platform ios \
+  --bundle ios-bundle.jsbundle \
+  --target-version "1.0.0"
+```
+
+Or upload through the dashboard:
+
+1. Go to your app in the [BundleNudge Dashboard](https://bundlenudge.com/dashboard)
+2. Click "Create Release"
+3. Upload your bundle file
+4. Set the target binary version
+5. Click "Release"
+
+## Step 4: Verify on Device
+
+To verify everything is working:
+
+1. **Run your app** on a device or simulator
+2. **Make a visible change** to your code (like changing some text)
+3. **Build and upload** a new bundle using Step 3
+4. **Restart your app** — you should see the update after the second launch
+
+If you set `installMode: 'immediate'`, the update applies right away. With `'nextLaunch'` (the default), it applies on the next app start.
+
+### Debug Mode
+
+Enable debug logging to see what's happening:
+
+```tsx
+BundleNudge.initialize({
+  appId: 'your-app-id',
+  debug: true, // Enable verbose logging
+});
+```
+
+Check your console for logs like:
+
+```
+[BundleNudge] Checking for update...
+[BundleNudge] Update available: 1.0.1
+[BundleNudge] Downloading bundle...
+[BundleNudge] Download complete, will apply on next launch
+```
+
+## Using the React Hook
+
+For more control over the update flow, use the `useBundleNudge` hook:
+
+```tsx
+import { useBundleNudge } from '@bundlenudge/sdk';
+
+function UpdateBanner() {
+  const {
+    status,
+    checkForUpdate,
+    downloadAndInstall,
+    currentVersion,
+    updateInfo,
+  } = useBundleNudge();
+
+  if (status === 'update-available' && updateInfo) {
+    return (
+      <View style={styles.banner}>
+        <Text>Version {updateInfo.version} available!</Text>
+        <Button
+          title="Update Now"
+          onPress={() => downloadAndInstall(updateInfo)}
+        />
+      </View>
+    );
+  }
+
+  return null;
+}
+```
+
+## Common Issues
+
+### "BundleNudge not initialized"
+
+Make sure you call `BundleNudge.initialize()` before trying to use `getInstance()` or any hooks.
+
+### Updates not applying
+
+1. Check that you called `notifyAppReady()` after your app renders
+2. Verify your App ID matches the dashboard
+3. Make sure the target version matches your binary version
+4. Check the debug logs for errors
+
+### iOS pod install fails
+
+Try cleaning and reinstalling:
+
+```bash
+cd ios
+rm -rf Pods Podfile.lock
+pod install --repo-update
+cd ..
+```
+
+### Crash on launch after update
+
+BundleNudge automatically rolls back if the app crashes before `notifyAppReady()` is called. Check your crash logs to see what went wrong with the new bundle.
+
+## Next Steps
+
+You're all set up! Here's what to explore next:
+
+- [Understand the core concepts](/getting-started/concepts) — bundles, releases, channels, and more
+- [Set up CI/CD integration](/sdk/ci-cd) — automate your release workflow
+- [Configure rollout strategies](/dashboard/rollouts) — gradual deployments and targeting
+- [Monitor update health](/dashboard/analytics) — track adoption and errors
+
+Need help? [Join our Discord](https://discord.gg/bundlenudge) or [email support](mailto:support@bundlenudge.com).

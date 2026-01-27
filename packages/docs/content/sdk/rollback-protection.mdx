@@ -1,0 +1,370 @@
+---
+title: "Rollback Protection"
+description: "Automatic rollback, health monitoring, and crash detection"
+order: 3
+---
+
+# Rollback Protection
+
+One of the biggest risks with OTA updates is pushing a broken bundle that crashes the app. BundleNudge includes automatic rollback protection that detects crashes and reverts to the previous working version.
+
+## How Automatic Rollback Works
+
+When a new update is applied, BundleNudge enters a "verification window". During this time:
+
+1. The app starts with the new bundle
+2. A timer begins (default: 60 seconds)
+3. The app must call `notifyAppReady()` and pass health checks
+4. If the app crashes repeatedly or health checks fail, it rolls back
+
+Here's the flow:
+
+```
+New Bundle Applied
+       |
+       v
++---------------+
+| Verification  |
+| Window Opens  |
++---------------+
+       |
+       v
++-------------------+
+| App calls         |
+| notifyAppReady()  |
++-------------------+
+       |
+       v
++-------------------+
+| Health checks     |
+| pass              |
++-------------------+
+       |
+       v
++-------------------+
+| Update verified   |
+| Previous version  |
+| cleaned up        |
++-------------------+
+```
+
+If something goes wrong:
+
+```
+New Bundle Applied
+       |
+       v
++---------------+
+| Verification  |
+| Window Opens  |
++---------------+
+       |
+       v
++-------------------+        +-------------------+
+| App crashes 3x    | -----> | Automatic         |
+| within 10 seconds |        | Rollback to       |
++-------------------+        | Previous Version  |
+                             +-------------------+
+```
+
+## Configuration Options
+
+Control the rollback behavior through configuration:
+
+```typescript
+import { setupBundleNudge } from '@bundlenudge/sdk'
+
+await setupBundleNudge({
+  appId: 'your-app-id',
+
+  // Time window for verification (default: 60 seconds)
+  verificationWindowMs: 60000,
+
+  // Number of crashes before rollback (default: 3)
+  crashThreshold: 3,
+
+  // Time window for counting crashes (default: 10 seconds)
+  crashWindowMs: 10000,
+})
+```
+
+### verificationWindowMs
+
+How long the verification window stays open. The previous version is kept until:
+- `notifyAppReady()` is called AND
+- All health checks pass (if configured)
+
+```typescript
+// Longer window for complex apps
+{
+  verificationWindowMs: 120000  // 2 minutes
+}
+
+// Shorter window for simple apps
+{
+  verificationWindowMs: 30000  // 30 seconds
+}
+```
+
+### crashThreshold
+
+Number of crashes within `crashWindowMs` before triggering rollback:
+
+```typescript
+// More sensitive - rollback after 2 crashes
+{
+  crashThreshold: 2
+}
+
+// Less sensitive - rollback after 5 crashes
+{
+  crashThreshold: 5
+}
+```
+
+### crashWindowMs
+
+Time window for counting crashes. Crashes outside this window don't count:
+
+```typescript
+// Short window - only rapid crashes trigger rollback
+{
+  crashWindowMs: 5000
+}
+
+// Longer window - catch spaced-out crashes
+{
+  crashWindowMs: 30000
+}
+```
+
+## The Dual-Flag Verification System
+
+BundleNudge uses a dual-flag system for verification. Both conditions must be met:
+
+1. **App Ready**: Your code calls `notifyAppReady()`
+2. **Health Passed**: All configured health checks pass
+
+This prevents premature verification when your app "starts" but isn't actually working.
+
+```typescript
+import { BundleNudge } from '@bundlenudge/sdk'
+
+function App() {
+  useEffect(() => {
+    // Only called after your UI is actually rendered
+    BundleNudge.getInstance().notifyAppReady()
+  }, [])
+
+  return <YourApp />
+}
+```
+
+## Health Monitoring
+
+For critical apps, you can configure health checks that must pass before an update is verified.
+
+### Tracking Events
+
+Track critical events that indicate your app is working:
+
+```typescript
+const bundleNudge = BundleNudge.getInstance()
+
+// Track when main screen loads
+bundleNudge.trackEvent('main_screen_loaded')
+
+// Track when user data loads
+bundleNudge.trackEvent('user_data_loaded')
+
+// Track when navigation is ready
+bundleNudge.trackEvent('navigation_initialized')
+```
+
+### Tracking API Endpoints
+
+Track critical API calls:
+
+```typescript
+const bundleNudge = BundleNudge.getInstance()
+
+// Track successful API response
+fetch('/api/user')
+  .then(response => {
+    bundleNudge.trackEndpoint('GET', '/api/user', response.status)
+  })
+```
+
+### Health Configuration from Dashboard
+
+Configure required events and endpoints in the BundleNudge dashboard. The SDK fetches this configuration automatically:
+
+```typescript
+// Configured in dashboard, fetched automatically:
+{
+  events: [
+    { name: 'main_screen_loaded', required: true },
+    { name: 'user_authenticated', required: true }
+  ],
+  endpoints: [
+    { method: 'GET', url: '/api/user', expectedStatus: [200], required: true }
+  ]
+}
+```
+
+### Checking Health Status
+
+You can check if health monitoring has completed:
+
+```typescript
+const bundleNudge = BundleNudge.getInstance()
+
+// Returns true if all health checks passed
+const isVerified = bundleNudge.isHealthVerified()
+```
+
+## Manual Rollback
+
+Sometimes you need to trigger a rollback manually (e.g., from a support tool):
+
+```typescript
+import { BundleNudge } from '@bundlenudge/sdk'
+
+const bundleNudge = BundleNudge.getInstance()
+
+// Check if rollback is possible
+if (bundleNudge.canRollback()) {
+  // Trigger rollback
+  await bundleNudge.rollback()
+  // App will restart with previous version
+}
+```
+
+A rollback is only possible when:
+- There's a previous version stored
+- The update hasn't been verified yet
+
+After verification, the previous version is cleaned up and rollback is no longer available.
+
+## Crash Detection Internals
+
+The crash detector works by:
+
+1. **Recording crash timestamps**: Each app start during verification is logged
+2. **Counting rapid crashes**: If starts happen within `crashWindowMs`, it's a crash loop
+3. **Triggering rollback**: When `crashThreshold` is exceeded, rollback happens before JS loads
+
+This happens at the native level, so even if JavaScript crashes immediately, the native code can still detect it and rollback.
+
+## Dashboard Rollback Reports
+
+Every rollback is reported to the BundleNudge dashboard. You can see:
+
+- Which releases triggered rollbacks
+- How many devices rolled back
+- Rollback reasons (crash, health failure, manual)
+- Time of rollback
+
+Use this data to:
+- Identify problematic releases quickly
+- See rollback trends across versions
+- Debug issues that caused crashes
+
+### Rollback Reasons
+
+The dashboard shows these rollback reasons:
+
+| Reason | Description |
+|--------|-------------|
+| `crash_detected` | App crashed repeatedly during verification |
+| `route_failure` | Critical API endpoint failed |
+| `server_triggered` | Rollback triggered from dashboard |
+| `manual` | User or developer triggered rollback |
+
+## Best Practices
+
+### Always call notifyAppReady
+
+Place this call after your main UI renders:
+
+```typescript
+function App() {
+  useEffect(() => {
+    // Wait for initial render
+    requestAnimationFrame(() => {
+      BundleNudge.getInstance().notifyAppReady()
+    })
+  }, [])
+
+  return <MainScreen />
+}
+```
+
+### Configure appropriate thresholds
+
+For different app types:
+
+```typescript
+// High-traffic consumer app - be aggressive
+{
+  crashThreshold: 2,
+  crashWindowMs: 5000,
+  verificationWindowMs: 30000
+}
+
+// Enterprise app - be conservative
+{
+  crashThreshold: 5,
+  crashWindowMs: 30000,
+  verificationWindowMs: 120000
+}
+```
+
+### Track meaningful events
+
+Don't just track that JavaScript loaded - track that your app is actually working:
+
+```typescript
+// Bad - just shows JS is running
+bundleNudge.trackEvent('app_started')
+
+// Good - shows real functionality works
+bundleNudge.trackEvent('products_displayed')
+bundleNudge.trackEvent('checkout_ready')
+```
+
+### Test rollback in development
+
+Before shipping, test that rollback works:
+
+1. Push an update that crashes intentionally
+2. Verify the app rolls back automatically
+3. Check the dashboard shows the rollback
+
+```typescript
+// Test code - DO NOT SHIP
+if (currentVersion === 'test-crash-version') {
+  throw new Error('Intentional crash for rollback testing')
+}
+```
+
+## Crash Reporter Integration
+
+BundleNudge integrates with popular crash reporters to tag crashes with bundle version info:
+
+```typescript
+import { tagCrashReporters, tagSentry, tagBugsnag } from '@bundlenudge/sdk'
+
+// Tag all supported crash reporters
+tagCrashReporters({
+  releaseId: 'release-123',
+  bundleVersion: '1.2.3',
+  bundleHash: 'abc123...',
+})
+
+// Or tag specific ones
+tagSentry({ releaseId: 'release-123', bundleVersion: '1.2.3' })
+tagBugsnag({ releaseId: 'release-123', bundleVersion: '1.2.3' })
+```
+
+This helps you correlate crashes in your error tracker with specific OTA releases.

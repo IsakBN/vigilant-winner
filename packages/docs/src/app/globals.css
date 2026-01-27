@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand: #FF6B35;
+  --brand-dark: #e55a2b;
+}
+
+/* Clean, minimal design */
+body {
+  @apply antialiased text-gray-900 bg-white;
+}
+
+/* Prose styling for MDX content */
+.prose {
+  @apply max-w-none;
+}
+
+.prose h1 {
+  @apply text-3xl font-bold mt-8 mb-4 text-gray-900;
+}
+
+.prose h2 {
+  @apply text-2xl font-semibold mt-8 mb-3 text-gray-900;
+}
+
+.prose h3 {
+  @apply text-xl font-semibold mt-6 mb-2 text-gray-900;
+}
+
+.prose p {
+  @apply my-4 leading-relaxed text-gray-700;
+}
+
+.prose ul, .prose ol {
+  @apply my-4 pl-6;
+}
+
+.prose li {
+  @apply my-2 text-gray-700;
+}
+
+.prose a {
+  @apply text-brand-500 hover:underline;
+}
+
+.prose code {
+  @apply bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-gray-800;
+}
+
+.prose pre {
+  @apply bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-6;
+}
+
+.prose pre code {
+  @apply bg-transparent p-0 text-inherit;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-brand-500 pl-4 italic text-gray-600 my-6;
+}
+
+.prose table {
+  @apply w-full my-6 border-collapse;
+}
+
+.prose th {
+  @apply text-left p-3 bg-gray-100 border-b-2 border-gray-200 font-semibold;
+}
+
+.prose td {
+  @apply p-3 border-b border-gray-100;
+}
+
+/* Copy button styling */
+.copy-button {
+  @apply absolute top-2 right-2 px-2 py-1 text-xs bg-gray-800 text-gray-300 rounded hover:bg-gray-700 transition-colors;
+}
+
+.copy-button:active {
+  @apply bg-green-600;
+}

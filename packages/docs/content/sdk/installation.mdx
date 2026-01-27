@@ -1,0 +1,244 @@
+---
+title: "Installation"
+description: "Install and configure BundleNudge SDK in your React Native app"
+order: 1
+---
+
+# Installation
+
+Getting BundleNudge into your React Native app takes just a few minutes. The SDK supports both React Native CLI projects and Expo projects with development builds.
+
+## React Native CLI
+
+For bare React Native projects, you'll need to install the package and link the native modules.
+
+### 1. Install the package
+
+```bash
+npm install @bundlenudge/sdk
+# or
+yarn add @bundlenudge/sdk
+# or
+pnpm add @bundlenudge/sdk
+```
+
+### 2. Install iOS dependencies
+
+```bash
+cd ios && pod install && cd ..
+```
+
+### 3. Configure iOS
+
+Open your `AppDelegate.mm` (or `AppDelegate.swift`) and update the bundle URL:
+
+```swift
+// AppDelegate.swift
+import BundleNudge
+
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate {
+  // ...
+
+  override func sourceURL(for bridge: RCTBridge!) -> URL! {
+    // BundleNudge returns the OTA bundle if available, otherwise nil
+    if let bundleURL = BundleNudge.bundleURL() {
+      return bundleURL
+    }
+
+    // Fall back to the embedded bundle
+    #if DEBUG
+    return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
+    #else
+    return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
+    #endif
+  }
+}
+```
+
+For Objective-C projects:
+
+```objc
+// AppDelegate.mm
+#import <BundleNudge/BundleNudge.h>
+
+- (NSURL *)sourceURLForBridge:(RCTBridge *)bridge {
+  NSURL *bundleURL = [BundleNudge bundleURL];
+  if (bundleURL) {
+    return bundleURL;
+  }
+
+  #if DEBUG
+  return [[RCTBundleURLProvider sharedSettings] jsBundleURLForBundleRoot:@"index"];
+  #else
+  return [[NSBundle mainBundle] URLForResource:@"main" withExtension:@"jsbundle"];
+  #endif
+}
+```
+
+### 4. Configure Android
+
+Update your `MainApplication.kt` to use BundleNudge's bundle path:
+
+```kotlin
+// MainApplication.kt
+import com.bundlenudge.BundleNudgeModule
+
+class MainApplication : Application(), ReactApplication {
+
+  override val reactNativeHost: ReactNativeHost =
+    object : DefaultReactNativeHost(this) {
+
+      override fun getJSBundleFile(): String? {
+        // Returns the OTA bundle path if available, otherwise null (uses embedded)
+        return BundleNudgeModule.getBundlePath(applicationContext)
+      }
+
+      // ... rest of your config
+    }
+}
+```
+
+For Java projects:
+
+```java
+// MainApplication.java
+import com.bundlenudge.BundleNudgeModule;
+
+public class MainApplication extends Application implements ReactApplication {
+
+  private final ReactNativeHost mReactNativeHost =
+    new DefaultReactNativeHost(this) {
+
+      @Nullable
+      @Override
+      protected String getJSBundleFile() {
+        return BundleNudgeModule.getBundlePath(getApplicationContext());
+      }
+
+      // ... rest of your config
+    };
+}
+```
+
+### 5. Initialize in JavaScript
+
+```typescript
+// App.tsx or index.js
+import { setupBundleNudge } from '@bundlenudge/sdk'
+
+// Initialize at app startup
+setupBundleNudge({
+  appId: 'your-app-id-from-dashboard',
+})
+```
+
+## Expo Projects
+
+For Expo projects, use the config plugin which handles all native setup automatically.
+
+See the [Expo guide](/sdk/expo) for complete instructions.
+
+```json
+// app.json
+{
+  "expo": {
+    "plugins": [
+      ["@bundlenudge/sdk/expo/plugin", {
+        "appId": "your-app-id-from-dashboard"
+      }]
+    ]
+  }
+}
+```
+
+Then rebuild your development build:
+
+```bash
+npx expo prebuild
+npx expo run:ios
+# or
+npx expo run:android
+```
+
+## Verifying Installation
+
+After installation, verify everything is working correctly:
+
+### 1. Check native module linking
+
+Add this to your app temporarily:
+
+```typescript
+import { getBundleNudgeStatus } from '@bundlenudge/sdk'
+
+const status = getBundleNudgeStatus()
+console.log('BundleNudge native available:', status.isNativeAvailable)
+```
+
+If `isNativeAvailable` is `false`, the native module isn't linked properly.
+
+### 2. Check device registration
+
+The SDK registers devices automatically on first launch. Check your BundleNudge dashboard to see the device appear.
+
+### 3. Test an update
+
+1. Create a release in the BundleNudge dashboard
+2. Restart your app
+3. Check the logs for update check messages
+
+## Troubleshooting
+
+### Native module not found
+
+If you see the warning "Native module not found", try these steps:
+
+**iOS:**
+```bash
+cd ios
+rm -rf Pods Podfile.lock
+pod install --repo-update
+cd ..
+```
+
+**Android:**
+```bash
+cd android
+./gradlew clean
+cd ..
+npx react-native run-android
+```
+
+### Build errors on iOS
+
+Make sure your Podfile has the correct deployment target:
+
+```ruby
+# Podfile
+platform :ios, '13.0'
+```
+
+### Build errors on Android
+
+Ensure your `minSdkVersion` is at least 21:
+
+```groovy
+// android/build.gradle
+buildscript {
+  ext {
+    minSdkVersion = 21
+    // ...
+  }
+}
+```
+
+### Updates not applying
+
+1. Make sure you're calling `notifyAppReady()` after the app renders
+2. Check that the app was fully restarted (not just refreshed in dev mode)
+3. Verify the release targets your app version in the dashboard
+
+### Expo Go not working
+
+BundleNudge requires native modules and won't work in Expo Go. You need to use a [development build](/sdk/expo) or standalone app.

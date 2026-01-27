@@ -1,0 +1,240 @@
+---
+title: "Self-Hosting Overview"
+description: "Run BundleNudge on your own infrastructure"
+order: 1
+---
+
+# Self-Hosting Overview
+
+BundleNudge can be self-hosted on your own infrastructure using Cloudflare's global edge network. This gives you full control over your data, compliance with regulatory requirements, and the ability to customize the platform.
+
+## Why Self-Host?
+
+### Data Sovereignty
+
+Keep all your data within your control:
+
+- App bundles stored in your own R2 buckets
+- Device telemetry in your own database
+- No data leaves your infrastructure
+
+### Compliance
+
+Meet regulatory requirements:
+
+- GDPR, HIPAA, SOC 2 compliance
+- Data residency requirements
+- Audit logging and access controls
+
+### Customization
+
+Extend the platform:
+
+- Custom authentication providers
+- Integration with internal systems
+- Modified rate limits and quotas
+
+### Cost Control
+
+Predictable pricing at scale:
+
+- Cloudflare Workers: $0.50 per million requests (after free tier)
+- D1 Database: $0.75 per million rows read
+- R2 Storage: $0.015/GB/month (no egress fees)
+
+## Architecture Overview
+
+BundleNudge's self-hosted architecture runs entirely on Cloudflare:
+
+```
+                    ┌─────────────────────────────────────────────┐
+                    │              Cloudflare Edge                │
+                    │                                             │
+┌─────────┐        │  ┌─────────────┐      ┌─────────────────┐  │
+│  React  │───────▶│  │   Workers   │─────▶│   R2 Storage    │  │
+│ Native  │        │  │   (API)     │      │   (Bundles)     │  │
+│  App    │        │  └─────────────┘      └─────────────────┘  │
+└─────────┘        │         │                                   │
+                    │         ├─────────────────┐                │
+                    │         │                 │                │
+                    │         ▼                 ▼                │
+                    │  ┌─────────────┐   ┌─────────────┐        │
+                    │  │     D1      │   │     KV      │        │
+                    │  │ (Database)  │   │(Rate Limit) │        │
+                    │  └─────────────┘   └─────────────┘        │
+                    │                                             │
+                    └─────────────────────────────────────────────┘
+                                        │
+                                        │ Auth
+                                        ▼
+                              ┌─────────────────┐
+                              │  Neon Postgres  │
+                              │  (User Auth)    │
+                              └─────────────────┘
+```
+
+### Components
+
+| Component | Service | Purpose |
+|-----------|---------|---------|
+| API | Cloudflare Workers | REST API, business logic |
+| Database | Cloudflare D1 | App metadata, releases, devices |
+| Storage | Cloudflare R2 | JavaScript bundles (no egress fees) |
+| Rate Limiting | Cloudflare KV | Request rate limiting |
+| Cache | Cloudflare KV | Response caching |
+| Auth Database | Neon Postgres | User authentication (Better Auth) |
+| Realtime | Durable Objects | WebSocket connections |
+
+## Requirements
+
+### Cloudflare Account
+
+You need a Cloudflare account with:
+
+- **Workers Paid** plan ($5/month) - Required for D1 and Durable Objects
+- Verified payment method
+
+### Neon Account (for Auth)
+
+For user authentication:
+
+- Free tier works for small deployments
+- Pro tier for production ($19/month)
+
+### Development Tools
+
+- Node.js 18+
+- pnpm 8+
+- Wrangler CLI (`npm install -g wrangler`)
+- Git
+
+## Cost Considerations
+
+### Cloudflare Pricing (as of 2024)
+
+| Service | Free Tier | Paid |
+|---------|-----------|------|
+| Workers | 100K req/day | $0.50/million |
+| D1 | 5M rows read/day | $0.75/million rows |
+| R2 | 10GB storage | $0.015/GB/month |
+| KV | 100K reads/day | $0.50/million |
+| Durable Objects | 1M requests | $0.15/million |
+
+### Estimated Monthly Costs
+
+| Scale | Users | API Requests | Storage | Est. Cost |
+|-------|-------|--------------|---------|-----------|
+| Starter | < 1,000 | < 1M | < 10GB | Free |
+| Growing | 10,000 | 10M | 50GB | ~$15/month |
+| Scale | 100,000 | 100M | 500GB | ~$100/month |
+| Enterprise | 1M+ | 1B+ | 5TB+ | Custom |
+
+**Key cost advantages:**
+
+- **No egress fees** - R2 has zero egress costs
+- **Edge computing** - Low latency globally
+- **Generous free tiers** - Start free, pay as you grow
+
+## Deployment Options
+
+### Option 1: Quick Start (Recommended)
+
+Use our deployment script for a guided setup:
+
+```bash
+git clone https://github.com/bundlenudge/bundlenudge.git
+cd bundlenudge
+pnpm install
+pnpm run deploy:self-hosted
+```
+
+This interactive script will:
+1. Create Cloudflare resources (D1, R2, KV)
+2. Set up environment variables
+3. Run database migrations
+4. Deploy the Workers
+
+### Option 2: Manual Deployment
+
+For full control, follow the step-by-step guides:
+
+1. [Cloudflare Workers Setup](/docs/self-hosting/cloudflare-workers)
+2. [Database Setup](/docs/self-hosting/database)
+
+### Option 3: Infrastructure as Code
+
+Use Terraform for reproducible deployments:
+
+```hcl
+module "bundlenudge" {
+  source = "github.com/bundlenudge/terraform-cloudflare"
+
+  cloudflare_account_id = var.account_id
+  environment           = "production"
+  domain               = "api.yourdomain.com"
+}
+```
+
+## Security Considerations
+
+### Secrets Management
+
+Store sensitive values in Wrangler secrets:
+
+```bash
+# Never commit these to version control
+wrangler secret put JWT_SECRET
+wrangler secret put ENCRYPTION_KEY
+wrangler secret put DATABASE_URL
+```
+
+### Network Security
+
+- All traffic is HTTPS by default
+- Workers run in isolated V8 isolates
+- No persistent server = smaller attack surface
+
+### Access Control
+
+- API keys use bcrypt hashing
+- Session tokens are short-lived
+- Rate limiting prevents abuse
+
+## Limitations
+
+### Compared to Managed Service
+
+| Feature | Self-Hosted | Managed |
+|---------|-------------|---------|
+| Automatic updates | Manual | Automatic |
+| Support | Community | Priority |
+| Dashboard hosting | Bring your own | Included |
+| SSL certificates | Cloudflare (auto) | Included |
+| Monitoring | DIY | Built-in |
+
+### Technical Limits
+
+- D1 database: 10GB per database
+- R2: No object size limit (practical limit ~5TB)
+- Workers: 30s CPU time (regular) / 15min (cron)
+- Durable Objects: 128KB storage per object
+
+## Getting Started
+
+Ready to deploy? Follow the guides in order:
+
+1. **[Cloudflare Workers](/docs/self-hosting/cloudflare-workers)** - Deploy the API
+2. **[Database Setup](/docs/self-hosting/database)** - Configure D1 and Neon
+
+## Support
+
+### Community
+
+- [GitHub Discussions](https://github.com/bundlenudge/bundlenudge/discussions)
+- [Discord Server](https://discord.gg/bundlenudge)
+
+### Enterprise Support
+
+For dedicated support, custom SLAs, and priority fixes:
+
+- Contact: enterprise@bundlenudge.com

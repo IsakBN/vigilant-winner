@@ -1,0 +1,318 @@
+---
+title: "Channels"
+description: "Use channels to control which users receive which updates"
+order: 3
+---
+
+# Channels
+
+Channels let you deploy different versions of your app to different groups of users. They're essential for staged rollouts, beta testing, and environment separation.
+
+## What Are Channels?
+
+A channel is a deployment track that determines which release a device receives. Each device subscribes to a single channel and receives the active release for that channel.
+
+Common channel patterns:
+
+| Channel | Purpose | Users |
+|---------|---------|-------|
+| production | Stable releases | All users (default) |
+| staging | Internal testing | Your team |
+| beta | Beta program | Opt-in testers |
+| canary | Early testing | Small % of users |
+
+---
+
+## The Default Channel (Production)
+
+Every app comes with a **production** channel that cannot be deleted. This channel:
+
+- Is assigned to devices by default
+- Receives releases intended for all users
+- Has 100% rollout by default
+- Is marked with a "Default" badge in the UI
+
+[Screenshot: Channel List with Default Badge]
+
+When a device initializes the SDK without specifying a channel, it automatically subscribes to production.
+
+```typescript
+// Device subscribes to production channel by default
+BundleNudge.init({
+  appId: 'app_abc123',
+  apiKey: 'bnk_xxx',
+  // channel: 'production' (implicit)
+});
+```
+
+---
+
+## Creating Channels
+
+To create a new channel:
+
+1. Go to your app in the dashboard
+2. Click the **Channels** tab
+3. Click **New Channel**
+
+[Screenshot: Create Channel Form]
+
+### Channel Configuration
+
+#### Name
+
+Choose a URL-safe identifier (lowercase letters, numbers, hyphens):
+
+- `staging`
+- `beta`
+- `internal-testing`
+- `canary-v2`
+
+This is the value you'll use in the SDK configuration.
+
+#### Display Name
+
+A human-readable name shown in the dashboard:
+
+- "Staging Environment"
+- "Beta Testers"
+- "Internal QA"
+
+#### Description (Optional)
+
+Explain the channel's purpose:
+
+```
+Beta channel for users who opted into early access
+through the settings screen.
+```
+
+Click **Create Channel** when done.
+
+---
+
+## Common Channel Setups
+
+### Staging Channel
+
+For internal testing before production:
+
+1. Create a channel named `staging`
+2. Deploy new releases to staging first
+3. Have your team test thoroughly
+4. Promote to production when ready
+
+```typescript
+// In your staging build
+BundleNudge.init({
+  appId: 'app_abc123',
+  apiKey: 'bnk_xxx',
+  channel: 'staging',
+});
+```
+
+### Beta Channel
+
+For beta testers and early adopters:
+
+1. Create a channel named `beta`
+2. Add a beta opt-in toggle in your app settings
+3. Switch channel based on user preference
+
+```typescript
+// Dynamic channel based on user preference
+const channel = user.isBetaTester ? 'beta' : 'production';
+
+BundleNudge.init({
+  appId: 'app_abc123',
+  apiKey: 'bnk_xxx',
+  channel,
+});
+```
+
+### Environment-Based Channels
+
+Match channels to your environments:
+
+```typescript
+// Based on build configuration
+const channel = __DEV__ ? 'development' : 'production';
+
+BundleNudge.init({
+  appId: 'app_abc123',
+  apiKey: 'bnk_xxx',
+  channel,
+});
+```
+
+---
+
+## Promoting Between Channels
+
+Promoting means deploying a release from one channel to another. This is the safest way to move code from staging to production.
+
+### Manual Promotion
+
+1. Go to the release you want to promote
+2. Click **Promote** or select it from the dropdown menu
+3. Choose the target channel
+4. Confirm the promotion
+
+[Screenshot: Promote Release Dialog]
+
+### Promotion Best Practices
+
+1. **Staging first** - Always test in staging before production
+2. **Gradual rollout** - Start with low percentage in production
+3. **Monitor metrics** - Watch for issues after each promotion
+4. **Document changes** - Update release notes if needed
+
+### Promotion Flow Example
+
+```
+Developer pushes code
+    ↓
+Release created on 'staging' channel
+    ↓
+QA tests on staging (100% rollout)
+    ↓
+Promote to 'beta' channel
+    ↓
+Beta testers validate (100% rollout)
+    ↓
+Promote to 'production' channel
+    ↓
+Gradual rollout: 10% → 25% → 50% → 100%
+```
+
+---
+
+## Device Targeting
+
+Device targeting lets you control which devices within a channel receive updates based on device attributes.
+
+### Setting Up Targeting Rules
+
+1. Go to your channel's detail page
+2. Find the **Targeting Rules** section
+3. Click **Add Rule**
+
+[Screenshot: Targeting Rules Builder]
+
+### Available Target Fields
+
+| Field | Description | Example Value |
+|-------|-------------|---------------|
+| `appVersion` | App's semantic version | `1.2.0` |
+| `osVersion` | Device OS version | `17.0`, `14` |
+| `platform` | Device platform | `ios`, `android` |
+| `deviceModel` | Device model identifier | `iPhone15,2` |
+| `locale` | Device locale | `en-US`, `de-DE` |
+| `timezone` | Device timezone | `America/New_York` |
+
+### Available Operators
+
+| Operator | Description | Use With |
+|----------|-------------|----------|
+| `equals` | Exact match | Any field |
+| `not equals` | Excludes value | Any field |
+| `greater than` | Numeric comparison | Versions, numbers |
+| `greater or equal` | Numeric comparison | Versions, numbers |
+| `less than` | Numeric comparison | Versions, numbers |
+| `less or equal` | Numeric comparison | Versions, numbers |
+| `version >` | Semantic version comparison | appVersion, osVersion |
+| `version >=` | Semantic version comparison | appVersion, osVersion |
+| `version <` | Semantic version comparison | appVersion, osVersion |
+| `version <=` | Semantic version comparison | appVersion, osVersion |
+| `contains` | Substring match | Any text field |
+| `starts with` | Prefix match | Any text field |
+
+### Match Logic
+
+When you have multiple rules, choose how they combine:
+
+- **Match All** - Device must satisfy every rule (AND logic)
+- **Match Any** - Device must satisfy at least one rule (OR logic)
+
+### Targeting Examples
+
+**Only devices on iOS 17 or later:**
+
+```
+osVersion  version >=  17.0
+```
+
+**Only devices in the US:**
+
+```
+locale  starts with  en-US
+```
+
+**Exclude old app versions:**
+
+```
+appVersion  version >=  2.0.0
+```
+
+**Multiple conditions (Match All):**
+
+```
+platform     equals      ios
+osVersion    version >=  16.0
+appVersion   version >=  1.5.0
+```
+
+### Removing Targeting
+
+To remove a targeting rule:
+
+1. Click the **trash icon** next to the rule
+2. The rule is removed immediately
+
+To target all devices, remove all rules. The message "No targeting rules. All devices will receive updates." confirms universal targeting.
+
+---
+
+## Channel Settings
+
+### Editing a Channel
+
+1. Click on the channel to open its detail page
+2. Click **Edit Channel** or the settings icon
+3. Update the display name or description
+4. Click **Save**
+
+### Rollout Percentage
+
+Control what percentage of targeted devices receive updates:
+
+1. Go to the channel detail page
+2. Find the **Rollout Percentage** slider
+3. Adjust using the slider or enter a value
+4. Use presets: 10%, 25%, 50%, 100%
+
+[Screenshot: Rollout Slider Component]
+
+**Rollout states:**
+
+- `0%` - Paused, no devices receive updates
+- `1-99%` - Gradual rollout in progress
+- `100%` - Full rollout to all targeted devices
+
+### Deleting a Channel
+
+Non-default channels can be deleted:
+
+1. Go to the channel detail page
+2. Click **Delete Channel**
+3. Confirm deletion
+
+**Warning**: Devices subscribed to a deleted channel will stop receiving updates. Consider migrating them to another channel first by pushing a release that changes the channel subscription.
+
+---
+
+## Next Steps
+
+- [Create releases](/dashboard/releases) for your channels
+- [Set up teams](/dashboard/teams) to manage channel deployments
+- [Configure health checks](/dashboard/apps#health-configuration) for safe rollouts

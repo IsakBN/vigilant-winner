@@ -1,0 +1,446 @@
+---
+title: "Expo"
+description: "Using BundleNudge with Expo and EAS Build"
+order: 5
+---
+
+# Expo
+
+BundleNudge works great with Expo projects that use development builds or standalone apps. The config plugin handles all native setup automatically.
+
+## Important: Expo Go Limitations
+
+BundleNudge requires native modules and **will not work in Expo Go**. You need to use:
+
+- Development builds (`expo run:ios` / `expo run:android`)
+- EAS Build (`eas build`)
+- Standalone production apps
+
+The SDK detects when native modules are unavailable and falls back to a no-op mode. Updates won't apply, but your app won't crash.
+
+## Quick Start
+
+### 1. Install the package
+
+```bash
+npx expo install @bundlenudge/sdk
+```
+
+### 2. Add the config plugin
+
+Add the plugin to your `app.json` or `app.config.js`:
+
+```json
+{
+  "expo": {
+    "plugins": [
+      ["@bundlenudge/sdk/expo/plugin", {
+        "appId": "your-app-id-from-dashboard"
+      }]
+    ]
+  }
+}
+```
+
+Or in `app.config.js`:
+
+```javascript
+export default {
+  expo: {
+    plugins: [
+      ['@bundlenudge/sdk/expo/plugin', {
+        appId: 'your-app-id-from-dashboard',
+        debug: process.env.NODE_ENV !== 'production',
+      }],
+    ],
+  },
+}
+```
+
+### 3. Build your app
+
+Run prebuild to generate native code:
+
+```bash
+npx expo prebuild
+```
+
+Then build and run:
+
+```bash
+# iOS
+npx expo run:ios
+
+# Android
+npx expo run:android
+```
+
+### 4. Initialize in JavaScript
+
+```typescript
+import { setupBundleNudge } from '@bundlenudge/sdk'
+
+// Initialize at app startup
+setupBundleNudge({
+  appId: 'your-app-id',
+})
+```
+
+## Config Plugin Options
+
+The plugin accepts these options:
+
+```typescript
+interface BundleNudgePluginProps {
+  // Required: Your app ID from the dashboard
+  appId: string
+
+  // Optional: Custom API URL (for self-hosted)
+  apiUrl?: string
+
+  // Optional: Enable debug logging (default: false)
+  debug?: boolean
+}
+```
+
+### appId (required)
+
+Your unique app identifier from the BundleNudge dashboard:
+
+```json
+{
+  "plugins": [
+    ["@bundlenudge/sdk/expo/plugin", {
+      "appId": "app_abc123xyz"
+    }]
+  ]
+}
+```
+
+### apiUrl
+
+Override the API URL for self-hosted deployments:
+
+```json
+{
+  "plugins": [
+    ["@bundlenudge/sdk/expo/plugin", {
+      "appId": "app_abc123xyz",
+      "apiUrl": "https://bundlenudge.your-company.com"
+    }]
+  ]
+}
+```
+
+### debug
+
+Enable verbose native logging:
+
+```json
+{
+  "plugins": [
+    ["@bundlenudge/sdk/expo/plugin", {
+      "appId": "app_abc123xyz",
+      "debug": true
+    }]
+  ]
+}
+```
+
+## What the Plugin Does
+
+The config plugin automatically configures both iOS and Android projects during prebuild.
+
+### iOS Configuration
+
+Adds to `Info.plist`:
+
+```xml
+<key>BundleNudgeAppId</key>
+<string>your-app-id</string>
+<key>BundleNudgeDebug</key>
+<false/>
+<!-- If apiUrl is set: -->
+<key>BundleNudgeApiUrl</key>
+<string>https://your-custom-url.com</string>
+```
+
+### Android Configuration
+
+Adds to `AndroidManifest.xml`:
+
+```xml
+<application>
+  <meta-data
+    android:name="com.bundlenudge.APP_ID"
+    android:value="your-app-id" />
+  <meta-data
+    android:name="com.bundlenudge.DEBUG"
+    android:value="false" />
+  <!-- If apiUrl is set: -->
+  <meta-data
+    android:name="com.bundlenudge.API_URL"
+    android:value="https://your-custom-url.com" />
+</application>
+```
+
+## EAS Build Integration
+
+BundleNudge works seamlessly with EAS Build.
+
+### eas.json Configuration
+
+Create different profiles for development and production:
+
+```json
+{
+  "cli": {
+    "version": ">= 3.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "BUNDLENUDGE_APP_ID": "dev_app_id"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "BUNDLENUDGE_APP_ID": "staging_app_id"
+      }
+    },
+    "production": {
+      "env": {
+        "BUNDLENUDGE_APP_ID": "prod_app_id"
+      }
+    }
+  }
+}
+```
+
+### Dynamic Configuration
+
+Use environment variables in `app.config.js`:
+
+```javascript
+export default {
+  expo: {
+    plugins: [
+      ['@bundlenudge/sdk/expo/plugin', {
+        appId: process.env.BUNDLENUDGE_APP_ID || 'default_app_id',
+        debug: process.env.NODE_ENV !== 'production',
+      }],
+    ],
+  },
+}
+```
+
+### Build Commands
+
+```bash
+# Development build
+eas build --profile development --platform ios
+
+# Preview build
+eas build --profile preview --platform all
+
+# Production build
+eas build --profile production --platform all
+```
+
+## Development Builds
+
+Development builds are the recommended way to develop with BundleNudge in Expo.
+
+### Creating a Development Build
+
+```bash
+# Install dev-client
+npx expo install expo-dev-client
+
+# Add to plugins
+# app.json: "plugins": ["expo-dev-client", ...]
+
+# Build locally
+npx expo run:ios
+npx expo run:android
+
+# Or build with EAS
+eas build --profile development --platform ios
+```
+
+### Running Your Development Build
+
+```bash
+# Start the bundler
+npx expo start --dev-client
+
+# Select your development build from the list
+```
+
+### Testing Updates in Development
+
+1. Push a release to BundleNudge dashboard
+2. Restart your development build (not just refresh)
+3. Check logs for update download
+
+## Expo Updates Comparison
+
+BundleNudge vs Expo Updates:
+
+| Feature | BundleNudge | Expo Updates |
+|---------|-------------|--------------|
+| Automatic rollback | Yes | No |
+| Health monitoring | Yes | No |
+| Crash detection | Yes | No |
+| Dashboard | Full-featured | Basic |
+| Targeting | Device/version | Channel-based |
+| Self-hosting | Yes | EAS only |
+| Pricing | Per-device | Per-user |
+
+You can use both, but they shouldn't be enabled simultaneously. If you're using BundleNudge, disable Expo Updates:
+
+```json
+{
+  "expo": {
+    "updates": {
+      "enabled": false
+    },
+    "plugins": [
+      ["@bundlenudge/sdk/expo/plugin", { "appId": "..." }]
+    ]
+  }
+}
+```
+
+## Troubleshooting
+
+### Plugin not applying
+
+If the plugin doesn't seem to work after prebuild:
+
+```bash
+# Clean and rebuild
+rm -rf ios android
+npx expo prebuild --clean
+npx expo run:ios
+```
+
+### Native module not found
+
+If you see "Native module not found" in your dev build:
+
+1. Verify the plugin is in `app.json`
+2. Run `npx expo prebuild --clean`
+3. Rebuild: `npx expo run:ios` or `npx expo run:android`
+
+### Updates not applying
+
+1. Make sure you're using a development build, not Expo Go
+2. Verify the app fully restarts (not hot reload)
+3. Check device appears in dashboard
+
+### Different app IDs per environment
+
+Use environment variables:
+
+```javascript
+// app.config.js
+const getAppId = () => {
+  if (process.env.APP_VARIANT === 'production') {
+    return 'prod_app_id'
+  }
+  if (process.env.APP_VARIANT === 'preview') {
+    return 'staging_app_id'
+  }
+  return 'dev_app_id'
+}
+
+export default {
+  expo: {
+    plugins: [
+      ['@bundlenudge/sdk/expo/plugin', {
+        appId: getAppId(),
+      }],
+    ],
+  },
+}
+```
+
+Then set the variant when building:
+
+```bash
+APP_VARIANT=production eas build --profile production
+```
+
+## Complete Example
+
+Here's a complete Expo project setup:
+
+**app.json:**
+```json
+{
+  "expo": {
+    "name": "My App",
+    "slug": "my-app",
+    "version": "1.0.0",
+    "updates": {
+      "enabled": false
+    },
+    "plugins": [
+      "expo-dev-client",
+      ["@bundlenudge/sdk/expo/plugin", {
+        "appId": "app_abc123"
+      }]
+    ]
+  }
+}
+```
+
+**App.tsx:**
+```typescript
+import { useEffect } from 'react'
+import { View, Text } from 'react-native'
+import { setupBundleNudge, useBundleNudge } from '@bundlenudge/sdk'
+
+// Initialize once at startup
+setupBundleNudge({
+  appId: 'app_abc123',
+}).catch(console.error)
+
+export default function App() {
+  const { updateAvailable, downloadAndApply } = useBundleNudge()
+
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <Text>My Expo App</Text>
+      {updateAvailable && (
+        <Text onPress={downloadAndApply}>
+          Update available! Tap to install.
+        </Text>
+      )}
+    </View>
+  )
+}
+```
+
+**eas.json:**
+```json
+{
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "production": {}
+  }
+}
+```
+
+Build and run:
+```bash
+npx expo prebuild
+npx expo run:ios
+```

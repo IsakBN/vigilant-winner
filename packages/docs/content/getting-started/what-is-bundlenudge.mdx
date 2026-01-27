@@ -1,0 +1,151 @@
+---
+title: "What is BundleNudge?"
+description: "Learn what BundleNudge is, how OTA updates work, and when you should use them in your React Native app."
+order: 1
+---
+
+# What is BundleNudge?
+
+Let me tell you about a problem every React Native developer eventually faces.
+
+You've just shipped a new feature. Your users love it. Then you notice a bug. A small one, but it's annoying. You fix it in 30 seconds. And then... you wait. App Store review takes a day. Google Play takes a few hours. Your users are stuck with the buggy version until then.
+
+That's the problem BundleNudge solves.
+
+## The Magic of OTA Updates
+
+Here's the thing about React Native apps: the JavaScript code that powers your UI and business logic is separate from the native shell. When users download your app from the store, they get both pieces bundled together. But you can actually update the JavaScript part independently, without going through app store review.
+
+This is called an **Over-The-Air (OTA) update**.
+
+When your app launches, BundleNudge checks our servers for any new JavaScript bundles. If there's an update, it downloads in the background. On the next launch (or immediately, if you prefer), the app loads the new code.
+
+No app store. No review. No waiting.
+
+```
+Your App Launch
+      │
+      ▼
+┌─────────────────┐
+│  Check for      │
+│  OTA update     │
+└────────┬────────┘
+         │
+    ┌────┴────┐
+    │ Update  │  No ──▶ Load current bundle
+    │ exists? │
+    └────┬────┘
+         │ Yes
+         ▼
+┌─────────────────┐
+│  Download new   │
+│  bundle         │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Apply on next  │
+│  launch         │
+└─────────────────┘
+```
+
+## Why This Matters
+
+Think about what this means for your team:
+
+**Ship fixes in minutes, not days.** Found a typo? Broken button? Critical business logic error? Fix it, push it, done. Your users get the fix within minutes of you deploying.
+
+**Iterate faster.** A/B test features. Roll out gradually. Get feedback quickly. You're no longer blocked by app store timelines.
+
+**Reduce risk.** If something goes wrong, roll back instantly. No waiting for an emergency app store review.
+
+**Keep users happy.** They never have to manually update through the store for JavaScript changes. The app just gets better automatically.
+
+## What You Can (and Can't) Update
+
+Here's the important part: OTA updates only work for JavaScript code.
+
+### You CAN update:
+
+- React components and screens
+- Business logic and state management
+- API calls and data handling
+- Styles and layouts
+- Images and assets bundled with JavaScript
+- Navigation structure
+- Text and copy
+
+### You CAN'T update:
+
+- Native modules (Objective-C, Swift, Java, Kotlin)
+- Native dependencies that require linking
+- App permissions
+- The app icon or splash screen
+- Anything in `Info.plist` or `AndroidManifest.xml`
+
+If you add a new native library or change native code, you still need a full app store release. But for everything else—which is most of your day-to-day development—OTA updates have you covered.
+
+## When to Use BundleNudge
+
+BundleNudge is perfect when you need to:
+
+- **Fix bugs quickly** without waiting for app store review
+- **Ship features faster** by iterating on JavaScript code
+- **Run A/B tests** by deploying different bundles to different users
+- **Roll out gradually** to catch issues before they affect everyone
+- **Maintain compliance** with regulations that require quick fixes
+
+## When NOT to Use BundleNudge
+
+You should still go through the app store when:
+
+- Adding new native dependencies or modules
+- Changing app permissions
+- Updating the app's native configuration
+- Making changes that require binary updates
+
+The app stores also have rules about OTA updates. Apple requires that OTA-delivered code doesn't change the app's primary purpose or bypass their review process. BundleNudge is designed for incremental improvements to existing functionality, not for shipping entirely new apps through the backdoor.
+
+## How BundleNudge Keeps You Safe
+
+Pushing code directly to user devices is powerful. It's also risky if done wrong. That's why BundleNudge has multiple safety mechanisms built in:
+
+### Automatic Rollback
+
+If the new bundle causes crashes on launch, BundleNudge automatically reverts to the previous working version. Users never get stuck.
+
+### Hash Verification
+
+Every bundle is verified with SHA-256 hashes before being applied. If the download is corrupted or tampered with, it's rejected.
+
+### Binary Version Matching
+
+BundleNudge tracks which native app versions are compatible with which JavaScript bundles. You won't accidentally push code that requires native features the user doesn't have.
+
+### Gradual Rollouts
+
+Deploy to 1% of users first. Then 10%. Then 50%. Catch issues before they affect everyone.
+
+## Architecture at a Glance
+
+```
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│   Your RN App    │────▶│  BundleNudge API │────▶│   R2 Storage     │
+│   (SDK inside)   │     │  (Cloudflare)    │     │   (Bundles)      │
+└──────────────────┘     └──────────────────┘     └──────────────────┘
+                                  │
+                           ┌──────┴──────┐
+                           │             │
+                     ┌─────▼─────┐ ┌─────▼─────┐
+                     │ Database  │ │ Dashboard │
+                     │ (D1/Neon) │ │ (Next.js) │
+                     └───────────┘ └───────────┘
+```
+
+The SDK lives in your React Native app. It talks to our API to check for updates. Bundles are stored on Cloudflare R2 for fast global delivery. The dashboard lets you manage releases, view analytics, and configure rollouts.
+
+## Ready to Get Started?
+
+Now that you understand what BundleNudge is and how it works, let's get it set up in your app. The whole process takes about 5 minutes.
+
+[Continue to Quickstart →](/getting-started/quickstart)
