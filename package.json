@@ -26,7 +26,9 @@
     "interrogate": "./.claude/workflows/runner/interrogate.sh",
     "build-package": "./scripts/preflight-check.sh && ./.claude/workflows/runner/build-package.sh",
     "loop": "./.claude/loop/runner.sh",
-    "loop:continue": "./.claude/loop/runner.sh --continue"
+    "loop:continue": "./.claude/loop/runner.sh --continue",
+    "deploy:app": "./deploy/deploy.sh app",
+    "deploy:admin": "./deploy/deploy.sh admin"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

@@ -18,7 +18,9 @@ export const auth = betterAuth({
     emailOTP({
       sendVerificationOTP: async ({ email, otp }) => {
         // TODO: Implement email sending with Resend or similar
+        // eslint-disable-next-line no-console
         console.log(`[DEV] OTP for ${email}: ${otp}`)
+        await Promise.resolve()
       },
     }),
   ],
