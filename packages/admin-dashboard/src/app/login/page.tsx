@@ -38,7 +38,12 @@ export default function AdminLoginPage() {
     setLoading(true)
 
     try {
-      await authClient.emailOtp.verifyEmail({ email, otp })
+      // Use signIn.emailOtp for authentication (not verifyEmail which only verifies email)
+      const { error } = await authClient.signIn.emailOtp({ email, otp })
+      if (error) {
+        setError(error.message ?? 'Invalid or expired OTP')
+        return
+      }
       router.push('/admin')
     } catch {
       setError('Invalid or expired OTP')
