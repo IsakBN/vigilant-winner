@@ -8,6 +8,7 @@ import {
   useEffect,
   useState,
 } from 'react'
+import { signInWithGitHub } from '@/lib/auth-client'
 
 interface User {
   id: string
@@ -62,7 +63,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
 
   const fetchSession = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/api/auth/session`, {
+      const response = await fetch(`${API_URL}/api/auth/get-session`, {
         credentials: 'include',
       })
 
@@ -95,9 +96,13 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
     void fetchSession()
   }, [fetchSession])
 
-  const login = useCallback((provider: 'github' | 'google') => {
-    const redirectUrl = `${API_URL}/api/auth/${provider}`
-    window.location.href = redirectUrl
+  const login = useCallback(async (provider: 'github' | 'google') => {
+    if (provider === 'github') {
+      // Use Better Auth's social sign-in
+      const callbackURL = `${window.location.origin}/dashboard`
+      await signInWithGitHub(callbackURL)
+    }
+    // TODO: Add Google support if needed
   }, [])
 
   const loginWithEmail = useCallback(async (

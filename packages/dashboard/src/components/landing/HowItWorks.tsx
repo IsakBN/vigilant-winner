@@ -2,9 +2,9 @@ import { FlaskIcon } from '../icons'
 
 export function HowItWorks() {
   return (
-    <section id="how-it-works" className="bg-pastel-blue/40 text-text-dark py-24 overflow-hidden rounded-br-[10rem] rounded-tl-3xl my-8 shadow-lg">
+    <section id="how-it-works" className="bg-pastel-blue/40 text-text-dark py-16 overflow-hidden rounded-br-[10rem] rounded-tl-3xl my-6 shadow-lg">
       <div className="container-fluid">
-        <div className="mb-16 text-center">
+        <div className="mb-10 text-center">
           <h2 className="text-5xl font-extrabold tracking-tight mb-4 text-text-dark">
             How It Works
           </h2>
@@ -13,7 +13,7 @@ export function HowItWorks() {
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-16 relative">
+        <div className="grid lg:grid-cols-3 gap-10 relative">
           {/* Step 1 */}
           <StepCard
             step={1}
@@ -61,7 +61,7 @@ export function HowItWorks() {
         </div>
 
         {/* Setup code */}
-        <div className="mt-20 max-w-2xl mx-auto">
+        <div className="mt-12 max-w-2xl mx-auto">
           <p className="text-center text-base text-text-light mb-4 font-medium">
             One-time setup in your app:
           </p>
@@ -113,14 +113,14 @@ function StepCard({
   const translateClass = offsetY ? 'lg:-translate-y-10' : ''
 
   return (
-    <div className={`space-y-6 p-8 bg-cream-bg rounded-xl ${shadowClass} border ${borderColor} transform ${rotation} hover:rotate-0 transition-transform duration-300 ${translateClass}`}>
-      <div className="flex items-center gap-4">
-        <span className="w-12 h-12 rounded-full bg-bright-accent flex items-center justify-center text-xl font-bold text-white shadow">
+    <div className={`space-y-4 p-6 bg-cream-bg rounded-xl ${shadowClass} border ${borderColor} transform ${rotation} hover:rotate-0 transition-transform duration-300 ${translateClass}`}>
+      <div className="flex items-center gap-3">
+        <span className="w-10 h-10 rounded-full bg-bright-accent flex items-center justify-center text-lg font-bold text-white shadow">
           {step}
         </span>
-        <h3 className="text-3xl font-bold text-text-dark">{title}</h3>
+        <h3 className="text-2xl font-bold text-text-dark">{title}</h3>
       </div>
-      <p className="text-lg text-text-light">{description}</p>
+      <p className="text-base text-text-light">{description}</p>
       {children}
     </div>
   )

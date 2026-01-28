@@ -7,6 +7,7 @@
  */
 
 import Link from 'next/link'
+import { Users } from 'lucide-react'
 import {
     Table,
     TableHeader,
@@ -16,8 +17,9 @@ import {
     TableCell,
     Badge,
     Button,
-    Skeleton,
 } from '@/components/ui'
+import { EmptyState } from '@/components/shared'
+import { UserTableSkeleton } from './UserTableSkeleton'
 import type { AdminUser, UserStatus } from '@/lib/api'
 
 interface UserTableProps {
@@ -74,29 +76,8 @@ function UserAvatar({ name, avatarUrl }: { name: string | null; avatarUrl: strin
     }
 
     return (
-        <div className="w-8 h-8 rounded-full bg-neutral-100 text-neutral-600 flex items-center justify-center text-sm font-medium">
+        <div className="w-8 h-8 rounded-full bg-neutral-100 text-muted-foreground flex items-center justify-center text-sm font-medium">
             {initial}
-        </div>
-    )
-}
-
-/**
- * Loading skeleton for table
- */
-function UserTableSkeleton() {
-    return (
-        <div className="space-y-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex items-center gap-4 p-4">
-                    <Skeleton className="w-8 h-8 rounded-full" />
-                    <div className="flex-1 space-y-2">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-3 w-48" />
-                    </div>
-                    <Skeleton className="h-6 w-16" />
-                    <Skeleton className="h-8 w-20" />
-                </div>
-            ))}
         </div>
     )
 }
@@ -115,9 +96,11 @@ export function UserTable({
 
     if (users.length === 0) {
         return (
-            <div className="text-center py-12 text-text-light">
-                No users found.
-            </div>
+            <EmptyState
+                icon={Users}
+                title="No users found"
+                variant="minimal"
+            />
         )
     }
 
@@ -148,7 +131,7 @@ export function UserTable({
                                     >
                                         {user.name ?? 'Unknown'}
                                     </Link>
-                                    <div className="text-sm text-text-light">{user.email}</div>
+                                    <div className="text-sm text-muted-foreground">{user.email}</div>
                                 </div>
                             </div>
                         </TableCell>
@@ -164,12 +147,12 @@ export function UserTable({
                                 <Badge variant="outline">Unverified</Badge>
                             )}
                         </TableCell>
-                        <TableCell className="text-text-light">{user.appsCount}</TableCell>
-                        <TableCell className="text-text-light">{user.teamsCount}</TableCell>
-                        <TableCell className="text-text-light">
+                        <TableCell className="text-muted-foreground">{user.appsCount}</TableCell>
+                        <TableCell className="text-muted-foreground">{user.teamsCount}</TableCell>
+                        <TableCell className="text-muted-foreground">
                             {formatDate(user.lastLoginAt)}
                         </TableCell>
-                        <TableCell className="text-text-light">
+                        <TableCell className="text-muted-foreground">
                             {formatDate(user.createdAt)}
                         </TableCell>
                         <TableCell>

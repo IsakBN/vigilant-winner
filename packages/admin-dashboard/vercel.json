@@ -1,0 +1,6 @@
+{
+  "framework": "nextjs",
+  "installCommand": "cd ../.. && corepack enable && pnpm install --no-frozen-lockfile",
+  "buildCommand": "cd ../.. && pnpm --filter @bundlenudge/shared-ui build && pnpm --filter @bundlenudge/admin-dashboard build",
+  "outputDirectory": ".next"
+}

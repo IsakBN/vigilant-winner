@@ -3,7 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "bundlenudge-worker": "./dist/index.js"
+  },
   "scripts": {
+    "start": "node dist/index.js",
     "dev": "wrangler dev",
     "build": "tsc",
     "deploy": "wrangler deploy",
@@ -17,8 +21,10 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.0.0",
+    "@eslint/js": "^9.0.0",
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0",
+    "typescript-eslint": "^8.0.0",
     "vitest": "^2.0.0",
     "wrangler": "^3.0.0"
   }

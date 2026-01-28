@@ -1,34 +1,12 @@
-import { Navbar } from '@/components/landing/Navbar'
-import { Hero } from '@/components/landing/Hero'
-import { Comparison } from '@/components/landing/Comparison'
-import { HowItWorks } from '@/components/landing/HowItWorks'
-import { Features } from '@/components/landing/Features'
-import { Pricing } from '@/components/landing/Pricing'
-import { StagedRollouts } from '@/components/landing/StagedRollouts'
-import { VersionControlCenter } from '@/components/landing/VersionControlCenter'
-import { Testing } from '@/components/landing/Testing'
-import { OpenSource } from '@/components/landing/OpenSource'
-import { Footer } from '@/components/landing/Footer'
+import { redirect } from 'next/navigation'
 
-// Force dynamic rendering for auth-aware navbar
-export const dynamic = 'force-dynamic'
-
+/**
+ * This dashboard package is deprecated.
+ * All routes are redirected to the new subdomain-based apps:
+ * - Landing page: bundlenudge.com (packages/landing)
+ * - App dashboard: app.bundlenudge.com (packages/app-dashboard)
+ * - Admin dashboard: admin.bundlenudge.com (packages/admin-dashboard)
+ */
 export default function HomePage() {
-  return (
-    <>
-      <Navbar />
-      <main>
-        <Hero />
-        <Comparison />
-        <HowItWorks />
-        <Features />
-        <Pricing />
-        <StagedRollouts />
-        <VersionControlCenter />
-        <Testing />
-        <OpenSource />
-      </main>
-      <Footer />
-    </>
-  )
+  redirect('https://bundlenudge.com')
 }

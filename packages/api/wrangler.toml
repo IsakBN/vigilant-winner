@@ -1,49 +1,50 @@
-name = "bundlenudge-api"
+name = "bundlenudge-prod"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
 
 # D1 Database
 [[d1_databases]]
 binding = "DB"
-database_name = "bundlenudge-db"
-database_id = "placeholder-id"
+database_name = "bundlenudge-prod-db"
+database_id = "e8902644-6bf9-43f5-881d-a02c39851973"
 
 # R2 Bucket for bundles
 [[r2_buckets]]
 binding = "BUNDLES"
-bucket_name = "bundlenudge-bundles"
+bucket_name = "bundlenudge-prod-bundles"
 
 # KV for rate limiting
 [[kv_namespaces]]
 binding = "RATE_LIMIT"
-id = "placeholder-id"
+id = "298a365381cb4a5ba703520328c959f9"
 
-# Cache KV (referenced in CLAUDE.md but missing)
+# Cache KV
 [[kv_namespaces]]
 binding = "CACHE"
-id = "placeholder-cache-id"
+id = "91353617c9754eefb4decace7a923a10"
 
 # Priority Queues (P0=Enterprise, P1=Team, P2=Pro, P3=Free)
 [[queues.producers]]
 binding = "BUILD_QUEUE_P0"
-queue = "bundlenudge-builds-p0"
+queue = "bundlenudge-prod-builds-p0"
 
 [[queues.producers]]
 binding = "BUILD_QUEUE_P1"
-queue = "bundlenudge-builds-p1"
+queue = "bundlenudge-prod-builds-p1"
 
 [[queues.producers]]
 binding = "BUILD_QUEUE_P2"
-queue = "bundlenudge-builds-p2"
+queue = "bundlenudge-prod-builds-p2"
 
 [[queues.producers]]
 binding = "BUILD_QUEUE_P3"
-queue = "bundlenudge-builds-p3"
+queue = "bundlenudge-prod-builds-p3"
 
 # Dead Letter Queue
 [[queues.producers]]
 binding = "BUILD_QUEUE_DLQ"
-queue = "bundlenudge-builds-dlq"
+queue = "bundlenudge-prod-builds-dlq"
 
 # Durable Objects
 [durable_objects]
@@ -60,4 +61,11 @@ new_classes = ["RealtimeDO"]
 crons = ["0 * * * *"]  # Every hour at minute 0
 
 [vars]
-ENVIRONMENT = "development"
+ENVIRONMENT = "production"
+API_URL = "https://api.bundlenudge.com"
+DASHBOARD_URL = "https://app.bundlenudge.com"
+APP_DASHBOARD_URL = "https://app.bundlenudge.com"
+ADMIN_DASHBOARD_URL = "https://admin.bundlenudge.com"
+LANDING_URL = "https://bundlenudge.com"
+# Railway PostgreSQL (shared auth database for app + admin)
+DATABASE_URL = "postgresql://postgres:UmCrzLjCAQbiyugXvrzrvHyojxRiYkAe@nozomi.proxy.rlwy.net:51415/railway"

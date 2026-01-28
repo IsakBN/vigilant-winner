@@ -511,7 +511,7 @@ describe('team invitations logic', () => {
   })
 
   describe('member project access logic', () => {
-    type AccessCheck = {
+    interface AccessCheck {
       hasFullAccess: boolean
       hasProjectAccess: boolean
       appId: string

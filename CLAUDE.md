@@ -20,7 +20,7 @@ pnpm build          # Build all packages
 | Layer | Technology |
 |-------|------------|
 | API | Cloudflare Workers + Hono + Drizzle ORM |
-| Database | Cloudflare D1 (SQLite) + Neon (Postgres) |
+| Database | Cloudflare D1 (SQLite) + Railway (Postgres) |
 | Storage | Cloudflare R2 (bundles) + KV (rate limiting) |
 | Auth | Better Auth + Clerk |
 | Dashboard | Next.js 15 + React 19 + TanStack Query |

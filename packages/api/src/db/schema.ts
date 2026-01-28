@@ -861,6 +861,30 @@ export const newsletterCampaigns = sqliteTable('newsletter_campaigns', {
 }))
 
 // ============================================
+// Testers Table
+// ============================================
+
+/**
+ * Testers table
+ * Stores test users who receive build notifications via email
+ *
+ * @agent testers-routes
+ * @created 2026-01-27
+ */
+export const testers = sqliteTable('testers', {
+  id: text('id').primaryKey(),
+  appId: text('app_id').notNull().references(() => apps.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(),
+  name: text('name'),
+  createdAt: integer('created_at').notNull(),
+  createdBy: text('created_by').notNull(),
+}, (table) => ({
+  appIdx: index('testers_app_idx').on(table.appId),
+  emailIdx: index('testers_email_idx').on(table.email),
+  appEmailIdx: index('testers_app_email_idx').on(table.appId, table.email),
+}))
+
+// ============================================
 // Re-export Auth Schema
 // ============================================
 

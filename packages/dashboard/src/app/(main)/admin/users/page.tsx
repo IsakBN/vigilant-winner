@@ -9,6 +9,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useAdminUsers, useSuspendUser, useUnsuspendUser, useVerifyEmail } from '@/hooks/useAdmin'
 import { UserTable } from '@/components/admin'
+import { ErrorState } from '@/components/shared'
 import {
     Button,
     Card,
@@ -43,7 +44,7 @@ export default function AdminUsersPage() {
         [search, status, page, sortBy, sortOrder]
     )
 
-    const { users, total, totalPages, isLoading, isError, error } = useAdminUsers(params)
+    const { users, total, totalPages, isLoading, isError, error, refetch } = useAdminUsers(params)
     const suspendUser = useSuspendUser()
     const unsuspendUser = useUnsuspendUser()
     const verifyEmail = useVerifyEmail()
@@ -106,7 +107,10 @@ export default function AdminUsersPage() {
             />
 
             {isError ? (
-                <ErrorState error={error} />
+                <ErrorState
+                    message={error?.message ?? 'Failed to load users'}
+                    onRetry={() => void refetch()}
+                />
             ) : (
                 <>
                     <Card>
@@ -237,18 +241,6 @@ function Pagination({ page, totalPages, onPageChange }: PaginationProps) {
                 </Button>
             </div>
         </div>
-    )
-}
-
-function ErrorState({ error }: { error: Error | null }) {
-    return (
-        <Card className="border-destructive/50">
-            <CardContent className="py-8 text-center">
-                <p className="text-destructive">
-                    Failed to load users: {error?.message ?? 'Unknown error'}
-                </p>
-            </CardContent>
-        </Card>
     )
 }
 

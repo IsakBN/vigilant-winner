@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Clean logomark - works great as favicon -->
+  <defs>
+    <linearGradient id="markGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#5E7CFF"/>
+      <stop offset="100%" style="stop-color:#4A63D9"/>
+    </linearGradient>
+    <linearGradient id="boxFill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF"/>
+      <stop offset="100%" style="stop-color:#F0F3FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square -->
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#markGrad)"/>
+
+  <!-- 3D Bundle/Package -->
+  <g>
+    <!-- Box base -->
+    <path d="M32 16L48 25V41L32 50L16 41V25L32 16Z" fill="url(#boxFill)"/>
+
+    <!-- Top right face (darker) -->
+    <path d="M32 16L48 25L32 33L32 16Z" fill="#C8D4FF"/>
+
+    <!-- Top left face -->
+    <path d="M32 16L16 25L32 33V16Z" fill="#E0E7FF"/>
+
+    <!-- Center vertical line -->
+    <path d="M32 33V50" stroke="#5E7CFF" stroke-width="2"/>
+
+    <!-- Box outline strokes -->
+    <path d="M32 16L48 25V41L32 50L16 41V25L32 16Z" stroke="#5E7CFF" stroke-width="1.5" fill="none"/>
+    <path d="M16 25L32 33L48 25" stroke="#5E7CFF" stroke-width="1.5" fill="none"/>
+  </g>
+
+  <!-- Motion streaks (the nudge!) -->
+  <g>
+    <path d="M8 29L4 29" stroke="#FFEAA7" stroke-width="3" stroke-linecap="round" opacity="0.9"/>
+    <path d="M10 36L4 36" stroke="#FFEAA7" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+    <path d="M8 43L4 43" stroke="#FFEAA7" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
+  </g>
+
+  <!-- Forward arrow -->
+  <path d="M54 36L60 36M60 36L56 32M60 36L56 40" stroke="#C8E6C9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,5 +1,6 @@
 import Foundation
 import React
+import CommonCrypto
 
 /**
  * BundleNudge Native Module for iOS
@@ -224,7 +225,9 @@ class BundleNudge: NSObject, RCTBridgeModule {
             metadata["currentVersion"] = nil
             metadata["currentVersionHash"] = nil
             metadata["pendingVersion"] = nil
+            metadata["pendingVersionHash"] = nil
             metadata["previousVersion"] = nil
+            metadata["previousVersionHash"] = nil
             metadata["crashCount"] = 0
             metadata["lastCrashTime"] = nil
             if deviceId != nil {
@@ -260,6 +263,52 @@ class BundleNudge: NSObject, RCTBridgeModule {
         }
         let range = NSRange(location: 0, length: version.utf16.count)
         return regex.firstMatch(in: version, range: range) != nil
+    }
+
+    @objc
+    func hashFile(_ path: String,
+                  resolve: @escaping RCTPromiseResolveBlock,
+                  reject: @escaping RCTPromiseRejectBlock) {
+        // Run on background thread to avoid blocking UI
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let url = URL(fileURLWithPath: path)
+
+                // Check if file exists
+                guard FileManager.default.fileExists(atPath: path) else {
+                    DispatchQueue.main.async {
+                        reject("E_FILE_NOT_FOUND", "File not found: \(path)", nil)
+                    }
+                    return
+                }
+
+                // Check if file is readable
+                guard FileManager.default.isReadableFile(atPath: path) else {
+                    DispatchQueue.main.async {
+                        reject("E_PERMISSION_DENIED", "Cannot read file: \(path)", nil)
+                    }
+                    return
+                }
+
+                let data = try Data(contentsOf: url)
+
+                // Use CommonCrypto for SHA-256
+                var hash = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+                data.withUnsafeBytes {
+                    _ = CC_SHA256($0.baseAddress, CC_LONG(data.count), &hash)
+                }
+
+                let hashString = hash.map { String(format: "%02x", $0) }.joined()
+
+                DispatchQueue.main.async {
+                    resolve(hashString)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    reject("E_HASH_FAILED", "Failed to hash file: \(error.localizedDescription)", error)
+                }
+            }
+        }
     }
 
     @objc
@@ -299,7 +348,19 @@ class BundleNudge: NSObject, RCTBridgeModule {
             let bundlePath = (bundleDir as NSString).appendingPathComponent("bundle.js")
             try data.write(to: URL(fileURLWithPath: bundlePath))
 
-            NSLog("[BundleNudge] Bundle saved to: %@", bundlePath)
+            // Calculate SHA-256 hash of the saved bundle
+            var hash = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+            data.withUnsafeBytes {
+                _ = CC_SHA256($0.baseAddress, CC_LONG(data.count), &hash)
+            }
+            let bundleHash = hash.map { String(format: "%02x", $0) }.joined()
+
+            // Save hash in metadata under pendingVersionHash
+            var metadata = BundleNudge.loadMetadata() ?? [:]
+            metadata["pendingVersionHash"] = bundleHash
+            BundleNudge.saveMetadata(metadata)
+
+            NSLog("[BundleNudge] Bundle saved to: %@ with hash: %@", bundlePath, bundleHash)
             resolve(bundlePath)
         } catch {
             NSLog("[BundleNudge] Failed to save bundle: %@", error.localizedDescription)
@@ -308,6 +369,39 @@ class BundleNudge: NSObject, RCTBridgeModule {
     }
 
     // MARK: - Private Static Helpers
+
+    /// Validate bundle hash matches stored hash
+    /// Returns true if valid or no hash stored (legacy), false if mismatch
+    private static func validateBundleHash(_ bundlePath: String) -> Bool {
+        guard let metadata = loadMetadata(),
+              let expectedHash = metadata["currentVersionHash"] as? String,
+              !expectedHash.isEmpty else {
+            // No hash stored - skip validation (legacy bundle)
+            return true
+        }
+
+        guard let data = FileManager.default.contents(atPath: bundlePath) else {
+            NSLog("[BundleNudge] Cannot read bundle for hash validation: %@", bundlePath)
+            return false
+        }
+
+        // Calculate SHA-256
+        var hash = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+        data.withUnsafeBytes {
+            _ = CC_SHA256($0.baseAddress, CC_LONG(data.count), &hash)
+        }
+        let actualHash = hash.map { String(format: "%02x", $0) }.joined()
+
+        if actualHash != expectedHash {
+            NSLog("[BundleNudge] Hash mismatch! Expected: %@, Got: %@", expectedHash, actualHash)
+            // Remove corrupt bundle
+            try? FileManager.default.removeItem(atPath: bundlePath)
+            return false
+        }
+
+        NSLog("[BundleNudge] Bundle hash validated successfully")
+        return true
+    }
 
     private static func getCurrentBundlePath() -> String? {
         guard let metadata = loadMetadata(),
@@ -319,11 +413,17 @@ class BundleNudge: NSObject, RCTBridgeModule {
             .appendingPathComponent(bundlesDirectory)
             .appending("/\(currentVersion)/bundle.js")
 
-        if FileManager.default.fileExists(atPath: bundlePath) {
-            return bundlePath
+        guard FileManager.default.fileExists(atPath: bundlePath) else {
+            return nil
         }
 
-        return nil
+        // Validate hash before returning
+        guard validateBundleHash(bundlePath) else {
+            NSLog("[BundleNudge] Bundle failed hash validation, falling back to embedded")
+            return nil
+        }
+
+        return bundlePath
     }
 
     private static func getPendingBundlePath() -> String? {
@@ -361,8 +461,11 @@ class BundleNudge: NSObject, RCTBridgeModule {
 
         // Move current to previous, pending to current
         metadata["previousVersion"] = metadata["currentVersion"]
+        metadata["previousVersionHash"] = metadata["currentVersionHash"]
         metadata["currentVersion"] = pendingVersion
+        metadata["currentVersionHash"] = metadata["pendingVersionHash"]
         metadata["pendingVersion"] = nil
+        metadata["pendingVersionHash"] = nil
         metadata["crashCount"] = 0
         metadata["lastCrashTime"] = nil
 

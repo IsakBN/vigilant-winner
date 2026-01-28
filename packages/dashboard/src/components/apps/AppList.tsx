@@ -11,7 +11,8 @@ import { AppCard } from './AppCard'
 import { AppListSkeleton } from './AppListSkeleton'
 import { EmptyAppState } from './EmptyAppState'
 import { PlatformFilter } from './PlatformFilter'
-import { Input, Button } from '@/components/ui'
+import { Input } from '@/components/ui'
+import { ErrorState } from '@/components/shared'
 import { useApps, type AppFilters } from '@/hooks/useApps'
 import type { Platform } from '@/lib/api'
 
@@ -26,7 +27,7 @@ export function AppList({ accountId, onCreateApp }: AppListProps) {
         search: '',
     })
 
-    const { apps, total, filteredCount, isLoading, isError, error } = useApps(
+    const { apps, total, filteredCount, isLoading, isError, error, refetch } = useApps(
         accountId,
         filters
     )
@@ -69,14 +70,10 @@ export function AppList({ accountId, onCreateApp }: AppListProps) {
     // Error state
     if (isError) {
         return (
-            <div className="text-center py-12">
-                <p className="text-destructive mb-4">
-                    Failed to load apps: {error?.message ?? 'Unknown error'}
-                </p>
-                <Button variant="outline" onClick={() => window.location.reload()}>
-                    Retry
-                </Button>
-            </div>
+            <ErrorState
+                message={error?.message ?? 'Failed to load apps'}
+                onRetry={() => void refetch()}
+            />
         )
     }
 

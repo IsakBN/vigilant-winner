@@ -7,6 +7,7 @@
  */
 
 import { useCallback } from 'react'
+import { Flag } from 'lucide-react'
 import {
     Card,
     CardContent,
@@ -19,6 +20,7 @@ import {
     Skeleton,
     useToast,
 } from '@/components/ui'
+import { EmptyState, ErrorState } from '@/components/shared'
 import { useFeatureFlags, useFeatureFlagActions } from '@/hooks/useAdmin'
 import type { FeatureFlag } from '@/lib/api'
 
@@ -28,7 +30,7 @@ interface FeatureFlagListProps {
 }
 
 export function FeatureFlagList({ onEditFlag, onCreateFlag }: FeatureFlagListProps) {
-    const { flags, isLoading, isError, error } = useFeatureFlags()
+    const { flags, isLoading, isError, error, refetch } = useFeatureFlags()
     const { toggleFlag, deleteFlag } = useFeatureFlagActions()
     const { toast } = useToast()
 
@@ -85,11 +87,10 @@ export function FeatureFlagList({ onEditFlag, onCreateFlag }: FeatureFlagListPro
 
     if (isError) {
         return (
-            <div className="text-center py-8">
-                <p className="text-destructive">
-                    Failed to load feature flags: {error?.message}
-                </p>
-            </div>
+            <ErrorState
+                message={error?.message ?? 'Failed to load feature flags'}
+                onRetry={() => void refetch()}
+            />
         )
     }
 
@@ -107,7 +108,20 @@ export function FeatureFlagList({ onEditFlag, onCreateFlag }: FeatureFlagListPro
 
             {/* Flag List */}
             {flags.length === 0 ? (
-                <EmptyState onCreateFlag={onCreateFlag} />
+                <Card>
+                    <CardContent className="py-0">
+                        <EmptyState
+                            icon={Flag}
+                            title="No feature flags"
+                            description="Create your first feature flag to control feature rollouts."
+                            action={
+                                onCreateFlag
+                                    ? { label: 'Create Flag', onClick: onCreateFlag }
+                                    : undefined
+                            }
+                        />
+                    </CardContent>
+                </Card>
             ) : (
                 <div className="grid gap-4">
                     {flags.map((flag) => (
@@ -240,22 +254,6 @@ function TargetOrgsInfo({ count }: { count: number }) {
             <span className="text-muted-foreground">Target orgs:</span>
             <span className="font-medium">{count}</span>
         </div>
-    )
-}
-
-function EmptyState({ onCreateFlag }: { onCreateFlag?: () => void }) {
-    return (
-        <Card>
-            <CardContent className="py-12 text-center">
-                <h3 className="text-lg font-medium mb-2">No feature flags</h3>
-                <p className="text-muted-foreground mb-4">
-                    Create your first feature flag to control feature rollouts.
-                </p>
-                {onCreateFlag && (
-                    <Button onClick={onCreateFlag}>Create Flag</Button>
-                )}
-            </CardContent>
-        </Card>
     )
 }
 

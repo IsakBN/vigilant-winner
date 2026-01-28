@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+  <!-- Creative version with more personality -->
+  <defs>
+    <linearGradient id="creativeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#5E7CFF"/>
+      <stop offset="50%" style="stop-color:#7B93FF"/>
+      <stop offset="100%" style="stop-color:#4A63D9"/>
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFEAA7"/>
+      <stop offset="100%" style="stop-color:#FFD54F"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Organic blob shape background -->
+  <path d="M40 6C58 6 72 16 74 34C76 52 66 70 48 74C30 78 12 68 8 50C4 32 22 6 40 6Z" fill="url(#creativeGrad)"/>
+
+  <!-- Stylized flying package -->
+  <g transform="translate(16, 18)">
+    <!-- Package shadow -->
+    <ellipse cx="24" cy="44" rx="16" ry="4" fill="#4A63D9" opacity="0.3"/>
+
+    <!-- Main package body -->
+    <path d="M24 8L42 18V34L24 44L6 34V18L24 8Z" fill="white"/>
+    <path d="M24 8L42 18L24 27V8Z" fill="#E0E7FF"/>
+    <path d="M24 8L6 18L24 27V8Z" fill="#F0F3FF"/>
+    <path d="M24 27V44" stroke="#5E7CFF" stroke-width="2"/>
+    <path d="M6 18L24 27L42 18" stroke="#5E7CFF" stroke-width="1.5" fill="none"/>
+    <path d="M24 8L42 18V34L24 44L6 34V18L24 8Z" stroke="#5E7CFF" stroke-width="1.5" fill="none"/>
+
+    <!-- Tape/seal on package -->
+    <rect x="20" y="6" width="8" height="22" fill="url(#glowGrad)" rx="2"/>
+    <path d="M20 27L24 30L28 27" stroke="#D4A000" stroke-width="1" fill="none"/>
+  </g>
+
+  <!-- Speed lines / motion blur -->
+  <g filter="url(#glow)">
+    <path d="M8 32L2 32" stroke="url(#glowGrad)" stroke-width="3" stroke-linecap="round"/>
+    <path d="M10 40L3 40" stroke="url(#glowGrad)" stroke-width="3" stroke-linecap="round" opacity="0.8"/>
+    <path d="M8 48L2 48" stroke="url(#glowGrad)" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+  </g>
+
+  <!-- Sparkle effects -->
+  <g fill="#FFEAA7">
+    <circle cx="68" cy="20" r="2"/>
+    <circle cx="72" cy="28" r="1.5"/>
+    <circle cx="65" cy="32" r="1"/>
+  </g>
+
+  <!-- Forward swoosh -->
+  <path d="M62 42C68 38 72 40 76 38" stroke="#C8E6C9" stroke-width="3" stroke-linecap="round" opacity="0.8"/>
+</svg>

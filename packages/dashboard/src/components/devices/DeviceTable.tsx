@@ -107,7 +107,7 @@ function DeviceRow({ device, appId, accountId }: DeviceRowProps) {
           <span className="font-medium text-neutral-900">
             {device.deviceModel || 'Unknown'}
           </span>
-          <span className="text-xs text-neutral-500 font-mono">
+          <span className="text-xs text-muted-foreground font-mono">
             {truncateId(device.deviceId)}
           </span>
         </div>
@@ -116,17 +116,17 @@ function DeviceRow({ device, appId, accountId }: DeviceRowProps) {
         <PlatformBadge platform={device.platform} />
       </TableCell>
       <TableCell>
-        <span className="text-sm text-neutral-600">
+        <span className="text-sm text-muted-foreground">
           {device.osVersion || '-'}
         </span>
       </TableCell>
       <TableCell>
-        <span className="text-sm text-neutral-600">
+        <span className="text-sm text-muted-foreground">
           {device.appVersion || '-'}
         </span>
       </TableCell>
       <TableCell>
-        <span className="text-sm text-neutral-600" title={device.lastSeenAt ? new Date(device.lastSeenAt * 1000).toISOString() : undefined}>
+        <span className="text-sm text-muted-foreground" title={device.lastSeenAt ? new Date(device.lastSeenAt * 1000).toISOString() : undefined}>
           {getRelativeTime(device.lastSeenAt)}
         </span>
       </TableCell>
@@ -171,7 +171,7 @@ function TablePagination({ pagination, onPageChange }: PaginationProps) {
 
   return (
     <div className="flex items-center justify-between px-4 py-3 border-t">
-      <p className="text-sm text-neutral-500">
+      <p className="text-sm text-muted-foreground">
         Showing {start} to {end} of {total} devices
       </p>
       <div className="flex items-center gap-2">
@@ -183,7 +183,7 @@ function TablePagination({ pagination, onPageChange }: PaginationProps) {
         >
           <ChevronLeft className="w-4 h-4" />
         </Button>
-        <span className="text-sm text-neutral-600">
+        <span className="text-sm text-muted-foreground">
           Page {currentPage} of {totalPages}
         </span>
         <Button

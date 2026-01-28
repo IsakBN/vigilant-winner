@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-cream-bg font-body text-text-dark antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  @apply font-heading text-text-dark;
+}
+
+.container-fluid {
+  @apply max-w-screen-xl mx-auto px-6 lg:px-12;
+}
+
+/* Feature icon hover animation */
+.feature-icon {
+  @apply transition-all duration-300 ease-out;
+}
+
+.group:hover .feature-icon {
+  @apply scale-110;
+  animation: bounce-subtle 0.5s ease-out;
+}
+
+@keyframes bounce-subtle {
+  0%, 100% { transform: scale(1.1) translateY(0); }
+  50% { transform: scale(1.1) translateY(-4px); }
+}

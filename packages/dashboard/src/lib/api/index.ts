@@ -23,6 +23,17 @@ export type { ApiFetchOptions } from './client'
 export { auth, github } from './auth'
 export type { User, GitHubStatus } from './auth'
 
+// Re-export accounts API
+export { accounts } from './accounts'
+export type {
+    PlanType,
+    AccountUsage,
+    AccountBilling,
+    AccountStats,
+    AccountDashboardOverview,
+    GetDashboardOverviewResponse,
+} from './accounts'
+
 // Re-export apps API
 export { apps } from './apps'
 export type {
@@ -32,6 +43,14 @@ export type {
     CreateAppResponse,
     ListAppsResponse,
     GetAppResponse,
+    GitHubRepo,
+    ListReposResponse,
+    ListContentsResponse,
+    AppStats,
+    AppWithStats,
+    GetAppWithStatsResponse,
+    SetupStatus,
+    GetSetupStatusResponse,
 } from './apps'
 
 // Re-export channels API
@@ -158,6 +177,50 @@ export type {
     UploadProgressEvent,
 } from './builds'
 
+// Re-export testers API
+export { testers } from './testers'
+export type {
+    Tester,
+    TesterStats,
+    CreateTesterInput,
+    ImportCsvResult,
+    ExportCsvResult,
+    ListTestersResponse,
+    GetTesterResponse,
+    CreateTesterResponse,
+    ImportTestersResponse,
+    ExportTestersResponse,
+} from './testers'
+
+// Re-export credentials API
+export { credentials } from './credentials'
+export type {
+    AppleCredential,
+    CreateCredentialInput,
+    ListCredentialsResponse,
+    GetCredentialResponse,
+    CreateCredentialResponse,
+    VerifyCredentialResponse,
+} from './credentials'
+
+// Re-export crash integrations API
+export { crashIntegrations, CRASH_PROVIDERS } from './crash-integrations'
+export type {
+    CrashProvider,
+    SentryConfig,
+    BugsnagConfig,
+    CrashlyticsConfig,
+    CrashIntegrationConfig,
+    CrashIntegration,
+    CreateCrashIntegrationInput,
+    UpdateCrashIntegrationInput,
+    ListCrashIntegrationsResponse,
+    GetCrashIntegrationResponse,
+    CreateCrashIntegrationResponse,
+    UpdateCrashIntegrationResponse,
+    TestCrashIntegrationResponse,
+} from './crash-integrations'
+
 // Re-export admin API
 export {
     admin,
@@ -241,3 +304,76 @@ export type {
     ImportSubscribersResponse,
     SendCampaignResponse,
 } from './admin'
+
+// Re-export admin ops API
+export {
+    adminOps,
+    getOtaMetrics,
+    getBuildQueue,
+    cancelBuild,
+    retryBuild,
+    getApiHealth,
+    getStorageMetrics,
+    cleanupOrphanedBundles,
+    getSystemLogs,
+    exportLogs,
+    getDatabaseStats,
+    listAdminApps,
+    getAdminApp,
+    updateAppStatus,
+    deleteAdminApp,
+} from './admin-ops'
+
+// Re-export admin ops types from types/admin
+export type {
+    OtaMetrics,
+    OtaMetricsPeriod,
+    OtaMetricsAppBreakdown,
+    OtaMetricsHourlyBreakdown,
+    BuildJobStatus,
+    BuildJob,
+    WorkerStatus,
+    BuildWorker,
+    BuildQueueStats,
+    ApiEndpointStats,
+    ApiRecentError,
+    ApiHealthStats,
+    StorageAppMetrics,
+    StorageLargestBundle,
+    StorageGrowthEntry,
+    StorageMetrics,
+    LogLevel,
+    LogService,
+    LogEntry,
+    LogsResponse,
+    ListLogsParams,
+    DatabaseTable,
+    SlowQuery,
+    DatabaseStats,
+    AdminAppPlatform,
+    AdminAppStatus,
+    AdminApp as AdminOpsApp,
+    AdminAppSortBy,
+    SortOrder,
+    ListAdminAppsParams,
+    AdminAppsResponse,
+} from './types/admin'
+
+// Re-export A/B tests API
+export { abTests } from './ab-tests'
+export type {
+    ABTestStatus,
+    ConfidenceLevel,
+    VariantMetrics,
+    ABTestVariant,
+    ABTestResults,
+    AdoptionStats,
+    RolloutProgress,
+    VersionDistribution,
+    ABTestSummary,
+    ABTestListResponse,
+    CreateABTestVariant,
+    CreateABTestRequest,
+    CreateABTestResponse,
+} from './types/ab-tests'
+export { getConfidenceLevel, getConfidenceLabel } from './types/ab-tests'

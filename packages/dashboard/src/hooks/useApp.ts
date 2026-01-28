@@ -28,6 +28,7 @@ export interface AppWithStats extends App {
 
 interface UpdateAppInput {
   name?: string
+  bundleId?: string
 }
 
 // ============================================================================

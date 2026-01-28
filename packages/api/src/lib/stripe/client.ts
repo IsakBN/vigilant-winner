@@ -163,7 +163,7 @@ export interface StripeInvoice {
 export async function listInvoices(
   secretKey: string,
   customerId: string,
-  limit: number = 10
+  limit = 10
 ): Promise<StripeResponse<{ data: StripeInvoice[] }>> {
   return stripeRequest(secretKey, '/invoices', 'GET', {
     'customer': customerId,

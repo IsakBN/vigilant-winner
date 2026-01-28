@@ -6,7 +6,14 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm -r --parallel dev",
+    "dev:landing": "pnpm --filter @bundlenudge/landing dev",
+    "dev:app": "pnpm --filter @bundlenudge/app-dashboard dev",
+    "dev:admin": "pnpm --filter @bundlenudge/admin-dashboard dev",
     "build": "pnpm -r build",
+    "build:landing": "pnpm --filter @bundlenudge/landing build",
+    "build:app": "pnpm --filter @bundlenudge/app-dashboard build",
+    "build:admin": "pnpm --filter @bundlenudge/admin-dashboard build",
+    "build:all": "pnpm build:landing && pnpm build:app && pnpm build:admin",
     "test": "pnpm -r test",
     "test:run": "pnpm -r test -- --run",
     "typecheck": "pnpm -r typecheck",
@@ -19,12 +26,16 @@
     "interrogate": "./.claude/workflows/runner/interrogate.sh",
     "build-package": "./scripts/preflight-check.sh && ./.claude/workflows/runner/build-package.sh",
     "loop": "./.claude/loop/runner.sh",
-    "loop:continue": "./.claude/loop/runner.sh --continue"
+    "loop:continue": "./.claude/loop/runner.sh --continue",
+    "deploy:app": "./deploy/deploy.sh app",
+    "deploy:admin": "./deploy/deploy.sh admin"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "eslint": "^9.0.0",
+    "next": "16.1.5",
     "prettier": "^3.0.0",
+    "tsx": "^4.0.0",
     "typescript": "^5.0.0",
     "vitest": "^2.0.0"
   },
@@ -34,7 +45,7 @@
       "@types/react-dom": "^19.0.0"
     }
   },
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "pnpm@9.15.0",
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"

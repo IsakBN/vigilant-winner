@@ -256,7 +256,7 @@ export class RealtimeDO implements DurableObject {
    */
   private async handleBroadcast(request: Request): Promise<Response> {
     try {
-      const update = (await request.json()) as BroadcastUpdate
+      const update = (await request.json()) as { type: string; resource: string; id: string; data: unknown }
       const resourceKey = `${update.resource}:${update.id}`
       let sentCount = 0
 

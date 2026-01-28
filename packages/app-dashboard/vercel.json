@@ -1,0 +1,5 @@
+{
+  "framework": "nextjs",
+  "installCommand": "cd ../.. && pnpm install",
+  "buildCommand": "cd ../.. && pnpm --filter @bundlenudge/shared-ui build && pnpm --filter @bundlenudge/app-dashboard build"
+}
