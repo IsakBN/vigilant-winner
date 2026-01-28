@@ -20,7 +20,7 @@ Complete guide for deploying the BundleNudge subdomain architecture.
 │                         Databases                               │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│   Neon PostgreSQL:                                              │
+│   Railway PostgreSQL:                                              │
 │   ├── bundlenudge_app_auth    (app-dashboard sessions/users)    │
 │   └── bundlenudge_admin_auth  (admin-dashboard sessions/users)  │
 │                                                                 │
@@ -39,24 +39,24 @@ Complete guide for deploying the BundleNudge subdomain architecture.
 |---------|---------|---------|
 | **Vercel** | Host Next.js apps | https://vercel.com |
 | **Cloudflare** | API Workers, DNS | https://cloudflare.com |
-| **Neon** | PostgreSQL databases | https://neon.tech |
+| **Railway** | PostgreSQL databases | https://railway.app |
 | **GitHub** | OAuth provider | https://github.com/settings/developers |
 | **Domain** | DNS management | Your registrar |
 
 ---
 
-## Step 1: Create Neon Databases
+## Step 1: Create Railway Databases
 
 ### 1.1 Create App Auth Database
 
-1. Go to https://console.neon.tech
-2. Create new project: `bundlenudge-app-auth`
-3. Copy the connection string (looks like `postgresql://user:pass@host/neondb`)
+1. Go to https://railway.app
+2. Create new PostgreSQL database: `bundlenudge-app-auth`
+3. Copy the connection string (looks like `postgresql://user:pass@host/dbname`)
 4. Save as `APP_DATABASE_URL`
 
 ### 1.2 Create Admin Auth Database
 
-1. Create another project: `bundlenudge-admin-auth`
+1. Create another database: `bundlenudge-admin-auth`
 2. Copy the connection string
 3. Save as `ADMIN_DATABASE_URL`
 
@@ -165,7 +165,7 @@ vercel domains add app.bundlenudge.com
 |----------|-------|
 | `NEXT_PUBLIC_APP_URL` | https://app.bundlenudge.com |
 | `NEXT_PUBLIC_API_URL` | https://api.bundlenudge.com |
-| `DATABASE_URL` | postgresql://...neon.tech/bundlenudge_app_auth |
+| `DATABASE_URL` | postgresql://...railway.app/bundlenudge_app_auth |
 | `BETTER_AUTH_SECRET` | K7x9mP2nQ4rS6tU8vW0xY2zA4bC6dE8f |
 | `GITHUB_CLIENT_ID` | your-github-client-id |
 | `GITHUB_CLIENT_SECRET` | your-github-client-secret |
@@ -187,7 +187,7 @@ vercel domains add admin.bundlenudge.com
 |----------|-------|
 | `NEXT_PUBLIC_ADMIN_URL` | https://admin.bundlenudge.com |
 | `NEXT_PUBLIC_API_URL` | https://api.bundlenudge.com |
-| `DATABASE_URL` | postgresql://...neon.tech/bundlenudge_admin_auth |
+| `DATABASE_URL` | postgresql://...railway.app/bundlenudge_admin_auth |
 | `BETTER_AUTH_SECRET` | M3nO5pQ7rS9tU1vW3xY5zA7bC9dE1fG3 |
 
 ---
@@ -326,7 +326,7 @@ BETTER_AUTH_SECRET=different-dev-secret-32-chars-long
 
 ### Database connection errors
 - Verify DATABASE_URL is correct
-- Check Neon dashboard for connection limits
+- Check Railway dashboard for connection limits
 - Ensure IP allowlist includes Vercel IPs (or allow all)
 
 ### OTP not arriving (production)

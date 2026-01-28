@@ -13,14 +13,14 @@
 
 1. **Vercel Account** - For Next.js apps
 2. **Cloudflare Account** - For API (Workers)
-3. **Neon Account** - For PostgreSQL databases
+3. **Railway Account** - For PostgreSQL databases
 4. **Domain** - bundlenudge.com with DNS access
 
 ## Database Setup
 
-### 1. Create Neon Databases
+### 1. Create Railway Databases
 
-Create two separate databases in Neon:
+Create two separate databases in Railway:
 
 - `bundlenudge_app_auth` - For app-dashboard (Better Auth)
 - `bundlenudge_admin_auth` - For admin-dashboard (Better Auth + OTP)
@@ -58,7 +58,7 @@ vercel --prod
 Configure:
 - Domain: app.bundlenudge.com
 - Environment variables:
-  - `DATABASE_URL` - Neon connection string
+  - `DATABASE_URL` - Railway connection string
   - `BETTER_AUTH_SECRET` - Random 32+ char string
   - `GITHUB_CLIENT_ID` - GitHub OAuth app
   - `GITHUB_CLIENT_SECRET` - GitHub OAuth secret
@@ -74,7 +74,7 @@ vercel --prod
 Configure:
 - Domain: admin.bundlenudge.com
 - Environment variables:
-  - `DATABASE_URL` - Neon connection string (separate DB)
+  - `DATABASE_URL` - Railway connection string (separate DB)
   - `BETTER_AUTH_SECRET` - Random 32+ char string
   - `NEXT_PUBLIC_ADMIN_URL` - https://admin.bundlenudge.com
 
