@@ -17,6 +17,7 @@ import {
 } from '@/hooks/useTeams'
 import { useAuth } from '@/providers/AuthProvider'
 import { MemberTable, RemoveMemberDialog, MembersPageSkeleton } from '@/components/teams'
+import { Breadcrumbs } from '@/components/shared'
 import {
     Card,
     CardContent,
@@ -90,24 +91,14 @@ export default function TeamMembersPage() {
 
     return (
         <div className="space-y-6">
-            {/* Breadcrumb */}
-            <nav className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Link
-                    href={`/dashboard/${accountId}/teams`}
-                    className="hover:text-foreground transition-colors"
-                >
-                    Teams
-                </Link>
-                <span>/</span>
-                <Link
-                    href={`/dashboard/${accountId}/teams/${teamId}`}
-                    className="hover:text-foreground transition-colors"
-                >
-                    {team?.name ?? 'Team'}
-                </Link>
-                <span>/</span>
-                <span className="text-foreground">Members</span>
-            </nav>
+            {/* Breadcrumbs */}
+            <Breadcrumbs
+                items={[
+                    { label: 'Teams', href: `/dashboard/${accountId}/teams` },
+                    { label: team?.name ?? 'Team', href: `/dashboard/${accountId}/teams/${teamId}` },
+                    { label: 'Members' },
+                ]}
+            />
 
             {/* Header */}
             <div className="flex items-center justify-between">

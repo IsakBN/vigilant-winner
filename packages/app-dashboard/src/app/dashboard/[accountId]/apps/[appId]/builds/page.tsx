@@ -124,7 +124,7 @@ export default function BuildsPage() {
                 <Button asChild>
                     <Link href={`/dashboard/${accountId}/apps/${appId}/builds/new`}>
                         <Upload className="w-4 h-4 mr-2" />
-                        Upload Bundle
+                        Trigger Build
                     </Link>
                 </Button>
             </div>

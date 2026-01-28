@@ -11,6 +11,7 @@ import Link from 'next/link'
 import { useTeam, useTeamMembers, useInvitations } from '@/hooks/useTeams'
 import { useAuth } from '@/providers/AuthProvider'
 import { MemberTable, PendingInvitesList } from '@/components/teams'
+import { Breadcrumbs } from '@/components/shared'
 import {
     Card,
     CardContent,
@@ -62,6 +63,14 @@ export default function TeamOverviewPage() {
 
     return (
         <div className="space-y-8">
+            {/* Breadcrumbs */}
+            <Breadcrumbs
+                items={[
+                    { label: 'Teams', href: `/dashboard/${accountId}/teams` },
+                    { label: team.name },
+                ]}
+            />
+
             {/* Header */}
             <TeamHeader team={team} accountId={accountId} teamId={teamId} />
 

@@ -32,3 +32,6 @@ export {
     BugsnagIcon,
     CrashlyticsIcon,
 } from './IntegrationIcons'
+
+// Navigation
+export { SettingsNav } from './SettingsNav'

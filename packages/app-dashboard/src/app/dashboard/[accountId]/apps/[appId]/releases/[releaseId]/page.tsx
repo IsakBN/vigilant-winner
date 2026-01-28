@@ -4,15 +4,15 @@
  * Release Detail Page
  *
  * View and manage a specific release including rollout controls,
- * stats, and rollback reports.
+ * stats, crash data, health indicators, and rollback reports.
  */
 
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Settings } from 'lucide-react'
+import { Settings } from 'lucide-react'
 import { Button } from '@bundlenudge/shared-ui'
-import { useRelease, useUpdateRelease, type ReleaseStatus } from '@/hooks'
+import { useRelease, useUpdateRelease, useAppDetails, type ReleaseStatus } from '@/hooks'
 import { useRollbackReports } from '@/hooks/useRollbackReports'
 import {
     ReleaseStats,
@@ -21,7 +21,11 @@ import {
     ReleaseInfoDisplay,
     RolloutControlCard,
     RollbackReports,
+    CrashStatsCard,
+    ReleaseHealthIndicator,
+    calculateHealthStatus,
 } from '@/components/releases'
+import { Breadcrumbs } from '@/components/shared'
 
 // =============================================================================
 // Helper Functions
@@ -49,6 +53,7 @@ export default function ReleaseDetailPage() {
     const releaseId = params.releaseId as string
 
     // Data fetching
+    const { data: app } = useAppDetails(accountId, appId)
     const { data: release, isLoading, error } = useRelease(
         accountId,
         appId,
@@ -103,6 +108,37 @@ export default function ReleaseDetailPage() {
         })
     }, [updateRelease, releaseId])
 
+    // Compute crash and health metrics
+    const crashMetrics = useMemo(() => {
+        const stats = release?.stats
+        const rollbackData = rollbackReports.data
+
+        // Calculate error rate from stats
+        const downloads = stats?.downloads ?? 0
+        const errors = stats?.errors ?? 0
+        const errorRate = downloads > 0 ? (errors / downloads) * 100 : 0
+
+        // Calculate rollback/failure rate
+        const failureRate = rollbackData?.summary?.failureRate ?? 0
+
+        // Determine crash trend (simplified - could be enhanced with historical data)
+        let trend: 'up' | 'down' | 'stable' = 'stable'
+        if (failureRate > 5) trend = 'up'
+        else if (failureRate < 1 && errorRate < 1) trend = 'down'
+
+        // Calculate health status
+        const health = calculateHealthStatus(errorRate, failureRate)
+
+        return {
+            totalCrashes: errors,
+            crashRate: errorRate,
+            trend,
+            health,
+            errorRate,
+            rollbackRate: failureRate,
+        }
+    }, [release?.stats, rollbackReports.data])
+
     // Loading state
     if (isLoading) {
         return <ReleaseDetailSkeleton />
@@ -127,16 +163,19 @@ export default function ReleaseDetailPage() {
 
     return (
         <div className="space-y-6">
+            {/* Breadcrumbs */}
+            <Breadcrumbs
+                items={[
+                    { label: 'Apps', href: `/dashboard/${accountId}/apps` },
+                    { label: app?.app.name ?? 'App', href: basePath },
+                    { label: 'Releases', href: `${basePath}/releases` },
+                    { label: `v${release.version}` },
+                ]}
+            />
+
             {/* Header */}
             <div className="flex items-start justify-between">
                 <div>
-                    <Link
-                        href={`${basePath}/releases`}
-                        className="inline-flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-700 transition-colors mb-2"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        Back to Releases
-                    </Link>
                     <div className="flex items-center gap-3">
                         <h1 className="text-2xl font-bold text-neutral-900 font-mono">
                             v{release.version}
@@ -157,6 +196,21 @@ export default function ReleaseDetailPage() {
 
             {/* Stats */}
             <ReleaseStats stats={release.stats} />
+
+            {/* Health Indicator */}
+            <ReleaseHealthIndicator
+                health={crashMetrics.health}
+                errorRate={crashMetrics.errorRate}
+                rollbackRate={crashMetrics.rollbackRate}
+            />
+
+            {/* Crash Statistics */}
+            <CrashStatsCard
+                totalCrashes={crashMetrics.totalCrashes}
+                crashRate={crashMetrics.crashRate}
+                trend={crashMetrics.trend}
+                isLoading={rollbackReports.isLoading}
+            />
 
             {/* Release Info */}
             <ReleaseInfoDisplay

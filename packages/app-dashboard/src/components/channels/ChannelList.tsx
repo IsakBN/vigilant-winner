@@ -6,8 +6,8 @@
  * Displays a grid of channel cards with loading and empty states.
  */
 
-import { Radio, Plus } from 'lucide-react'
-import { Button, Skeleton, Card, CardContent } from '@bundlenudge/shared-ui'
+import { Radio } from 'lucide-react'
+import { Skeleton, Card, CardContent } from '@bundlenudge/shared-ui'
 import { ChannelCard } from './ChannelCard'
 import type { Channel } from '@/hooks'
 
@@ -20,7 +20,7 @@ interface ChannelListProps {
     appId: string
     accountId: string
     isLoading: boolean
-    onCreateClick: () => void
+    onCreateClick?: () => void
 }
 
 // =============================================================================
@@ -52,26 +52,18 @@ function ChannelListSkeleton() {
 // Empty State
 // =============================================================================
 
-function EmptyChannelState({ onCreateClick }: { onCreateClick: () => void }) {
+function EmptyChannelState() {
     return (
         <div className="text-center py-12 bg-neutral-50 rounded-xl border border-dashed border-neutral-200">
             <div className="mx-auto w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center mb-4">
                 <Radio className="w-6 h-6 text-neutral-400" />
             </div>
             <h3 className="text-lg font-semibold text-text-dark mb-2">
-                No channels yet
+                No custom channels
             </h3>
-            <p className="text-sm text-text-light max-w-sm mx-auto mb-6">
-                Channels let you deploy releases to different environments like
-                production, staging, or beta.
+            <p className="text-sm text-text-light max-w-sm mx-auto">
+                Your app uses the default Production, Staging, and Development channels.
             </p>
-            <Button
-                onClick={onCreateClick}
-                className="bg-bright-accent text-white hover:opacity-90"
-            >
-                <Plus className="w-4 h-4 mr-2" />
-                Create Channel
-            </Button>
         </div>
     )
 }
@@ -85,14 +77,13 @@ export function ChannelList({
     appId,
     accountId,
     isLoading,
-    onCreateClick,
 }: ChannelListProps) {
     if (isLoading) {
         return <ChannelListSkeleton />
     }
 
     if (channels.length === 0) {
-        return <EmptyChannelState onCreateClick={onCreateClick} />
+        return <EmptyChannelState />
     }
 
     return (

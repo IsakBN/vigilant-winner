@@ -55,3 +55,13 @@ export {
 // Detail page components
 export { RolloutControlCard } from './RolloutControlCard'
 export { ReleaseInfoDisplay } from './ReleaseInfoDisplay'
+
+// Health and crash components
+export { CrashStatsCard } from './CrashStatsCard'
+export type { CrashStatsCardProps } from './CrashStatsCard'
+export { ReleaseHealthIndicator, calculateHealthStatus } from './ReleaseHealthIndicator'
+export type {
+    HealthStatus,
+    HealthIndicatorData,
+    ReleaseHealthIndicatorProps,
+} from './ReleaseHealthIndicator'

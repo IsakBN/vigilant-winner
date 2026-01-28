@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation'
 import { Card, Skeleton } from '@bundlenudge/shared-ui'
 import { useApps, useUsage } from '@/hooks'
+import { ActivityFeed } from '@/components/dashboard'
 
 /**
  * Stats card skeleton for loading state
@@ -142,23 +143,8 @@ export default function AccountDashboardPage() {
             )}
 
             {/* Recent Activity section - show when user has apps */}
-            {!showGettingStarted && !isLoading && (
-                <Card className="p-6">
-                    <h2 className="text-lg font-semibold text-text-dark">
-                        Recent Activity
-                    </h2>
-                    <p className="text-text-light mt-2">
-                        Your recent releases and updates will appear here.
-                    </p>
-                    <div className="mt-4">
-                        <a
-                            href={`/dashboard/${accountId}/apps`}
-                            className="text-bright-accent hover:underline"
-                        >
-                            View all apps
-                        </a>
-                    </div>
-                </Card>
+            {!showGettingStarted && (
+                <ActivityFeed accountId={accountId} />
             )}
         </div>
     )

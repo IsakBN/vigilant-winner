@@ -107,10 +107,10 @@ function EmptyDeviceState() {
                 <Smartphone className="w-6 h-6 text-neutral-400" />
             </div>
             <h3 className="text-lg font-semibold text-neutral-900 mb-2">
-                No devices registered
+                No devices connected
             </h3>
             <p className="text-sm text-neutral-500 max-w-sm mx-auto">
-                Devices will appear here once users install your app and connect to the update service.
+                Devices will appear here once users install your app with the BundleNudge SDK.
             </p>
         </div>
     )

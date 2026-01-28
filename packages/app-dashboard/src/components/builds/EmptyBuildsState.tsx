@@ -26,12 +26,12 @@ export function EmptyBuildsState({ accountId, appId }: EmptyBuildsStateProps) {
                     No builds yet
                 </h3>
                 <p className="text-sm text-neutral-500 text-center max-w-sm mb-6">
-                    Upload a bundle or trigger a build to create your first build.
+                    Builds are created automatically when you push to GitHub or trigger them manually.
                 </p>
                 <Button asChild>
                     <Link href={`/dashboard/${accountId}/apps/${appId}/builds/new`}>
                         <Upload className="w-4 h-4 mr-2" />
-                        Upload Bundle
+                        Trigger Build
                     </Link>
                 </Button>
             </CardContent>

@@ -162,3 +162,19 @@ export {
     useExportTesters,
     testersKeys,
 } from './useTesters'
+
+// Health hooks
+export { useAppHealth, healthKeys } from './useAppHealth'
+export type { AppHealth } from './useAppHealth'
+
+// Activity hooks
+export { useRecentActivity, activityKeys } from './useRecentActivity'
+export type { ActivityItem, ActivityType } from './useRecentActivity'
+
+// App Metrics hooks
+export { useAppMetrics, appMetricsKeys } from './useAppMetrics'
+export type {
+    AppMetrics,
+    TrendDataPoint,
+    DeviceDistribution,
+} from './useAppMetrics'

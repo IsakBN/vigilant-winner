@@ -26,8 +26,7 @@ export function EmptyReleasesState({ accountId, appId }: EmptyReleasesStateProps
                     No releases yet
                 </h3>
                 <p className="text-sm text-neutral-500 text-center max-w-sm mb-6">
-                    Create your first release to start pushing OTA updates to your app
-                    users.
+                    Create your first release to start shipping updates.
                 </p>
                 <Button asChild>
                     <Link href={`/dashboard/${accountId}/apps/${appId}/releases/new`}>

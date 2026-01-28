@@ -9,8 +9,9 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Radio, Save } from 'lucide-react'
+import { Radio, Save } from 'lucide-react'
 import { useChannel, useUpdateChannel, useDeleteChannel } from '@/hooks/useChannels'
+import { useAppDetails } from '@/hooks/useApp'
 import {
     RolloutSlider,
     TargetingRules,
@@ -29,7 +30,7 @@ import {
     Switch,
     Badge,
 } from '@bundlenudge/shared-ui'
-import { ErrorState } from '@/components/shared/ErrorState'
+import { Breadcrumbs, ErrorState } from '@/components/shared'
 import type { ChannelTargetingRules, UpdateChannelInput } from '@/lib/api/types'
 
 // =============================================================================
@@ -44,6 +45,7 @@ export default function ChannelDetailPage() {
     const accountId = params.accountId as string
     const channelId = params.channelId as string
 
+    const { data: app } = useAppDetails(accountId, appId)
     const { data: channel, isLoading, error, refetch } = useChannel(accountId, appId, channelId)
     const updateMutation = useUpdateChannel(accountId, appId)
     const deleteMutation = useDeleteChannel(accountId, appId)
@@ -117,18 +119,23 @@ export default function ChannelDetailPage() {
 
     const isDefaultChannel = ['production', 'staging', 'development'].includes(channel.name)
     const backUrl = `/dashboard/${accountId}/apps/${appId}/channels`
+    const basePath = `/dashboard/${accountId}/apps/${appId}`
 
     return (
         <div className="space-y-6 p-6">
+            {/* Breadcrumbs */}
+            <Breadcrumbs
+                items={[
+                    { label: 'Apps', href: `/dashboard/${accountId}/apps` },
+                    { label: app?.app.name ?? 'App', href: basePath },
+                    { label: 'Channels', href: backUrl },
+                    { label: channel.displayName },
+                ]}
+            />
+
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <Link
-                        href={backUrl}
-                        className="p-2 hover:bg-neutral-100 rounded-lg transition-colors"
-                    >
-                        <ArrowLeft className="w-5 h-5 text-neutral-500" />
-                    </Link>
                     <div className="p-2.5 bg-neutral-100 rounded-lg">
                         <Radio className="w-5 h-5 text-neutral-600" />
                     </div>

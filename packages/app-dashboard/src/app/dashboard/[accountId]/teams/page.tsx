@@ -132,9 +132,9 @@ function EmptyState({ onCreateTeam }: { onCreateTeam: () => void }) {
                 </div>
                 <h3 className="text-lg font-semibold text-text-dark mb-2">No teams yet</h3>
                 <p className="text-text-light text-center mb-6 max-w-sm">
-                    Create a team to collaborate with others and manage apps together.
+                    Create a team to collaborate with others.
                 </p>
-                <Button onClick={onCreateTeam}>Create Your First Team</Button>
+                <Button onClick={onCreateTeam}>Create Team</Button>
             </CardContent>
         </Card>
     )
