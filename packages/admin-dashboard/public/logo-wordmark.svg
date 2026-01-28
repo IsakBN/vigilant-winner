@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 64" fill="none">
+  <defs>
+    <linearGradient id="wmGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#5E7CFF"/>
+      <stop offset="100%" style="stop-color:#4A63D9"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Icon -->
+  <g>
+    <rect x="4" y="8" width="48" height="48" rx="14" fill="url(#wmGrad)"/>
+
+    <!-- Bundle box -->
+    <path d="M18 26L28 20L38 26V36L28 42L18 36V26Z" fill="white" fill-opacity="0.95"/>
+    <path d="M28 20V31L38 26" fill="#D4DCFF"/>
+    <path d="M28 31L18 26" stroke="#5E7CFF" stroke-width="1" fill="none"/>
+    <path d="M28 31V42" stroke="#5E7CFF" stroke-width="1.5"/>
+
+    <!-- Motion arrow -->
+    <path d="M40 31L46 31M46 31L43 28M46 31L43 34" stroke="#FFEAA7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Wordmark text -->
+  <text x="64" y="43" font-family="Nunito, sans-serif" font-size="28" font-weight="800" fill="#333333">
+    <tspan fill="#5E7CFF">Bundle</tspan><tspan fill="#333333">Nudge</tspan>
+  </text>
+</svg>

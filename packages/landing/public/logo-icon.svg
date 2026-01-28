@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- Simplified icon version for favicons and small sizes -->
+  <defs>
+    <linearGradient id="iconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#5E7CFF"/>
+      <stop offset="100%" style="stop-color:#4A63D9"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect x="2" y="2" width="44" height="44" rx="12" fill="url(#iconGrad)"/>
+
+  <!-- Simplified bundle box -->
+  <path d="M14 19L24 13L34 19V29L24 35L14 29V19Z" fill="white" fill-opacity="0.95"/>
+  <path d="M24 13V24L34 19" fill="#D4DCFF"/>
+  <path d="M24 24L14 19" stroke="#5E7CFF" stroke-width="1" fill="none"/>
+  <path d="M24 24V35" stroke="#5E7CFF" stroke-width="1.5"/>
+
+  <!-- Motion arrow -->
+  <path d="M36 24L41 24M41 24L38 21M41 24L38 27" stroke="#FFEAA7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
