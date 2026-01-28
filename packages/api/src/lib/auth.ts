@@ -65,14 +65,19 @@ export function createAuth(env: Env): ReturnType<typeof betterAuth> {
       },
     },
     trustedOrigins: [
+      // Environment-configured URLs
       env.DASHBOARD_URL,
       env.API_URL,
+      // Production subdomains
+      'https://app.bundlenudge.com',
+      'https://admin.bundlenudge.com',
       'https://bundlenudge.com',
       'https://www.bundlenudge.com',
-      'https://app.bundlenudge.com',
-      'http://localhost:3000',
-      'http://localhost:3001',
-    ],
+      // Development
+      'http://localhost:3000',  // landing page
+      'http://localhost:3001',  // app-dashboard
+      'http://localhost:3002',  // admin-dashboard
+    ].filter(Boolean) as string[],
     // Cross-subdomain cookie support for api.bundlenudge.com -> www.bundlenudge.com
     advanced: {
       crossSubDomainCookies: {

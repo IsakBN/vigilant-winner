@@ -190,7 +190,7 @@ export async function sendTestEmail(
  */
 export function parseSubscriberCsv(
   csvContent: string
-): Array<{ email: string; name?: string }> {
+): { email: string; name?: string }[] {
   const lines = csvContent.trim().split('\n')
   if (lines.length === 0) return []
 
@@ -211,7 +211,7 @@ export function parseSubscriberCsv(
     if (emailCol === -1) emailCol = 0
   }
 
-  const subscribers: Array<{ email: string; name?: string }> = []
+  const subscribers: { email: string; name?: string }[] = []
 
   for (let i = startIndex; i < lines.length; i++) {
     const line = lines[i].trim()

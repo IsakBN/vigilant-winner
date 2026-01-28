@@ -7,33 +7,61 @@ const nextConfig: NextConfig = {
   // Set output file tracing root to monorepo root for proper dependency resolution
   outputFileTracingRoot: path.join(__dirname, '../../'),
 
-  // Redirects for old URLs
-  // Using temporary redirects (307) to allow changing destinations later if needed
+  // Redirects for subdomain migration
+  // This dashboard is deprecated - redirecting all routes to new subdomains
   async redirects() {
     return [
-      // Setup page -> Overview (setup is now inline on Overview for new apps)
+      // ===========================================
+      // SUBDOMAIN MIGRATION REDIRECTS (PERMANENT)
+      // ===========================================
+
+      // Redirect dashboard routes to app subdomain
       {
-        source: '/dashboard/:teamId/apps/:id/setup',
-        destination: '/dashboard/:teamId/apps/:id',
-        permanent: false,
+        source: '/dashboard/:path*',
+        destination: 'https://app.bundlenudge.com/dashboard/:path*',
+        permanent: true,
       },
-      // Testers page -> Audience with testers tab
+      // Redirect auth routes to app subdomain
       {
-        source: '/dashboard/:teamId/apps/:id/testers',
-        destination: '/dashboard/:teamId/apps/:id/audience?tab=testers',
-        permanent: false,
+        source: '/login',
+        destination: 'https://app.bundlenudge.com/login',
+        permanent: true,
       },
-      // SDK Devices page -> Audience with devices tab
       {
-        source: '/dashboard/:teamId/apps/:id/registered-devices',
-        destination: '/dashboard/:teamId/apps/:id/audience?tab=devices',
-        permanent: false,
+        source: '/sign-up',
+        destination: 'https://app.bundlenudge.com/sign-up',
+        permanent: true,
       },
-      // Credentials page -> Settings with integrations section
       {
-        source: '/dashboard/:teamId/apps/:id/credentials',
-        destination: '/dashboard/:teamId/apps/:id/settings#integrations',
-        permanent: false,
+        source: '/signup',
+        destination: 'https://app.bundlenudge.com/sign-up',
+        permanent: true,
+      },
+      {
+        source: '/forgot-password',
+        destination: 'https://app.bundlenudge.com/forgot-password',
+        permanent: true,
+      },
+      {
+        source: '/reset-password',
+        destination: 'https://app.bundlenudge.com/reset-password',
+        permanent: true,
+      },
+      {
+        source: '/verify-email',
+        destination: 'https://app.bundlenudge.com/verify-email',
+        permanent: true,
+      },
+      // Redirect admin routes to admin subdomain
+      {
+        source: '/admin/:path*',
+        destination: 'https://admin.bundlenudge.com/admin/:path*',
+        permanent: true,
+      },
+      {
+        source: '/admin',
+        destination: 'https://admin.bundlenudge.com/admin',
+        permanent: true,
       },
     ]
   },

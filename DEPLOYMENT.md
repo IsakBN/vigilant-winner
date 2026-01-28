@@ -1,8 +1,127 @@
-# BundleNudge Production Deployment
+# Deployment Guide
 
-Step-by-step guide to deploy BundleNudge. Follow in order.
+## Architecture
+
+| Subdomain | Package | Description |
+|-----------|---------|-------------|
+| bundlenudge.com | packages/landing | Marketing landing page |
+| app.bundlenudge.com | packages/app-dashboard | Customer dashboard |
+| admin.bundlenudge.com | packages/admin-dashboard | Internal admin |
+| api.bundlenudge.com | packages/api | Cloudflare Workers API |
+
+## Prerequisites
+
+1. **Vercel Account** - For Next.js apps
+2. **Cloudflare Account** - For API (Workers)
+3. **Neon Account** - For PostgreSQL databases
+4. **Domain** - bundlenudge.com with DNS access
+
+## Database Setup
+
+### 1. Create Neon Databases
+
+Create two separate databases in Neon:
+
+- `bundlenudge_app_auth` - For app-dashboard (Better Auth)
+- `bundlenudge_admin_auth` - For admin-dashboard (Better Auth + OTP)
+
+### 2. Run Migrations
+
+```bash
+# App dashboard auth
+pnpm --filter @bundlenudge/app-dashboard db:push
+
+# Admin dashboard auth
+pnpm --filter @bundlenudge/admin-dashboard db:push
+```
+
+## Vercel Deployment
+
+### 1. Landing Page (bundlenudge.com)
+
+```bash
+cd packages/landing
+vercel --prod
+```
+
+Configure:
+- Domain: bundlenudge.com
+- Framework: Next.js
+
+### 2. App Dashboard (app.bundlenudge.com)
+
+```bash
+cd packages/app-dashboard
+vercel --prod
+```
+
+Configure:
+- Domain: app.bundlenudge.com
+- Environment variables:
+  - `DATABASE_URL` - Neon connection string
+  - `BETTER_AUTH_SECRET` - Random 32+ char string
+  - `GITHUB_CLIENT_ID` - GitHub OAuth app
+  - `GITHUB_CLIENT_SECRET` - GitHub OAuth secret
+  - `NEXT_PUBLIC_APP_URL` - https://app.bundlenudge.com
+
+### 3. Admin Dashboard (admin.bundlenudge.com)
+
+```bash
+cd packages/admin-dashboard
+vercel --prod
+```
+
+Configure:
+- Domain: admin.bundlenudge.com
+- Environment variables:
+  - `DATABASE_URL` - Neon connection string (separate DB)
+  - `BETTER_AUTH_SECRET` - Random 32+ char string
+  - `NEXT_PUBLIC_ADMIN_URL` - https://admin.bundlenudge.com
+
+## Cloudflare API Deployment
+
+```bash
+cd packages/api
+pnpm deploy
+```
+
+## DNS Configuration
+
+Add these records to your DNS:
+
+| Type | Name | Value |
+|------|------|-------|
+| CNAME | @ | cname.vercel-dns.com |
+| CNAME | app | cname.vercel-dns.com |
+| CNAME | admin | cname.vercel-dns.com |
+| CNAME | api | your-worker.workers.dev |
+
+## Admin Email Allowlist
+
+After deploying admin-dashboard, add authorized admin emails:
+
+```sql
+INSERT INTO email_allowlist (id, email_pattern, added_by, note)
+VALUES
+  (gen_random_uuid(), '*@bundlenudge.com', 'system', 'All company emails'),
+  (gen_random_uuid(), 'specific-admin@gmail.com', 'system', 'External admin');
+```
+
+## Verification Checklist
+
+- [ ] Landing page loads at bundlenudge.com
+- [ ] App dashboard loads at app.bundlenudge.com
+- [ ] Login works with email/password
+- [ ] Login works with GitHub OAuth
+- [ ] Admin dashboard loads at admin.bundlenudge.com
+- [ ] Admin OTP login works
+- [ ] API responds at api.bundlenudge.com
 
 ---
+
+# API Deployment (Detailed)
+
+Step-by-step guide to deploy the Cloudflare Workers API.
 
 ## Prerequisites
 
@@ -17,8 +136,6 @@ Install wrangler CLI:
 npm install -g wrangler
 wrangler login
 ```
-
----
 
 ## Step 1: Create Cloudflare Resources
 
@@ -72,8 +189,6 @@ binding = "CACHE"
 id = "YOUR_CACHE_KV_ID"
 ```
 
----
-
 ## Step 2: Deploy the Worker
 
 ```bash
@@ -90,8 +205,6 @@ Test it works:
 curl https://bundlenudge-prod.YOUR-SUBDOMAIN.workers.dev/health
 ```
 
----
-
 ## Step 3: Run Database Migrations
 
 Create all the database tables:
@@ -99,8 +212,6 @@ Create all the database tables:
 ```bash
 wrangler d1 execute bundlenudge-prod-db --remote --file=drizzle/0000_overconfident_jackal.sql
 ```
-
----
 
 ## Step 4: Set Up Neon PostgreSQL
 
@@ -113,8 +224,6 @@ wrangler d1 execute bundlenudge-prod-db --remote --file=drizzle/0000_overconfide
 wrangler secret put DATABASE_URL
 ```
 Paste your connection string when prompted.
-
----
 
 ## Step 5: Set All Secrets
 
@@ -174,15 +283,11 @@ wrangler secret put APP_URL
 ```
 Enter: `https://app.bundlenudge.com` (same as dashboard)
 
----
-
 ## Step 6: Seed Subscription Plans
 
 ```bash
 wrangler d1 execute bundlenudge-prod-db --remote --command "INSERT INTO subscription_plans (id, name, display_name, price_cents, mau_limit, storage_gb, bundle_retention, features, is_active, created_at) VALUES ('plan_free', 'free', 'Free', 0, 1000, 1, 7, '{\"hasAnalytics\":false}', 1, unixepoch()), ('plan_pro', 'pro', 'Pro', 2900, 10000, 10, 30, '{\"hasAnalytics\":true}', 1, unixepoch()), ('plan_team', 'team', 'Team', 9900, 100000, 50, 90, '{\"hasAnalytics\":true}', 1, unixepoch()), ('plan_enterprise', 'enterprise', 'Enterprise', 0, 999999999, 999999, 365, '{\"hasAnalytics\":true}', 1, unixepoch());"
 ```
-
----
 
 ## Step 7: Configure Stripe Webhook
 
@@ -202,16 +307,12 @@ wrangler d1 execute bundlenudge-prod-db --remote --command "INSERT INTO subscrip
 wrangler secret put STRIPE_WEBHOOK_SECRET
 ```
 
----
-
 ## Step 8: Configure Resend Email
 
 1. Go to [resend.com/domains](https://resend.com/domains)
 2. Add your domain (e.g., `mail.bundlenudge.com`)
 3. Add the DNS records they provide (SPF, DKIM)
 4. Wait for verification
-
----
 
 ## Step 9: GitHub OAuth (Optional)
 
@@ -230,8 +331,6 @@ wrangler secret put GITHUB_CLIENT_ID
 wrangler secret put GITHUB_CLIENT_SECRET
 ```
 
----
-
 ## Step 10: Custom Domain (Optional)
 
 ### API Domain
@@ -242,8 +341,6 @@ wrangler secret put GITHUB_CLIENT_SECRET
 
 ### Dashboard Domain
 Deploy dashboard to Vercel, then add custom domain in Vercel settings.
-
----
 
 ## Verify Deployment
 
@@ -270,8 +367,6 @@ Should show all your secrets.
 wrangler tail bundlenudge-prod
 ```
 
----
-
 ## Troubleshooting
 
 ### "Table not found" errors
@@ -290,8 +385,6 @@ wrangler secret list
 1. Check webhook URL is correct in Stripe dashboard
 2. Check STRIPE_WEBHOOK_SECRET is set correctly
 3. View logs: `wrangler tail bundlenudge-prod`
-
----
 
 ## Quick Reference
 

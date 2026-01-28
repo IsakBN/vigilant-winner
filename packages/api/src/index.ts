@@ -88,11 +88,15 @@ const app = new Hono<{ Bindings: Env }>()
 
 // Allowed origins for CORS with credentials
 const ALLOWED_ORIGINS = [
+  // Production subdomains
+  'https://app.bundlenudge.com',
+  'https://admin.bundlenudge.com',
   'https://bundlenudge.com',
   'https://www.bundlenudge.com',
-  'https://app.bundlenudge.com',
-  'http://localhost:3000',
-  'http://localhost:3001',
+  // Development
+  'http://localhost:3000',  // landing page
+  'http://localhost:3001',  // app-dashboard
+  'http://localhost:3002',  // admin-dashboard
 ]
 
 // Middleware
@@ -151,11 +155,15 @@ app.all('/api/auth/*', async (c) => {
 
   const allowedOrigins = [
     c.env.DASHBOARD_URL,
+    // Production subdomains
     'https://app.bundlenudge.com',
-    'https://www.bundlenudge.com',
+    'https://admin.bundlenudge.com',
     'https://bundlenudge.com',
-    'http://localhost:3000',
-    'http://localhost:3001',
+    'https://www.bundlenudge.com',
+    // Development
+    'http://localhost:3000',  // landing page
+    'http://localhost:3001',  // app-dashboard
+    'http://localhost:3002',  // admin-dashboard
   ].filter(Boolean)
 
   const isAllowed = origin && allowedOrigins.includes(origin)

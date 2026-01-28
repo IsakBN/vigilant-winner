@@ -134,7 +134,7 @@ export async function verifyPassword(
  * @param length - Number of random bytes (default: 32, producing 64-char hex)
  * @returns Hex-encoded random token
  */
-export function generateSecureToken(length: number = 32): string {
+export function generateSecureToken(length = 32): string {
   const bytes = crypto.getRandomValues(new Uint8Array(length))
   return arrayToHex(bytes)
 }
@@ -144,7 +144,7 @@ export function generateSecureToken(length: number = 32): string {
  * @param hours - Number of hours until expiry (default: 1)
  * @returns Date object representing the expiry time
  */
-export function generateTokenExpiry(hours: number = 1): Date {
+export function generateTokenExpiry(hours = 1): Date {
   return new Date(Date.now() + hours * 60 * 60 * 1000)
 }
 
