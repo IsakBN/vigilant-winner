@@ -7,7 +7,7 @@
  */
 
 import { Button } from '@bundlenudge/shared-ui'
-import { PhoneIcon } from '@/components/icons'
+import { GitHubIcon } from '@/components/settings'
 
 interface EmptyAppStateProps {
     type: 'no-apps' | 'no-results'
@@ -20,24 +20,27 @@ function NoAppsState({ onCreateApp }: { onCreateApp?: () => void }) {
         <div className="flex flex-col items-center justify-center py-16 px-4">
             {/* Icon Container */}
             <div className="w-20 h-20 rounded-2xl bg-soft-yellow/50 flex items-center justify-center mb-6">
-                <PhoneIcon className="w-10 h-10 text-text-dark" />
+                <div className="w-10 h-10 text-text-dark">
+                    <GitHubIcon />
+                </div>
             </div>
 
             {/* Title */}
             <h3 className="text-xl font-semibold text-text-dark mb-2">
-                Create your first app
+                Connect your first repository
             </h3>
 
             {/* Description */}
             <p className="text-text-light text-center max-w-md mb-6">
-                Get started by creating an app. Once created, you can push OTA
+                Get started by connecting a GitHub repository. Once connected, you can push OTA
                 updates directly to your React Native users.
             </p>
 
             {/* CTA Button */}
             {onCreateApp && (
-                <Button onClick={onCreateApp} size="lg">
-                    Create App
+                <Button onClick={onCreateApp} size="lg" className="gap-2">
+                    <GitHubIcon />
+                    Connect Repository
                 </Button>
             )}
         </div>

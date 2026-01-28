@@ -17,6 +17,22 @@ export interface GitHubStatus {
     connectedAt: number | null
 }
 
+export interface GitHubRepository {
+    id: number
+    name: string
+    fullName: string
+    owner: string
+    description: string | null
+    private: boolean
+    defaultBranch: string
+    language: string | null
+    url: string
+}
+
+export interface ListGitHubReposResponse {
+    repos: GitHubRepository[]
+}
+
 export interface SlackStatus {
     connected: boolean
     workspaceName: string | null
@@ -64,6 +80,13 @@ export const integrations = {
      */
     disconnectGitHub(): Promise<{ success: boolean }> {
         return apiClient.delete('/auth/github')
+    },
+
+    /**
+     * List GitHub repositories for the connected user
+     */
+    listGitHubRepos(): Promise<ListGitHubReposResponse> {
+        return apiClient.get('/github/repos')
     },
 
     /**

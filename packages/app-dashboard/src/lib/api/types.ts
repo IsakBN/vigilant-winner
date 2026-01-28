@@ -53,6 +53,7 @@ export interface CreateAppInput {
     name: string
     platform: Platform
     bundleId?: string
+    githubRepo?: string
 }
 
 /**

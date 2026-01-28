@@ -1,9 +1,10 @@
 'use client'
 
 import { useParams, useRouter } from 'next/navigation'
-import { CreateAppForm } from '@/components/apps'
+import { ConnectRepoForm } from '@/components/apps'
 import { useCreateApp } from '@/hooks/useApps'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@bundlenudge/shared-ui'
+import { GitHubIcon } from '@/components/settings'
 
 export default function NewAppPage() {
     const params = useParams()
@@ -23,19 +24,27 @@ export default function NewAppPage() {
     return (
         <div className="p-6 max-w-2xl mx-auto">
             <div className="mb-6">
-                <h1 className="text-2xl font-bold">Create New App</h1>
-                <p className="text-gray-600">Set up a new app for OTA updates</p>
+                <h1 className="text-2xl font-bold flex items-center gap-2">
+                    <span className="w-6 h-6">
+                        <GitHubIcon />
+                    </span>
+                    Connect GitHub Repository
+                </h1>
+                <p className="text-gray-600">
+                    Import a repository to enable OTA updates for your React Native app
+                </p>
             </div>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>App Details</CardTitle>
+                    <CardTitle>Repository Details</CardTitle>
                     <CardDescription>
-                        Enter the basic information about your app
+                        Select a GitHub repository to connect with BundleNudge
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <CreateAppForm
+                    <ConnectRepoForm
+                        accountId={accountId}
                         onSubmit={handleSubmit}
                         isLoading={createApp.isPending}
                         error={createApp.error?.message}

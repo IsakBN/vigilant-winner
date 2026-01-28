@@ -5,8 +5,6 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   LayoutGrid,
-  Rocket,
-  Smartphone,
   Users,
   Settings,
   X,
@@ -23,9 +21,7 @@ interface SidebarProps {
 
 const NAV_ITEMS = [
   { href: '', icon: LayoutGrid, label: 'Apps' },
-  { href: '/releases', icon: Rocket, label: 'Releases' },
-  { href: '/devices', icon: Smartphone, label: 'Devices' },
-  { href: '/team', icon: Users, label: 'Team' },
+  { href: '/teams', icon: Users, label: 'Teams' },
   { href: '/settings', icon: Settings, label: 'Settings' },
 ]
 

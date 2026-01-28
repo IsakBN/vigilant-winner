@@ -68,6 +68,8 @@ export type {
 export { integrations } from './integrations'
 export type {
     GitHubStatus,
+    GitHubRepository,
+    ListGitHubReposResponse,
     SlackStatus,
     DiscordStatus,
     CrashProvider,
