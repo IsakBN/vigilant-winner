@@ -67,4 +67,5 @@ DASHBOARD_URL = "https://app.bundlenudge.com"
 APP_DASHBOARD_URL = "https://app.bundlenudge.com"
 ADMIN_DASHBOARD_URL = "https://admin.bundlenudge.com"
 LANDING_URL = "https://bundlenudge.com"
-DATABASE_URL = "postgresql://neondb_owner:npg_Iws58FxeWpNM@ep-frosty-star-ag3k54au-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require"
+# Railway PostgreSQL (shared auth database for app + admin)
+DATABASE_URL = "postgresql://postgres:UmCrzLjCAQbiyugXvrzrvHyojxRiYkAe@nozomi.proxy.rlwy.net:51415/railway"

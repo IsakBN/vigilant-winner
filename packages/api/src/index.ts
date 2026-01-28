@@ -101,7 +101,9 @@ const ALLOWED_ORIGINS = [
 
 // Middleware
 app.use('*', logger())
-app.use('*', cors({
+
+// CORS for non-auth routes (auth routes handle their own CORS for Better Auth compatibility)
+app.use('/v1/*', cors({
   origin: (origin) => {
     // Allow requests with no origin (like mobile apps, curl, etc.)
     if (!origin) return '*'

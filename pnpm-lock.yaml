@@ -24,6 +24,9 @@ importers:
       prettier:
         specifier: ^3.0.0
         version: 3.8.1
+      tsx:
+        specifier: ^4.0.0
+        version: 4.21.0
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
@@ -39,6 +42,9 @@ importers:
       '@bundlenudge/shared-ui':
         specifier: workspace:*
         version: link:../shared-ui
+      '@radix-ui/react-tabs':
+        specifier: ^1.1.13
+        version: 1.1.13(@types/react-dom@19.2.3(@types/react@19.2.9))(@types/react@19.2.9)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@tanstack/react-query':
         specifier: ^5.0.0
         version: 5.90.20(react@19.2.3)
@@ -118,9 +124,6 @@ importers:
       '@hono/zod-validator':
         specifier: ^0.4.3
         version: 0.4.3(hono@4.11.5)(zod@3.25.76)
-      '@neondatabase/serverless':
-        specifier: ^1.0.2
-        version: 1.0.2
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3
@@ -139,6 +142,9 @@ importers:
       nanoid:
         specifier: ^5.1.6
         version: 5.1.6
+      postgres:
+        specifier: ^3.4.5
+        version: 3.4.8
       zod:
         specifier: ^3.23.0
         version: 3.25.76
@@ -173,12 +179,18 @@ importers:
       '@bundlenudge/shared-ui':
         specifier: workspace:*
         version: link:../shared-ui
+      '@radix-ui/react-alert-dialog':
+        specifier: ^1.1.0
+        version: 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.9))(@types/react@19.2.9)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@radix-ui/react-dropdown-menu':
         specifier: ^2.1.0
         version: 2.1.16(@types/react-dom@19.2.3(@types/react@19.2.9))(@types/react@19.2.9)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@radix-ui/react-slot':
         specifier: ^1.1.0
         version: 1.2.4(@types/react@19.2.9)(react@19.2.3)
+      '@radix-ui/react-tabs':
+        specifier: ^1.1.13
+        version: 1.1.13(@types/react-dom@19.2.3(@types/react@19.2.9))(@types/react@19.2.9)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@tanstack/react-query':
         specifier: ^5.0.0
         version: 5.90.20(react@19.2.3)
@@ -8788,6 +8800,7 @@ snapshots:
     dependencies:
       '@types/node': 22.19.7
       '@types/pg': 8.16.0
+    optional: true
 
   '@next/env@15.5.9': {}
 
@@ -9646,6 +9659,7 @@ snapshots:
       '@types/node': 20.19.30
       pg-protocol: 1.11.0
       pg-types: 2.2.0
+    optional: true
 
   '@types/react-dom@19.2.3(@types/react@19.2.9)':
     dependencies:
@@ -13665,9 +13679,11 @@ snapshots:
 
   peberminta@0.9.0: {}
 
-  pg-int8@1.0.1: {}
+  pg-int8@1.0.1:
+    optional: true
 
-  pg-protocol@1.11.0: {}
+  pg-protocol@1.11.0:
+    optional: true
 
   pg-types@2.2.0:
     dependencies:
@@ -13676,6 +13692,7 @@ snapshots:
       postgres-bytea: 1.0.1
       postgres-date: 1.0.7
       postgres-interval: 1.2.0
+    optional: true
 
   picocolors@1.1.1: {}
 
@@ -13763,15 +13780,19 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  postgres-array@2.0.0: {}
+  postgres-array@2.0.0:
+    optional: true
 
-  postgres-bytea@1.0.1: {}
+  postgres-bytea@1.0.1:
+    optional: true
 
-  postgres-date@1.0.7: {}
+  postgres-date@1.0.7:
+    optional: true
 
   postgres-interval@1.2.0:
     dependencies:
       xtend: 4.0.2
+    optional: true
 
   postgres@3.4.8: {}
 
@@ -15368,7 +15389,8 @@ snapshots:
   xmlbuilder@15.1.1:
     optional: true
 
-  xtend@4.0.2: {}
+  xtend@4.0.2:
+    optional: true
 
   y18n@5.0.8: {}
 

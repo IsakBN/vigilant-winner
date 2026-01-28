@@ -1,18 +1,18 @@
 /**
  * Better Auth configuration for BundleNudge
  *
- * Uses Neon Postgres for auth tables and supports:
+ * Uses Railway Postgres for auth tables and supports:
  * - Email/password authentication
- * - Email OTP verification
+ * - Email OTP verification (with allowlist for admin)
  * - GitHub OAuth
  */
 
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { emailOTP } from 'better-auth/plugins'
-import { Pool } from '@neondatabase/serverless'
-import { drizzle } from 'drizzle-orm/neon-serverless'
-import { sendOTPEmail } from './email'
+import postgres from 'postgres'
+import { drizzle } from 'drizzle-orm/postgres-js'
+import { sendOTPEmail, sendPasswordResetEmail } from './email'
 import * as schema from './auth-schema'
 import type { Env } from '../types/env'
 
@@ -21,12 +21,46 @@ const SESSION_UPDATE_AGE_SECONDS = 60 * 60 * 24  // Update every 24 hours
 const OTP_LENGTH = 6
 const OTP_EXPIRY_SECONDS = 600  // 10 minutes
 
+type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>
+
+/**
+ * Check if an email is allowed for admin access
+ * Queries the email_allowlist table and matches against patterns
+ * SECURITY: Returns false if table is empty (fail closed)
+ */
+async function isEmailAllowedForAdmin(email: string, db: DrizzleDb): Promise<boolean> {
+  const patterns = await db.select().from(schema.emailAllowlist)
+
+  // Fail closed: if no patterns defined, reject all emails
+  if (patterns.length === 0) {
+    return false
+  }
+
+  const lowerEmail = email.toLowerCase()
+
+  for (const { emailPattern } of patterns) {
+    // Wildcard domain match: *@example.com
+    if (emailPattern.startsWith('*@')) {
+      const domain = emailPattern.slice(2).toLowerCase()
+      if (lowerEmail.endsWith(`@${domain}`)) {
+        return true
+      }
+    }
+    // Exact match (case-insensitive)
+    else if (lowerEmail === emailPattern.toLowerCase()) {
+      return true
+    }
+  }
+
+  return false
+}
+
 /**
  * Create a Better Auth instance for the given environment
  */
 export function createAuth(env: Env): ReturnType<typeof betterAuth> {
-  const pool = new Pool({ connectionString: env.DATABASE_URL })
-  const db = drizzle(pool, { schema })
+  const client = postgres(env.DATABASE_URL)
+  const db = drizzle(client, { schema })
 
   const isProduction = !env.API_URL?.includes('localhost')
 
@@ -40,6 +74,9 @@ export function createAuth(env: Env): ReturnType<typeof betterAuth> {
     secret: env.BETTER_AUTH_SECRET,
     emailAndPassword: {
       enabled: true,
+      async sendResetPassword({ user, url }) {
+        await sendPasswordResetEmail(user.email, url, env)
+      },
     },
     socialProviders: {
       github: {
@@ -50,6 +87,11 @@ export function createAuth(env: Env): ReturnType<typeof betterAuth> {
     plugins: [
       emailOTP({
         async sendVerificationOTP({ email, otp }) {
+          // Check allowlist before sending OTP (fail closed)
+          const allowed = await isEmailAllowedForAdmin(email, db)
+          if (!allowed) {
+            throw new Error('Email not authorized for admin access')
+          }
           await sendOTPEmail(email, otp, env)
         },
         otpLength: OTP_LENGTH,
