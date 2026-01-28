@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { authClient } from '@/lib/auth/client'
+import { authClient, signIn } from '@/lib/auth/client'
 
 type Step = 'email' | 'otp'
 
@@ -39,11 +39,13 @@ export default function AdminLoginPage() {
 
     try {
       // Use signIn.emailOtp for authentication (not verifyEmail which only verifies email)
-      const { error } = await authClient.signIn.emailOtp({ email, otp })
+      const { error } = await signIn.emailOtp({ email, otp })
       if (error) {
         setError(error.message ?? 'Invalid or expired OTP')
         return
       }
+      // Refresh session to ensure cookie is available before redirect
+      await authClient.getSession({ query: { disableCookieCache: true } })
       router.push('/admin')
     } catch {
       setError('Invalid or expired OTP')

@@ -1,9 +1,11 @@
 'use client'
 
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
+import { Settings } from 'lucide-react'
 import { useAppDetails } from '@/hooks/useApp'
 import { PlatformBadge } from '@/components/apps'
-import { Card, CardContent, CardHeader, CardTitle, Skeleton } from '@bundlenudge/shared-ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@bundlenudge/shared-ui'
 import { ErrorState } from '@/components/shared/ErrorState'
 
 export default function AppDetailPage() {
@@ -63,6 +65,12 @@ export default function AppDetailPage() {
                         <p className="text-gray-600 font-mono text-sm">{app.bundleId}</p>
                     )}
                 </div>
+                <Button variant="outline" asChild>
+                    <Link href={`/dashboard/${accountId}/apps/${appId}/settings`}>
+                        <Settings className="w-4 h-4 mr-2" />
+                        Settings
+                    </Link>
+                </Button>
             </div>
 
             {/* Stats Cards */}

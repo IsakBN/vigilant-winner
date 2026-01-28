@@ -4,7 +4,7 @@ import * as schema from './schema'
 
 let _db: ReturnType<typeof drizzle> | null = null
 
-function getDb() {
+function getDb(): ReturnType<typeof drizzle> {
   if (_db) return _db
 
   const databaseUrl = process.env.DATABASE_URL

@@ -2,9 +2,12 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest): NextResponse {
-  const sessionCookie = request.cookies.get('better-auth.session_token')
+  // Check for both cookie names: __Secure- prefix is added in production (secure: true)
+  const sessionCookie = request.cookies.get('__Secure-better-auth.session_token')
+    ?? request.cookies.get('better-auth.session_token')
   const isAuthPage = request.nextUrl.pathname.startsWith('/login') ||
-                     request.nextUrl.pathname.startsWith('/sign-up')
+                     request.nextUrl.pathname.startsWith('/sign-up') ||
+                     request.nextUrl.pathname.startsWith('/forgot-password')
 
   // If no session and trying to access protected route, redirect to login
   if (!sessionCookie && !isAuthPage && request.nextUrl.pathname !== '/') {

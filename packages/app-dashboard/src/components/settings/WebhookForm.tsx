@@ -19,31 +19,11 @@ import {
     CardHeader,
     CardTitle,
 } from '@bundlenudge/shared-ui'
-
-type WebhookEvent =
-    | 'release.created'
-    | 'release.updated'
-    | 'release.published'
-    | 'release.disabled'
-    | 'app.created'
-    | 'app.deleted'
-
-const WEBHOOK_EVENTS: { value: WebhookEvent; label: string }[] = [
-    { value: 'release.created', label: 'Release Created' },
-    { value: 'release.updated', label: 'Release Updated' },
-    { value: 'release.published', label: 'Release Published' },
-    { value: 'release.disabled', label: 'Release Disabled' },
-    { value: 'app.created', label: 'App Created' },
-    { value: 'app.deleted', label: 'App Deleted' },
-]
-
-interface Webhook {
-    id: string
-    name: string
-    url: string
-    events: WebhookEvent[]
-    enabled: boolean
-}
+import {
+    WEBHOOK_EVENTS,
+    type WebhookEvent,
+    type Webhook,
+} from '@/lib/api/webhooks'
 
 interface WebhookFormProps {
     webhook?: Webhook

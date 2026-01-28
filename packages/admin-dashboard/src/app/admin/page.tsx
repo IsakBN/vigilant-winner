@@ -1,40 +1,183 @@
-import { Users, AppWindow, CreditCard, Activity } from 'lucide-react'
-import { type LucideIcon } from 'lucide-react'
+'use client'
 
-export default function AdminHomePage() {
+import { useAdminStats, useRecentActivity } from '@/hooks/useAdmin'
+import {
+  useOtaMetrics,
+  useBuildQueue,
+  useApiHealth,
+  useStorageMetrics,
+} from '@/hooks/useAdminOps'
+import {
+  StatsGrid,
+  ActivityFeed,
+  SystemStatusBar,
+  KeyMetricsRow,
+  OtaVolumeChart,
+  AlertsSection,
+} from '@/components/admin'
+import { Card, CardContent, CardHeader, CardTitle, Badge } from '@bundlenudge/shared-ui'
+import { RefreshCw } from 'lucide-react'
+
+/**
+ * Admin dashboard home page
+ *
+ * Displays comprehensive operational snapshot with system status,
+ * key metrics, OTA volume chart, activity feed, and alerts.
+ */
+export default function AdminDashboardPage() {
+  const { data: stats, isLoading: statsLoading, dataUpdatedAt } = useAdminStats()
+  const { data: activityData, isLoading: activityLoading } = useRecentActivity({ limit: 10 })
+  const { data: otaMetrics, isLoading: otaLoading } = useOtaMetrics('24h')
+  const { data: buildQueue, isLoading: buildLoading } = useBuildQueue()
+  const { data: apiHealth, isLoading: apiLoading } = useApiHealth()
+  const { data: storage, isLoading: storageLoading } = useStorageMetrics()
+
+  const opsLoading = otaLoading || buildLoading || apiLoading || storageLoading
+
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard icon={Users} label="Total Users" value="1,234" />
-        <StatCard icon={AppWindow} label="Active Apps" value="567" />
-        <StatCard icon={CreditCard} label="Active Subscriptions" value="234" />
-        <StatCard icon={Activity} label="API Requests (24h)" value="45.2K" />
+    <div className="space-y-6">
+      {/* Page header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-text-dark">Platform Overview</h1>
+          <p className="text-sm text-text-light mt-1">
+            Monitor your platform metrics and system health
+          </p>
+        </div>
+        {stats?.cached && (
+          <CacheIndicator generatedAt={stats.generatedAt} updatedAt={dataUpdatedAt} />
+        )}
       </div>
 
-      <div className="bg-white rounded-lg border p-6">
-        <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
-        <p className="text-gray-600">
-          Welcome to the BundleNudge Admin Dashboard. Use the sidebar to navigate.
-        </p>
+      {/* System Status Bar */}
+      <SystemStatusBar
+        apiHealth={apiHealth}
+        buildQueue={buildQueue}
+        storage={storage}
+        isLoading={opsLoading}
+      />
+
+      {/* Key Metrics Row */}
+      <KeyMetricsRow
+        otaMetrics={otaMetrics}
+        buildQueue={buildQueue}
+        apiHealth={apiHealth}
+        storage={storage}
+        stats={stats}
+        isLoading={statsLoading || opsLoading}
+      />
+
+      {/* Alerts Section */}
+      <AlertsSection
+        buildQueue={buildQueue}
+        storage={storage}
+        apiHealth={apiHealth}
+        isLoading={opsLoading}
+      />
+
+      {/* Charts Row */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <OtaVolumeChart hourlyData={otaMetrics?.hourlyBreakdown} isLoading={otaLoading} />
+        <ActivityFeed items={activityData?.items} isLoading={activityLoading} />
       </div>
+
+      {/* Stats grid */}
+      <StatsGrid data={stats} isLoading={statsLoading} />
+
+      {/* Subscription breakdown */}
+      {stats && <SubscriptionBreakdown data={stats.subscriptions.byPlan} />}
     </div>
   )
 }
 
-function StatCard({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
+interface CacheIndicatorProps {
+  generatedAt?: number
+  updatedAt: number
+}
+
+function CacheIndicator({ generatedAt, updatedAt }: CacheIndicatorProps) {
+  const age = generatedAt ? Math.floor((Date.now() - generatedAt) / 1000) : 0
+  const localAge = Math.floor((Date.now() - updatedAt) / 1000)
+
   return (
-    <div className="bg-white rounded-lg border p-4">
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-purple-100 rounded-lg">
-          <Icon className="w-5 h-5 text-purple-600" />
-        </div>
-        <div>
-          <p className="text-sm text-gray-600">{label}</p>
-          <p className="text-xl font-bold">{value}</p>
-        </div>
-      </div>
+    <div className="flex items-center gap-2 text-xs text-text-light">
+      <RefreshCw className="w-3 h-3" />
+      <span>
+        Cached {age > 0 ? `${String(age)}s` : 'just now'} (fetched {String(localAge)}s ago)
+      </span>
     </div>
+  )
+}
+
+interface SubscriptionBreakdownProps {
+  data: Record<string, number>
+}
+
+const PLAN_COLORS: Record<string, string> = {
+  free: 'bg-gray-100 text-gray-700',
+  pro: 'bg-pastel-blue/20 text-pastel-blue',
+  team: 'bg-pastel-green/20 text-pastel-green',
+  enterprise: 'bg-pastel-purple/20 text-pastel-purple',
+}
+
+const PLAN_BAR_COLORS: Record<string, string> = {
+  free: 'bg-gray-300',
+  pro: 'bg-pastel-blue',
+  team: 'bg-pastel-green',
+  enterprise: 'bg-pastel-purple',
+}
+
+function SubscriptionBreakdown({ data }: SubscriptionBreakdownProps) {
+  const plans = Object.entries(data).sort((a, b) => b[1] - a[1])
+  const total = plans.reduce((sum, [, count]) => sum + count, 0)
+
+  if (plans.length === 0) {
+    return null
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg font-semibold text-text-dark">
+          Subscription Breakdown
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-wrap gap-4">
+          {plans.map(([plan, count]) => {
+            const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : '0'
+            const colorClass = PLAN_COLORS[plan.toLowerCase()] ?? 'bg-gray-100 text-gray-700'
+
+            return (
+              <div key={plan} className="flex items-center gap-3">
+                <Badge variant="outline" className={colorClass}>
+                  {plan}
+                </Badge>
+                <div className="text-sm">
+                  <span className="font-semibold text-text-dark">{count}</span>
+                  <span className="text-text-light ml-1">({percentage}%)</span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Visual bar */}
+        <div className="mt-4 h-2 rounded-full bg-muted overflow-hidden flex">
+          {plans.map(([plan, count]) => {
+            const percentage = total > 0 ? (count / total) * 100 : 0
+            const barColor = PLAN_BAR_COLORS[plan.toLowerCase()] ?? 'bg-gray-300'
+
+            return (
+              <div
+                key={plan}
+                className={barColor}
+                style={{ width: `${String(percentage)}%` }}
+              />
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
   )
 }

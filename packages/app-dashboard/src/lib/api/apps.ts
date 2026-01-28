@@ -9,6 +9,9 @@ import type {
     ListAppsResponse,
     GetAppResponse,
     GetAppWithStatsResponse,
+    UpdateAppInput,
+    UpdateAppResponse,
+    RegenerateApiKeyResponse,
 } from './types'
 
 export const apps = {
@@ -41,9 +44,23 @@ export const apps = {
     },
 
     /**
+     * Update an app
+     */
+    update(accountId: string, appId: string, data: UpdateAppInput): Promise<UpdateAppResponse> {
+        return apiClient.patch(`/accounts/${accountId}/apps/${appId}`, data)
+    },
+
+    /**
      * Delete an app
      */
     delete(accountId: string, appId: string): Promise<void> {
         return apiClient.delete(`/accounts/${accountId}/apps/${appId}`)
+    },
+
+    /**
+     * Regenerate API key for an app
+     */
+    regenerateApiKey(accountId: string, appId: string): Promise<RegenerateApiKeyResponse> {
+        return apiClient.post(`/accounts/${accountId}/apps/${appId}/api-key`)
     },
 }

@@ -1,0 +1,61 @@
+'use client'
+
+/**
+ * OrgsPagination Component
+ *
+ * Pagination controls for organization list with:
+ * - Page info display
+ * - Previous/Next buttons
+ */
+
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { Button } from '@bundlenudge/shared-ui'
+import type { OrgsPaginationProps } from './types'
+
+export function OrgsPagination({
+    page,
+    totalPages,
+    total,
+    limit,
+    onPageChange,
+}: OrgsPaginationProps) {
+    if (totalPages <= 1) {
+        return null
+    }
+
+    const start = (page - 1) * limit + 1
+    const end = Math.min(page * limit, total)
+
+    return (
+        <div className="flex items-center justify-between px-4 py-3 bg-card rounded-xl border border-border">
+            <div className="text-sm text-text-light">
+                Showing {String(start)} to {String(end)} of {String(total)} organizations
+            </div>
+            <div className="flex items-center gap-2">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onPageChange(page - 1)}
+                    disabled={page <= 1}
+                >
+                    <ChevronLeft className="w-4 h-4 mr-1" />
+                    Previous
+                </Button>
+                <span className="text-sm text-text-dark px-2">
+                    Page {String(page)} of {String(totalPages)}
+                </span>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onPageChange(page + 1)}
+                    disabled={page >= totalPages}
+                >
+                    Next
+                    <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+            </div>
+        </div>
+    )
+}
+
+export type { OrgsPaginationProps }
