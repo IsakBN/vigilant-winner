@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
+import { emailOTP } from 'better-auth/plugins'
 import { db } from './db'
 
 const SESSION_EXPIRY_DAYS = 7
@@ -11,7 +12,16 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
+    requireEmailVerification: true,
   },
+  plugins: [
+    emailOTP({
+      sendVerificationOTP: async ({ email, otp }) => {
+        // TODO: Implement email sending with Resend or similar
+        console.log(`[DEV] OTP for ${email}: ${otp}`)
+      },
+    }),
+  ],
   socialProviders: {
     github: {
       clientId: process.env.GITHUB_CLIENT_ID ?? '',

@@ -5,15 +5,20 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        'cream-bg': '#FFFDF8',
-        'pastel-blue': '#D6E6F2',
+        'cream-bg': '#FEFBF6',
         'pastel-purple': '#E8D5F2',
-        'warm-green': '#4CAF50',
-        'bright-accent': '#6366F1',
+        'admin-accent': '#7C3AED',
+        'admin-accent-dark': '#6D28D9',
         'text-dark': '#1F2937',
         'text-light': '#6B7280',
-        border: '#E5E7EB',
-        muted: '#F3F4F6',
+      },
+      fontFamily: {
+        heading: ['Nunito', 'sans-serif'],
+        body: ['Quicksand', 'sans-serif'],
+      },
+      borderRadius: {
+        xl: '1rem',
+        '2xl': '1.5rem',
       },
     },
   },
