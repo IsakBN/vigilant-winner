@@ -16,7 +16,7 @@
   "dependencies": {
     "@bundlenudge/shared": "workspace:*",
     "@bundlenudge/shared-ui": "workspace:*",
-    "@neondatabase/serverless": "^0.9.0",
+    "postgres": "^3.4.0",
     "@tanstack/react-query": "^5.0.0",
     "better-auth": "^1.2.0",
     "drizzle-orm": "^0.33.0",

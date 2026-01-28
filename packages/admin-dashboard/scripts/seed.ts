@@ -1,10 +1,10 @@
-import { neon } from '@neondatabase/serverless'
-import { drizzle } from 'drizzle-orm/neon-http'
+import postgres from 'postgres'
+import { drizzle } from 'drizzle-orm/postgres-js'
 import { emailAllowlist } from '../src/lib/db/schema'
 
 async function seed() {
-  const sql = neon(process.env.DATABASE_URL!)
-  const db = drizzle(sql)
+  const client = postgres(process.env.DATABASE_URL!)
+  const db = drizzle(client)
 
   await db.insert(emailAllowlist).values({
     id: crypto.randomUUID(),
@@ -14,6 +14,7 @@ async function seed() {
   })
 
   console.log('Admin allowlist seeded')
+  await client.end()
 }
 
 seed().catch(console.error)

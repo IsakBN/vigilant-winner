@@ -57,3 +57,4 @@ packages/sdk/android/build/
 packages/sdk/android/local.properties
 .vercel
 .env*.local
+.fyr/
