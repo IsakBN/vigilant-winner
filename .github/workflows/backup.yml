@@ -44,7 +44,7 @@
 #   - B2_BUCKET: B2 bucket name for archives
 #
 # Notifications (optional):
-#   - SLACK_WEBHOOK_URL: Slack webhook for failure notifications
+#   - SLACK_WEBHOOK_URL: Slack webhook for success/failure notifications
 # =============================================================================
 
 name: Backup System
@@ -179,6 +179,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Verify D1 backup integrity
+        id: verify
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.RAILWAY_S3_ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.RAILWAY_S3_SECRET_KEY }}
@@ -210,11 +211,76 @@ jobs:
             exit 1
           fi
 
+          # Get backup size in human-readable format
+          BACKUP_SIZE=$(ls -lh /tmp/verify_d1.sql.gz | awk '{print $5}')
+          echo "backup_size=$BACKUP_SIZE" >> $GITHUB_OUTPUT
+
           echo "::endgroup::"
+
+      - name: Calculate duration
+        id: duration
+        run: |
+          END_TIME=$(date +%s)
+          # Approximate start time (workflow started ~2 minutes before this step)
+          DURATION_SECONDS=$((END_TIME - $(date -d "${{ steps.timestamp.outputs.timestamp }}" +%s 2>/dev/null || echo $((END_TIME - 120)))))
+          DURATION_MINUTES=$((DURATION_SECONDS / 60))
+          DURATION_REMAINDER=$((DURATION_SECONDS % 60))
+          echo "duration=${DURATION_MINUTES}m ${DURATION_REMAINDER}s" >> $GITHUB_OUTPUT
+
+      - name: Send D1 backup success notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: env.SLACK_WEBHOOK_URL != ''
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":white_check_mark: *D1 Database Backup Completed*"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Size:*\n${{ steps.verify.outputs.backup_size }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Duration:*\n${{ steps.duration.outputs.duration }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*File:*\nd1_backup_${{ steps.timestamp.outputs.timestamp }}.sql.gz"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Date:*\n${{ steps.timestamp.outputs.date }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Destination: Railway S3 | <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                    }
+                  ]
+                }
+              ]
+            }' \
+            "$SLACK_WEBHOOK_URL"
 
     outputs:
       backup_file: d1_backup_${{ steps.timestamp.outputs.timestamp }}.sql.gz
       backup_date: ${{ steps.timestamp.outputs.date }}
+      backup_size: ${{ steps.verify.outputs.backup_size }}
+      duration: ${{ steps.duration.outputs.duration }}
 
   # ===========================================================================
   # Job: Backup Railway Postgres Databases (Auth + Telemetry)
@@ -389,6 +455,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Verify Telemetry backup integrity
+        id: verify_telemetry
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.RAILWAY_S3_ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.RAILWAY_S3_SECRET_KEY }}
@@ -418,13 +485,125 @@ jobs:
           # Verify dump is valid
           pg_restore --list /tmp/verify_telemetry.dump > /dev/null
 
+          # Get backup size
+          TELEMETRY_SIZE=$(ls -lh /tmp/verify_telemetry.dump | awk '{print $5}')
+          echo "telemetry_size=$TELEMETRY_SIZE" >> $GITHUB_OUTPUT
+
           echo "Telemetry backup verification passed"
           echo "::endgroup::"
+
+      - name: Get Auth backup size
+        id: verify_auth
+        run: |
+          AUTH_SIZE=$(ls -lh backups/postgres-auth/auth_backup_${{ steps.timestamp.outputs.timestamp }}.dump | awk '{print $5}')
+          echo "auth_size=$AUTH_SIZE" >> $GITHUB_OUTPUT
+
+      - name: Calculate duration
+        id: duration
+        run: |
+          END_TIME=$(date +%s)
+          DURATION_SECONDS=$((END_TIME - $(date -d "${{ steps.timestamp.outputs.timestamp }}" +%s 2>/dev/null || echo $((END_TIME - 300)))))
+          DURATION_MINUTES=$((DURATION_SECONDS / 60))
+          DURATION_REMAINDER=$((DURATION_SECONDS % 60))
+          echo "duration=${DURATION_MINUTES}m ${DURATION_REMAINDER}s" >> $GITHUB_OUTPUT
+
+      - name: Send Auth Postgres backup success notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: env.SLACK_WEBHOOK_URL != ''
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":white_check_mark: *Auth Postgres Backup Completed*"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Size:*\n${{ steps.verify_auth.outputs.auth_size }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*File:*\nauth_backup_${{ steps.timestamp.outputs.timestamp }}.dump"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Destination: Railway S3 | <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                    }
+                  ]
+                }
+              ]
+            }' \
+            "$SLACK_WEBHOOK_URL"
+
+      - name: Send Telemetry Postgres backup success notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: env.SLACK_WEBHOOK_URL != ''
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":white_check_mark: *Telemetry Postgres Backup Completed*"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Size:*\n${{ steps.verify_telemetry.outputs.telemetry_size }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Duration (total):*\n${{ steps.duration.outputs.duration }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*File:*\ntelemetry_backup_${{ steps.timestamp.outputs.timestamp }}.dump"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Date:*\n${{ steps.timestamp.outputs.date }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Destination: Railway S3 | <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                    }
+                  ]
+                }
+              ]
+            }' \
+            "$SLACK_WEBHOOK_URL"
 
     outputs:
       auth_backup_file: auth_backup_${{ steps.timestamp.outputs.timestamp }}.dump
       telemetry_backup_file: telemetry_backup_${{ steps.timestamp.outputs.timestamp }}.dump
       backup_date: ${{ steps.timestamp.outputs.date }}
+      auth_size: ${{ steps.verify_auth.outputs.auth_size }}
+      telemetry_size: ${{ steps.verify_telemetry.outputs.telemetry_size }}
+      duration: ${{ steps.duration.outputs.duration }}
 
   # ===========================================================================
   # Job: Sync R2 Bundles to Railway S3
@@ -525,6 +704,30 @@ jobs:
           echo "Bundle sync verification passed"
           echo "::endgroup::"
 
+      - name: Get sync stats
+        id: sync_stats
+        run: |
+          set -euo pipefail
+
+          # Get object count and size
+          SYNC_INFO=$(rclone size railway:${{ secrets.RAILWAY_S3_BUCKET }}/bundles/ --json 2>/dev/null || echo '{"bytes":0,"count":0}')
+          OBJECT_COUNT=$(echo "$SYNC_INFO" | jq '.count')
+          TOTAL_BYTES=$(echo "$SYNC_INFO" | jq '.bytes')
+
+          # Convert to human-readable
+          if [ "$TOTAL_BYTES" -gt 1073741824 ]; then
+            HUMAN_SIZE="$(echo "scale=2; $TOTAL_BYTES / 1073741824" | bc)GB"
+          elif [ "$TOTAL_BYTES" -gt 1048576 ]; then
+            HUMAN_SIZE="$(echo "scale=2; $TOTAL_BYTES / 1048576" | bc)MB"
+          elif [ "$TOTAL_BYTES" -gt 1024 ]; then
+            HUMAN_SIZE="$(echo "scale=2; $TOTAL_BYTES / 1024" | bc)KB"
+          else
+            HUMAN_SIZE="${TOTAL_BYTES}B"
+          fi
+
+          echo "object_count=$OBJECT_COUNT" >> $GITHUB_OUTPUT
+          echo "total_size=$HUMAN_SIZE" >> $GITHUB_OUTPUT
+
       - name: Create sync manifest
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.RAILWAY_S3_ACCESS_KEY }}
@@ -552,8 +755,59 @@ jobs:
             s3://${{ secrets.RAILWAY_S3_BUCKET }}/bundles/_manifests/sync_${{ steps.timestamp.outputs.timestamp }}.json \
             --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
 
+      - name: Send R2 sync success notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: env.SLACK_WEBHOOK_URL != ''
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":white_check_mark: *R2 Bundles Sync Completed*"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Objects Synced:*\n${{ steps.sync_stats.outputs.object_count }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Total Size:*\n${{ steps.sync_stats.outputs.total_size }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Source:*\nCloudflare R2"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Destination:*\nRailway S3"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Date: ${{ steps.timestamp.outputs.date }} | <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                    }
+                  ]
+                }
+              ]
+            }' \
+            "$SLACK_WEBHOOK_URL"
+
     outputs:
       sync_date: ${{ steps.timestamp.outputs.date }}
+      object_count: ${{ steps.sync_stats.outputs.object_count }}
+      total_size: ${{ steps.sync_stats.outputs.total_size }}
 
   # ===========================================================================
   # Job: Archive to Backblaze B2 (Weekly)
@@ -665,7 +919,8 @@ jobs:
 
           echo "::endgroup::"
 
-      - name: Create archive manifest
+      - name: Create archive manifest and get stats
+        id: archive_stats
         run: |
           set -euo pipefail
 
@@ -674,6 +929,39 @@ jobs:
           PG_AUTH_SIZE=$(rclone size b2:${{ secrets.B2_BUCKET }}/archives/${{ steps.timestamp.outputs.year }}/${{ steps.timestamp.outputs.week }}/postgres-auth/ --json 2>/dev/null || echo '{"bytes":0,"count":0}')
           PG_TELEMETRY_SIZE=$(rclone size b2:${{ secrets.B2_BUCKET }}/archives/${{ steps.timestamp.outputs.year }}/${{ steps.timestamp.outputs.week }}/postgres-telemetry/ --json 2>/dev/null || echo '{"bytes":0,"count":0}')
           BUNDLE_SIZE=$(rclone size b2:${{ secrets.B2_BUCKET }}/bundles/ --json 2>/dev/null || echo '{"bytes":0,"count":0}')
+
+          # Calculate total bytes
+          D1_BYTES=$(echo "$D1_SIZE" | jq '.bytes')
+          AUTH_BYTES=$(echo "$PG_AUTH_SIZE" | jq '.bytes')
+          TELEMETRY_BYTES=$(echo "$PG_TELEMETRY_SIZE" | jq '.bytes')
+          BUNDLE_BYTES=$(echo "$BUNDLE_SIZE" | jq '.bytes')
+          TOTAL_BYTES=$((D1_BYTES + AUTH_BYTES + TELEMETRY_BYTES + BUNDLE_BYTES))
+
+          # Convert to human-readable
+          format_size() {
+            local bytes=$1
+            if [ "$bytes" -gt 1073741824 ]; then
+              echo "$(echo "scale=2; $bytes / 1073741824" | bc)GB"
+            elif [ "$bytes" -gt 1048576 ]; then
+              echo "$(echo "scale=2; $bytes / 1048576" | bc)MB"
+            elif [ "$bytes" -gt 1024 ]; then
+              echo "$(echo "scale=2; $bytes / 1024" | bc)KB"
+            else
+              echo "${bytes}B"
+            fi
+          }
+
+          TOTAL_HUMAN=$(format_size $TOTAL_BYTES)
+          D1_HUMAN=$(format_size $D1_BYTES)
+          AUTH_HUMAN=$(format_size $AUTH_BYTES)
+          TELEMETRY_HUMAN=$(format_size $TELEMETRY_BYTES)
+          BUNDLE_HUMAN=$(format_size $BUNDLE_BYTES)
+
+          echo "total_size=$TOTAL_HUMAN" >> $GITHUB_OUTPUT
+          echo "d1_size=$D1_HUMAN" >> $GITHUB_OUTPUT
+          echo "auth_size=$AUTH_HUMAN" >> $GITHUB_OUTPUT
+          echo "telemetry_size=$TELEMETRY_HUMAN" >> $GITHUB_OUTPUT
+          echo "bundle_size=$BUNDLE_HUMAN" >> $GITHUB_OUTPUT
 
           # Create manifest
           cat > /tmp/archive_manifest.json << EOF
@@ -693,8 +981,66 @@ jobs:
           rclone copyto /tmp/archive_manifest.json \
             b2:${{ secrets.B2_BUCKET }}/archives/${{ steps.timestamp.outputs.year }}/${{ steps.timestamp.outputs.week }}/_manifest.json
 
+      - name: Send B2 archive success notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: env.SLACK_WEBHOOK_URL != ''
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":white_check_mark: *Backblaze B2 Archive Completed*"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Total Archived:*\n${{ steps.archive_stats.outputs.total_size }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Archive Week:*\n${{ steps.timestamp.outputs.week }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*D1 Backups:*\n${{ steps.archive_stats.outputs.d1_size }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Auth Postgres:*\n${{ steps.archive_stats.outputs.auth_size }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Telemetry Postgres:*\n${{ steps.archive_stats.outputs.telemetry_size }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Bundles:*\n${{ steps.archive_stats.outputs.bundle_size }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Destination: Backblaze B2 | <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                    }
+                  ]
+                }
+              ]
+            }' \
+            "$SLACK_WEBHOOK_URL"
+
     outputs:
       archive_week: ${{ steps.timestamp.outputs.week }}
+      total_size: ${{ steps.archive_stats.outputs.total_size }}
 
   # ===========================================================================
   # Job: Cleanup Old Backups
@@ -942,20 +1288,154 @@ jobs:
             }
 
   # ===========================================================================
-  # Job: Notify on Success (Daily Summary)
+  # Job: Daily Summary (After Hourly Backups)
   # ===========================================================================
-  notify-success:
-    name: Daily Success Summary
+  daily-summary:
+    name: Daily Backup Summary
+    runs-on: ubuntu-latest
+    needs: [backup-d1, backup-postgres, cleanup]
+    # Run after hourly backups complete successfully
+    if: >
+      always() &&
+      (needs.backup-d1.result == 'success' || needs.backup-postgres.result == 'success') &&
+      (github.event_name == 'schedule' && github.event.schedule == '0 * * * *')
+
+    steps:
+      - name: Determine job statuses
+        id: status
+        run: |
+          # D1 status
+          if [ "${{ needs.backup-d1.result }}" == "success" ]; then
+            echo "d1_status=:white_check_mark: Success" >> $GITHUB_OUTPUT
+          elif [ "${{ needs.backup-d1.result }}" == "skipped" ]; then
+            echo "d1_status=:fast_forward: Skipped" >> $GITHUB_OUTPUT
+          else
+            echo "d1_status=:x: Failed" >> $GITHUB_OUTPUT
+          fi
+
+          # Postgres status
+          if [ "${{ needs.backup-postgres.result }}" == "success" ]; then
+            echo "postgres_status=:white_check_mark: Success" >> $GITHUB_OUTPUT
+          elif [ "${{ needs.backup-postgres.result }}" == "skipped" ]; then
+            echo "postgres_status=:fast_forward: Skipped" >> $GITHUB_OUTPUT
+          else
+            echo "postgres_status=:x: Failed" >> $GITHUB_OUTPUT
+          fi
+
+          # Cleanup status
+          if [ "${{ needs.cleanup.result }}" == "success" ]; then
+            echo "cleanup_status=:white_check_mark: Success" >> $GITHUB_OUTPUT
+          elif [ "${{ needs.cleanup.result }}" == "skipped" ]; then
+            echo "cleanup_status=:fast_forward: Skipped" >> $GITHUB_OUTPUT
+          else
+            echo "cleanup_status=:warning: Warning" >> $GITHUB_OUTPUT
+          fi
+
+          # Check for any warnings
+          WARNINGS=""
+          if [ "${{ needs.cleanup.result }}" == "failure" ]; then
+            WARNINGS="Cleanup job failed - old backups may not be removed"
+          fi
+          echo "warnings=$WARNINGS" >> $GITHUB_OUTPUT
+
+      - name: Send daily summary notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: env.SLACK_WEBHOOK_URL != ''
+        run: |
+          # Build warnings block if any
+          WARNINGS_BLOCK=""
+          if [ -n "${{ steps.status.outputs.warnings }}" ]; then
+            WARNINGS_BLOCK=',{
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": ":warning: *Warnings:*\n${{ steps.status.outputs.warnings }}"
+              }
+            }'
+          fi
+
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Hourly Backup Summary",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*D1 Database:*\n${{ steps.status.outputs.d1_status }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*D1 Size:*\n${{ needs.backup-d1.outputs.backup_size || '\''N/A'\'' }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Auth Postgres:*\n${{ steps.status.outputs.postgres_status }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Auth Size:*\n${{ needs.backup-postgres.outputs.auth_size || '\''N/A'\'' }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Telemetry Postgres:*\n${{ steps.status.outputs.postgres_status }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Telemetry Size:*\n${{ needs.backup-postgres.outputs.telemetry_size || '\''N/A'\'' }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Cleanup:*\n${{ steps.status.outputs.cleanup_status }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Timestamp:*\n'"$(date -u +%Y-%m-%d\ %H:%M\ UTC)"'"
+                    }
+                  ]
+                }'"$WARNINGS_BLOCK"',
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Repository: ${{ github.repository }} | <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run Details>"
+                    }
+                  ]
+                }
+              ]
+            }' \
+            "$SLACK_WEBHOOK_URL"
+
+  # ===========================================================================
+  # Job: Weekly Summary (After B2 Archive)
+  # ===========================================================================
+  weekly-summary:
+    name: Weekly Backup Summary
     runs-on: ubuntu-latest
     needs: [backup-d1, backup-postgres, sync-bundles, archive-to-b2, cleanup]
-    # Only run at 3 AM UTC (after all daily jobs complete) and if all succeeded
+    # Only run at 3 AM UTC on Sundays (after weekly archive) and if archive succeeded
     if: >
       success() &&
       github.event_name == 'schedule' &&
       github.event.schedule == '0 3 * * 0'
 
     steps:
-      - name: Send success notification
+      - name: Send weekly summary notification
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: env.SLACK_WEBHOOK_URL != ''
@@ -967,7 +1447,7 @@ jobs:
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "Weekly Backup Complete",
+                    "text": ":tada: Weekly Backup Complete",
                     "emoji": true
                   }
                 },
@@ -975,7 +1455,46 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "All backup jobs completed successfully.\n\n- D1 Database: Backed up\n- Auth Postgres: Backed up\n- Telemetry Postgres: Backed up\n- R2 Bundles: Synced\n- B2 Archive: Updated\n- Old backups: Cleaned up"
+                    "text": "All backup jobs completed successfully for the week!"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*D1 Database:*\n:white_check_mark: Backed up"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Auth Postgres:*\n:white_check_mark: Backed up"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Telemetry Postgres:*\n:white_check_mark: Backed up"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*R2 Bundles:*\n:white_check_mark: Synced (${{ needs.sync-bundles.outputs.object_count || '\''0'\'' }} objects)"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*B2 Archive:*\n:white_check_mark: Updated (${{ needs.archive-to-b2.outputs.total_size || '\''N/A'\'' }})"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Cleanup:*\n:white_check_mark: Completed"
+                    }
+                  ]
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Archive Week:* ${{ needs.archive-to-b2.outputs.archive_week || '\''N/A'\'' }}\n*Total Archived to B2:* ${{ needs.archive-to-b2.outputs.total_size || '\''N/A'\'' }}"
                   }
                 },
                 {
@@ -983,7 +1502,7 @@ jobs:
                   "elements": [
                     {
                       "type": "mrkdwn",
-                      "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run Details>"
+                      "text": "Repository: ${{ github.repository }} | <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run Details>"
                     }
                   ]
                 }
