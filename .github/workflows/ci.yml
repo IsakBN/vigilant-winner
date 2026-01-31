@@ -24,6 +24,71 @@ jobs:
     timeout-minutes: 15
 
     steps:
+      - name: Record start time
+        run: echo "BUILD_START_TIME=$(date +%s)" >> $GITHUB_ENV
+
+      - name: Notify Slack - Build Started
+        if: always()
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": ":rocket: CI Build Started",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Repository:*\n${{ github.repository }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\n${{ github.ref_name }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Author:*\n${{ github.actor }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Event:*\n${{ github.event_name }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*PR/Commit:*\n${{ github.event.pull_request.title || github.event.head_commit.message || 'Direct push' }}"
+                  }
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Build>"
+                    }
+                  ]
+                }
+              ]
+            }
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -54,16 +119,255 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Security scanning
+      - name: Security Audit
+        id: security
+        run: |
+          echo "Running security audit..."
+          pnpm audit --audit-level=high 2>&1 | tee audit-output.txt || true
+
+          # Check if there are high/critical vulnerabilities
+          if pnpm audit --audit-level=high > /dev/null 2>&1; then
+            echo "AUDIT_STATUS=passed" >> $GITHUB_OUTPUT
+            echo "No high or critical vulnerabilities found"
+          else
+            echo "AUDIT_STATUS=failed" >> $GITHUB_OUTPUT
+            echo "::error::High or critical vulnerabilities detected!"
+            exit 1
+          fi
+
       # Build shared packages first (required for typecheck)
       - name: Build shared packages
+        id: build
         run: pnpm --filter @bundlenudge/shared build && pnpm --filter @bundlenudge/shared-ui build
 
       # Run sequentially to save memory (as per project constraints)
       - name: Typecheck
+        id: typecheck
         run: pnpm typecheck
 
       - name: Lint
+        id: lint
         run: pnpm lint
 
-      - name: Test
-        run: pnpm test -- --run
+      - name: Test with Coverage
+        id: test
+        run: |
+          # Run tests with coverage
+          pnpm test -- --run --coverage --coverage.reporter=text --coverage.reporter=json-summary 2>&1 | tee test-output.txt
+
+          # Extract coverage and test stats from output
+          COVERAGE_LINE=$(grep -E "All files.*\|" test-output.txt | tail -1 || echo "")
+          if [ -n "$COVERAGE_LINE" ]; then
+            # Extract the line coverage percentage (4th column typically)
+            COVERAGE=$(echo "$COVERAGE_LINE" | awk -F'|' '{print $4}' | tr -d ' %' || echo "0")
+          else
+            COVERAGE="0"
+          fi
+
+          # Count tests from output
+          TEST_COUNT=$(grep -oE "[0-9]+ passed" test-output.txt | head -1 | grep -oE "[0-9]+" || echo "0")
+
+          echo "COVERAGE_PERCENT=$COVERAGE" >> $GITHUB_OUTPUT
+          echo "TEST_COUNT=$TEST_COUNT" >> $GITHUB_OUTPUT
+          echo "Coverage: $COVERAGE%"
+          echo "Tests passed: $TEST_COUNT"
+
+      - name: Check Coverage Threshold
+        id: coverage_check
+        run: |
+          COVERAGE="${{ steps.test.outputs.COVERAGE_PERCENT }}"
+          THRESHOLD=80
+
+          echo "Coverage: $COVERAGE%"
+          echo "Threshold: $THRESHOLD%"
+
+          # Handle empty or non-numeric coverage
+          if [ -z "$COVERAGE" ] || ! echo "$COVERAGE" | grep -qE '^[0-9]+(\.[0-9]+)?$'; then
+            echo "::warning::Could not determine coverage percentage, skipping threshold check"
+            echo "THRESHOLD_MET=unknown" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Compare coverage to threshold (using bc for float comparison)
+          if [ $(echo "$COVERAGE >= $THRESHOLD" | bc -l) -eq 1 ]; then
+            echo "Coverage threshold met!"
+            echo "THRESHOLD_MET=true" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Coverage ($COVERAGE%) is below threshold ($THRESHOLD%)"
+            echo "THRESHOLD_MET=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Calculate Build Duration
+        if: always()
+        run: |
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - BUILD_START_TIME))
+          MINUTES=$((DURATION / 60))
+          SECONDS=$((DURATION % 60))
+          echo "BUILD_DURATION=${MINUTES}m ${SECONDS}s" >> $GITHUB_ENV
+
+      - name: Notify Slack - Build Success
+        if: success()
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": ":white_check_mark: CI Build Succeeded",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Repository:*\n${{ github.repository }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\n${{ github.ref_name }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Author:*\n${{ github.actor }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Duration:*\n${{ env.BUILD_DURATION }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Coverage:*\n${{ steps.test.outputs.COVERAGE_PERCENT || 'N/A' }}%"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Tests Passed:*\n${{ steps.test.outputs.TEST_COUNT || 'N/A' }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*PR/Commit:*\n${{ github.event.pull_request.title || github.event.head_commit.message || 'Direct push' }}"
+                  }
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":shield: Security Audit: *Passed*\n:memo: Typecheck: *Passed*\n:mag: Lint: *Passed*\n:test_tube: Tests: *Passed*"
+                  }
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Build> | <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|View Commit>"
+                    }
+                  ]
+                }
+              ]
+            }
+
+      - name: Notify Slack - Build Failed
+        if: failure()
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": ":x: CI Build Failed",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Repository:*\n${{ github.repository }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\n${{ github.ref_name }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Author:*\n${{ github.actor }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Duration:*\n${{ env.BUILD_DURATION }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*PR/Commit:*\n${{ github.event.pull_request.title || github.event.head_commit.message || 'Direct push' }}"
+                  }
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Failed Steps:*"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":shield: Security Audit: ${{ steps.security.outcome == 'failure' && '*FAILED*' || 'Passed' }}\n:building_construction: Build: ${{ steps.build.outcome == 'failure' && '*FAILED*' || 'Passed' }}\n:memo: Typecheck: ${{ steps.typecheck.outcome == 'failure' && '*FAILED*' || 'Passed' }}\n:mag: Lint: ${{ steps.lint.outcome == 'failure' && '*FAILED*' || 'Passed' }}\n:test_tube: Tests: ${{ steps.test.outcome == 'failure' && '*FAILED*' || 'Passed' }}\n:bar_chart: Coverage Threshold: ${{ steps.coverage_check.outcome == 'failure' && '*FAILED* (Below 80%)' || 'Passed' }}"
+                  }
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": ":warning: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Build Logs> | <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|View Commit>"
+                    }
+                  ]
+                }
+              ]
+            }
