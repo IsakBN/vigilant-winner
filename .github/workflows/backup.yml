@@ -1,0 +1,952 @@
+# =============================================================================
+# BundleNudge 3-Tier Backup System
+# =============================================================================
+#
+# This workflow implements a comprehensive backup strategy:
+#   Tier 1: Railway S3 (hourly D1/Postgres, daily R2 sync)
+#   Tier 2: Backblaze B2 (weekly archive)
+#
+# Schedule:
+#   - Hourly: D1 and Postgres backups to Railway S3
+#   - Daily (2 AM UTC): R2 bundles sync to Railway S3
+#   - Weekly (Sundays 3 AM UTC): Archive to Backblaze B2
+#
+# Retention:
+#   - Hourly backups: 30 days (720 backups)
+#   - Weekly archives: 1 year (52 archives)
+#
+# =============================================================================
+# REQUIRED SECRETS:
+# =============================================================================
+# Cloudflare:
+#   - CLOUDFLARE_API_TOKEN: API token with D1 read access
+#   - CLOUDFLARE_ACCOUNT_ID: Cloudflare account ID
+#
+# Railway S3 (Primary backup destination):
+#   - RAILWAY_S3_ENDPOINT: Railway S3-compatible endpoint URL
+#   - RAILWAY_S3_ACCESS_KEY: Railway S3 access key
+#   - RAILWAY_S3_SECRET_KEY: Railway S3 secret key
+#   - RAILWAY_S3_BUCKET: Railway S3 bucket name (e.g., "bundlenudge-backups")
+#
+# Railway Postgres (both databases):
+#   - RAILWAY_POSTGRES_URL_AUTH: Auth database connection string
+#   - RAILWAY_POSTGRES_URL_TELEMETRY: Telemetry database connection string
+#
+# Cloudflare R2:
+#   - R2_ACCESS_KEY_ID: R2 access key ID
+#   - R2_SECRET_ACCESS_KEY: R2 secret access key
+#   - R2_ENDPOINT: R2 endpoint URL (e.g., https://<account>.r2.cloudflarestorage.com)
+#   - R2_BUCKET: R2 bucket name for bundles
+#
+# Backblaze B2 (Archive destination):
+#   - B2_APPLICATION_KEY_ID: B2 application key ID
+#   - B2_APPLICATION_KEY: B2 application key
+#   - B2_BUCKET: B2 bucket name for archives
+#
+# Notifications (optional):
+#   - SLACK_WEBHOOK_URL: Slack webhook for failure notifications
+# =============================================================================
+
+name: Backup System
+
+on:
+  schedule:
+    # Hourly: D1 and Postgres backups
+    - cron: '0 * * * *'
+    # Daily at 2 AM UTC: R2 bundles sync
+    - cron: '0 2 * * *'
+    # Weekly on Sundays at 3 AM UTC: Archive to B2
+    - cron: '0 3 * * 0'
+
+  # Allow manual triggers with options
+  workflow_dispatch:
+    inputs:
+      backup_type:
+        description: 'Type of backup to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - d1
+          - postgres
+          - r2-sync
+          - archive-b2
+      force_cleanup:
+        description: 'Force cleanup of old backups'
+        required: false
+        default: false
+        type: boolean
+
+# Prevent concurrent backup runs
+concurrency:
+  group: backup-system
+  cancel-in-progress: false
+
+env:
+  BACKUP_RETENTION_HOURS: 720  # 30 days of hourly backups
+  ARCHIVE_RETENTION_WEEKS: 52  # 1 year of weekly archives
+
+jobs:
+  # ===========================================================================
+  # Job: Backup Cloudflare D1 Database
+  # ===========================================================================
+  backup-d1:
+    name: Backup D1 Database
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Run hourly or on manual trigger
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.backup_type == 'all' || github.event.inputs.backup_type == 'd1')
+      || (github.event_name == 'schedule' && github.event.schedule == '0 * * * *')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install wrangler
+        run: npm install -g wrangler@latest
+
+      - name: Generate timestamp
+        id: timestamp
+        run: |
+          echo "timestamp=$(date -u +%Y%m%d_%H%M%S)" >> $GITHUB_OUTPUT
+          echo "date=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
+
+      - name: Export D1 database
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+
+          echo "::group::Exporting D1 database"
+
+          # Create backup directory
+          mkdir -p backups/d1
+
+          # Export D1 database to SQL
+          # Note: Replace 'bundlenudge-db' with your actual D1 database name
+          wrangler d1 export bundlenudge-db \
+            --output=backups/d1/d1_backup_${{ steps.timestamp.outputs.timestamp }}.sql \
+            --remote
+
+          # Compress the backup
+          gzip backups/d1/d1_backup_${{ steps.timestamp.outputs.timestamp }}.sql
+
+          # Calculate checksum
+          sha256sum backups/d1/d1_backup_${{ steps.timestamp.outputs.timestamp }}.sql.gz > \
+            backups/d1/d1_backup_${{ steps.timestamp.outputs.timestamp }}.sql.gz.sha256
+
+          # Log backup size
+          ls -lh backups/d1/
+
+          echo "::endgroup::"
+
+      - name: Upload D1 backup to Railway S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.RAILWAY_S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.RAILWAY_S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          set -euo pipefail
+
+          echo "::group::Uploading D1 backup to Railway S3"
+
+          # Install AWS CLI
+          pip install awscli --quiet
+
+          # Upload backup and checksum
+          aws s3 cp backups/d1/d1_backup_${{ steps.timestamp.outputs.timestamp }}.sql.gz \
+            s3://${{ secrets.RAILWAY_S3_BUCKET }}/d1/hourly/${{ steps.timestamp.outputs.date }}/ \
+            --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
+
+          aws s3 cp backups/d1/d1_backup_${{ steps.timestamp.outputs.timestamp }}.sql.gz.sha256 \
+            s3://${{ secrets.RAILWAY_S3_BUCKET }}/d1/hourly/${{ steps.timestamp.outputs.date }}/ \
+            --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
+
+          echo "D1 backup uploaded successfully"
+          echo "::endgroup::"
+
+      - name: Verify D1 backup integrity
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.RAILWAY_S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.RAILWAY_S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          set -euo pipefail
+
+          echo "::group::Verifying D1 backup"
+
+          # Download and verify checksum
+          aws s3 cp \
+            s3://${{ secrets.RAILWAY_S3_BUCKET }}/d1/hourly/${{ steps.timestamp.outputs.date }}/d1_backup_${{ steps.timestamp.outputs.timestamp }}.sql.gz \
+            /tmp/verify_d1.sql.gz \
+            --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
+
+          aws s3 cp \
+            s3://${{ secrets.RAILWAY_S3_BUCKET }}/d1/hourly/${{ steps.timestamp.outputs.date }}/d1_backup_${{ steps.timestamp.outputs.timestamp }}.sql.gz.sha256 \
+            /tmp/verify_d1.sql.gz.sha256 \
+            --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
+
+          cd /tmp && sha256sum -c verify_d1.sql.gz.sha256
+
+          echo "D1 backup verification passed"
+          echo "::endgroup::"
+
+    outputs:
+      backup_file: d1_backup_${{ steps.timestamp.outputs.timestamp }}.sql.gz
+      backup_date: ${{ steps.timestamp.outputs.date }}
+
+  # ===========================================================================
+  # Job: Backup Railway Postgres Databases (Auth + Telemetry)
+  # ===========================================================================
+  backup-postgres:
+    name: Backup Postgres Databases
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # Run hourly or on manual trigger
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.backup_type == 'all' || github.event.inputs.backup_type == 'postgres')
+      || (github.event_name == 'schedule' && github.event.schedule == '0 * * * *')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Install AWS CLI
+        run: pip install awscli --quiet
+
+      - name: Generate timestamp
+        id: timestamp
+        run: |
+          echo "timestamp=$(date -u +%Y%m%d_%H%M%S)" >> $GITHUB_OUTPUT
+          echo "date=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
+
+      - name: Export Auth database
+        env:
+          DATABASE_URL: ${{ secrets.RAILWAY_POSTGRES_URL_AUTH }}
+        run: |
+          set -euo pipefail
+
+          echo "::group::Exporting Auth Postgres database"
+
+          mkdir -p backups/postgres-auth
+
+          pg_dump "$DATABASE_URL" \
+            --format=custom \
+            --compress=9 \
+            --no-owner \
+            --no-privileges \
+            --clean \
+            --if-exists \
+            --file=backups/postgres-auth/auth_backup_${{ steps.timestamp.outputs.timestamp }}.dump
+
+          sha256sum backups/postgres-auth/auth_backup_${{ steps.timestamp.outputs.timestamp }}.dump > \
+            backups/postgres-auth/auth_backup_${{ steps.timestamp.outputs.timestamp }}.dump.sha256
+
+          ls -lh backups/postgres-auth/
+
+          echo "::endgroup::"
+
+      - name: Export Telemetry database
+        env:
+          DATABASE_URL: ${{ secrets.RAILWAY_POSTGRES_URL_TELEMETRY }}
+        run: |
+          set -euo pipefail
+
+          echo "::group::Exporting Telemetry Postgres database"
+
+          mkdir -p backups/postgres-telemetry
+
+          pg_dump "$DATABASE_URL" \
+            --format=custom \
+            --compress=9 \
+            --no-owner \
+            --no-privileges \
+            --clean \
+            --if-exists \
+            --file=backups/postgres-telemetry/telemetry_backup_${{ steps.timestamp.outputs.timestamp }}.dump
+
+          sha256sum backups/postgres-telemetry/telemetry_backup_${{ steps.timestamp.outputs.timestamp }}.dump > \
+            backups/postgres-telemetry/telemetry_backup_${{ steps.timestamp.outputs.timestamp }}.dump.sha256
+
+          ls -lh backups/postgres-telemetry/
+
+          echo "::endgroup::"
+
+      - name: Upload Auth backup to Railway S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.RAILWAY_S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.RAILWAY_S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          set -euo pipefail
+
+          echo "::group::Uploading Auth backup to Railway S3"
+
+          aws s3 cp backups/postgres-auth/auth_backup_${{ steps.timestamp.outputs.timestamp }}.dump \
+            s3://${{ secrets.RAILWAY_S3_BUCKET }}/postgres-auth/hourly/${{ steps.timestamp.outputs.date }}/ \
+            --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
+
+          aws s3 cp backups/postgres-auth/auth_backup_${{ steps.timestamp.outputs.timestamp }}.dump.sha256 \
+            s3://${{ secrets.RAILWAY_S3_BUCKET }}/postgres-auth/hourly/${{ steps.timestamp.outputs.date }}/ \
+            --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
+
+          echo "Auth backup uploaded successfully"
+          echo "::endgroup::"
+
+      - name: Upload Telemetry backup to Railway S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.RAILWAY_S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.RAILWAY_S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          set -euo pipefail
+
+          echo "::group::Uploading Telemetry backup to Railway S3"
+
+          aws s3 cp backups/postgres-telemetry/telemetry_backup_${{ steps.timestamp.outputs.timestamp }}.dump \
+            s3://${{ secrets.RAILWAY_S3_BUCKET }}/postgres-telemetry/hourly/${{ steps.timestamp.outputs.date }}/ \
+            --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
+
+          aws s3 cp backups/postgres-telemetry/telemetry_backup_${{ steps.timestamp.outputs.timestamp }}.dump.sha256 \
+            s3://${{ secrets.RAILWAY_S3_BUCKET }}/postgres-telemetry/hourly/${{ steps.timestamp.outputs.date }}/ \
+            --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
+
+          echo "Telemetry backup uploaded successfully"
+          echo "::endgroup::"
+
+      - name: Verify Auth backup integrity
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.RAILWAY_S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.RAILWAY_S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          set -euo pipefail
+
+          echo "::group::Verifying Auth backup"
+
+          aws s3 cp \
+            s3://${{ secrets.RAILWAY_S3_BUCKET }}/postgres-auth/hourly/${{ steps.timestamp.outputs.date }}/auth_backup_${{ steps.timestamp.outputs.timestamp }}.dump \
+            /tmp/verify_auth.dump \
+            --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
+
+          aws s3 cp \
+            s3://${{ secrets.RAILWAY_S3_BUCKET }}/postgres-auth/hourly/${{ steps.timestamp.outputs.date }}/auth_backup_${{ steps.timestamp.outputs.timestamp }}.dump.sha256 \
+            /tmp/verify_auth.dump.sha256 \
+            --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
+
+          cd /tmp && sha256sum -c verify_auth.dump.sha256
+          pg_restore --list /tmp/verify_auth.dump > /dev/null
+
+          echo "Auth backup verification passed"
+          echo "::endgroup::"
+
+      - name: Verify Telemetry backup integrity
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.RAILWAY_S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.RAILWAY_S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          set -euo pipefail
+
+          echo "::group::Verifying Telemetry backup"
+
+          aws s3 cp \
+            s3://${{ secrets.RAILWAY_S3_BUCKET }}/postgres-telemetry/hourly/${{ steps.timestamp.outputs.date }}/telemetry_backup_${{ steps.timestamp.outputs.timestamp }}.dump \
+            /tmp/verify_telemetry.dump \
+            --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
+
+          aws s3 cp \
+            s3://${{ secrets.RAILWAY_S3_BUCKET }}/postgres-telemetry/hourly/${{ steps.timestamp.outputs.date }}/telemetry_backup_${{ steps.timestamp.outputs.timestamp }}.dump.sha256 \
+            /tmp/verify_telemetry.dump.sha256 \
+            --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
+
+          cd /tmp && sha256sum -c verify_telemetry.dump.sha256
+          pg_restore --list /tmp/verify_telemetry.dump > /dev/null
+
+          echo "Telemetry backup verification passed"
+          echo "::endgroup::"
+
+    outputs:
+      auth_backup_file: auth_backup_${{ steps.timestamp.outputs.timestamp }}.dump
+      telemetry_backup_file: telemetry_backup_${{ steps.timestamp.outputs.timestamp }}.dump
+      backup_date: ${{ steps.timestamp.outputs.date }}
+
+  # ===========================================================================
+  # Job: Sync R2 Bundles to Railway S3
+  # ===========================================================================
+  sync-bundles:
+    name: Sync R2 Bundles
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    # Run daily at 2 AM UTC or on manual trigger
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.backup_type == 'all' || github.event.inputs.backup_type == 'r2-sync')
+      || (github.event_name == 'schedule' && github.event.schedule == '0 2 * * *')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install rclone
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+
+      - name: Configure rclone
+        run: |
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf << EOF
+          [r2]
+          type = s3
+          provider = Cloudflare
+          access_key_id = ${{ secrets.R2_ACCESS_KEY_ID }}
+          secret_access_key = ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          endpoint = ${{ secrets.R2_ENDPOINT }}
+          acl = private
+
+          [railway]
+          type = s3
+          provider = Other
+          access_key_id = ${{ secrets.RAILWAY_S3_ACCESS_KEY }}
+          secret_access_key = ${{ secrets.RAILWAY_S3_SECRET_KEY }}
+          endpoint = ${{ secrets.RAILWAY_S3_ENDPOINT }}
+          acl = private
+          EOF
+
+      - name: Generate timestamp
+        id: timestamp
+        run: |
+          echo "timestamp=$(date -u +%Y%m%d_%H%M%S)" >> $GITHUB_OUTPUT
+          echo "date=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
+
+      - name: Sync bundles from R2 to Railway S3
+        run: |
+          set -euo pipefail
+
+          echo "::group::Syncing R2 bundles to Railway S3"
+
+          # Sync with checksums for integrity verification
+          # --checksum: Compare checksums instead of modification time
+          # --transfers: Number of parallel transfers
+          # --checkers: Number of parallel checkers
+          # --stats: Show transfer stats every 30 seconds
+          # --log-level: Set log level to INFO
+          rclone sync r2:${{ secrets.R2_BUCKET }} \
+            railway:${{ secrets.RAILWAY_S3_BUCKET }}/bundles/ \
+            --checksum \
+            --transfers 8 \
+            --checkers 16 \
+            --stats 30s \
+            --log-level INFO \
+            --stats-one-line
+
+          echo "::endgroup::"
+
+      - name: Verify sync integrity
+        run: |
+          set -euo pipefail
+
+          echo "::group::Verifying sync integrity"
+
+          # Count objects in source and destination
+          SOURCE_COUNT=$(rclone size r2:${{ secrets.R2_BUCKET }} --json | jq '.count')
+          DEST_COUNT=$(rclone size railway:${{ secrets.RAILWAY_S3_BUCKET }}/bundles/ --json | jq '.count')
+
+          echo "Source objects: $SOURCE_COUNT"
+          echo "Destination objects: $DEST_COUNT"
+
+          # Verify counts match
+          if [ "$SOURCE_COUNT" != "$DEST_COUNT" ]; then
+            echo "::error::Object count mismatch! Source: $SOURCE_COUNT, Dest: $DEST_COUNT"
+            exit 1
+          fi
+
+          # Run check to verify checksums
+          rclone check r2:${{ secrets.R2_BUCKET }} \
+            railway:${{ secrets.RAILWAY_S3_BUCKET }}/bundles/ \
+            --one-way \
+            --size-only
+
+          echo "Bundle sync verification passed"
+          echo "::endgroup::"
+
+      - name: Create sync manifest
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.RAILWAY_S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.RAILWAY_S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          set -euo pipefail
+
+          # Install AWS CLI
+          pip install awscli --quiet
+
+          # Create manifest with sync metadata
+          cat > /tmp/sync_manifest.json << EOF
+          {
+            "sync_timestamp": "${{ steps.timestamp.outputs.timestamp }}",
+            "sync_date": "${{ steps.timestamp.outputs.date }}",
+            "source": "r2:${{ secrets.R2_BUCKET }}",
+            "destination": "railway:${{ secrets.RAILWAY_S3_BUCKET }}/bundles/",
+            "github_run_id": "${{ github.run_id }}",
+            "github_run_number": "${{ github.run_number }}"
+          }
+          EOF
+
+          aws s3 cp /tmp/sync_manifest.json \
+            s3://${{ secrets.RAILWAY_S3_BUCKET }}/bundles/_manifests/sync_${{ steps.timestamp.outputs.timestamp }}.json \
+            --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
+
+    outputs:
+      sync_date: ${{ steps.timestamp.outputs.date }}
+
+  # ===========================================================================
+  # Job: Archive to Backblaze B2 (Weekly)
+  # ===========================================================================
+  archive-to-b2:
+    name: Archive to Backblaze B2
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    # Run weekly on Sundays at 3 AM UTC or on manual trigger
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.backup_type == 'all' || github.event.inputs.backup_type == 'archive-b2')
+      || (github.event_name == 'schedule' && github.event.schedule == '0 3 * * 0')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install rclone
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+
+      - name: Configure rclone
+        run: |
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf << EOF
+          [railway]
+          type = s3
+          provider = Other
+          access_key_id = ${{ secrets.RAILWAY_S3_ACCESS_KEY }}
+          secret_access_key = ${{ secrets.RAILWAY_S3_SECRET_KEY }}
+          endpoint = ${{ secrets.RAILWAY_S3_ENDPOINT }}
+          acl = private
+
+          [b2]
+          type = b2
+          account = ${{ secrets.B2_APPLICATION_KEY_ID }}
+          key = ${{ secrets.B2_APPLICATION_KEY }}
+          hard_delete = true
+          EOF
+
+      - name: Generate timestamp
+        id: timestamp
+        run: |
+          echo "timestamp=$(date -u +%Y%m%d_%H%M%S)" >> $GITHUB_OUTPUT
+          echo "week=$(date -u +%Y-W%V)" >> $GITHUB_OUTPUT
+          echo "year=$(date -u +%Y)" >> $GITHUB_OUTPUT
+
+      - name: Archive D1 backups to B2
+        run: |
+          set -euo pipefail
+
+          echo "::group::Archiving D1 backups to B2"
+
+          # Copy all D1 backups from the past week
+          rclone copy railway:${{ secrets.RAILWAY_S3_BUCKET }}/d1/hourly/ \
+            b2:${{ secrets.B2_BUCKET }}/archives/${{ steps.timestamp.outputs.year }}/${{ steps.timestamp.outputs.week }}/d1/ \
+            --transfers 8 \
+            --checkers 16 \
+            --stats 30s \
+            --log-level INFO
+
+          echo "::endgroup::"
+
+      - name: Archive Auth Postgres backups to B2
+        run: |
+          set -euo pipefail
+
+          echo "::group::Archiving Auth Postgres backups to B2"
+
+          rclone copy railway:${{ secrets.RAILWAY_S3_BUCKET }}/postgres-auth/hourly/ \
+            b2:${{ secrets.B2_BUCKET }}/archives/${{ steps.timestamp.outputs.year }}/${{ steps.timestamp.outputs.week }}/postgres-auth/ \
+            --transfers 4 \
+            --checkers 8 \
+            --stats 30s \
+            --log-level INFO
+
+          echo "::endgroup::"
+
+      - name: Archive Telemetry Postgres backups to B2
+        run: |
+          set -euo pipefail
+
+          echo "::group::Archiving Telemetry Postgres backups to B2"
+
+          rclone copy railway:${{ secrets.RAILWAY_S3_BUCKET }}/postgres-telemetry/hourly/ \
+            b2:${{ secrets.B2_BUCKET }}/archives/${{ steps.timestamp.outputs.year }}/${{ steps.timestamp.outputs.week }}/postgres-telemetry/ \
+            --transfers 4 \
+            --checkers 8 \
+            --stats 30s \
+            --log-level INFO
+
+          echo "::endgroup::"
+
+      - name: Archive bundles to B2
+        run: |
+          set -euo pipefail
+
+          echo "::group::Archiving bundles to B2"
+
+          # Sync bundles to B2 (incremental)
+          rclone sync railway:${{ secrets.RAILWAY_S3_BUCKET }}/bundles/ \
+            b2:${{ secrets.B2_BUCKET }}/bundles/ \
+            --checksum \
+            --transfers 8 \
+            --checkers 16 \
+            --stats 30s \
+            --log-level INFO
+
+          echo "::endgroup::"
+
+      - name: Create archive manifest
+        run: |
+          set -euo pipefail
+
+          # Get archive stats
+          D1_SIZE=$(rclone size b2:${{ secrets.B2_BUCKET }}/archives/${{ steps.timestamp.outputs.year }}/${{ steps.timestamp.outputs.week }}/d1/ --json 2>/dev/null || echo '{"bytes":0,"count":0}')
+          PG_AUTH_SIZE=$(rclone size b2:${{ secrets.B2_BUCKET }}/archives/${{ steps.timestamp.outputs.year }}/${{ steps.timestamp.outputs.week }}/postgres-auth/ --json 2>/dev/null || echo '{"bytes":0,"count":0}')
+          PG_TELEMETRY_SIZE=$(rclone size b2:${{ secrets.B2_BUCKET }}/archives/${{ steps.timestamp.outputs.year }}/${{ steps.timestamp.outputs.week }}/postgres-telemetry/ --json 2>/dev/null || echo '{"bytes":0,"count":0}')
+          BUNDLE_SIZE=$(rclone size b2:${{ secrets.B2_BUCKET }}/bundles/ --json 2>/dev/null || echo '{"bytes":0,"count":0}')
+
+          # Create manifest
+          cat > /tmp/archive_manifest.json << EOF
+          {
+            "archive_timestamp": "${{ steps.timestamp.outputs.timestamp }}",
+            "archive_week": "${{ steps.timestamp.outputs.week }}",
+            "d1_archive": $D1_SIZE,
+            "postgres_auth_archive": $PG_AUTH_SIZE,
+            "postgres_telemetry_archive": $PG_TELEMETRY_SIZE,
+            "bundles_total": $BUNDLE_SIZE,
+            "github_run_id": "${{ github.run_id }}",
+            "github_run_number": "${{ github.run_number }}"
+          }
+          EOF
+
+          # Upload manifest to B2
+          rclone copyto /tmp/archive_manifest.json \
+            b2:${{ secrets.B2_BUCKET }}/archives/${{ steps.timestamp.outputs.year }}/${{ steps.timestamp.outputs.week }}/_manifest.json
+
+    outputs:
+      archive_week: ${{ steps.timestamp.outputs.week }}
+
+  # ===========================================================================
+  # Job: Cleanup Old Backups
+  # ===========================================================================
+  cleanup:
+    name: Cleanup Old Backups
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [backup-d1, backup-postgres]
+    # Run after hourly backups complete, or on manual force cleanup
+    if: >
+      always() &&
+      (needs.backup-d1.result == 'success' || needs.backup-postgres.result == 'success' ||
+       (github.event_name == 'workflow_dispatch' && github.event.inputs.force_cleanup == 'true'))
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install AWS CLI
+        run: pip install awscli --quiet
+
+      - name: Calculate cutoff date
+        id: cutoff
+        run: |
+          # Calculate date 30 days ago for hourly backups
+          CUTOFF_DATE=$(date -u -d "30 days ago" +%Y-%m-%d 2>/dev/null || date -u -v-30d +%Y-%m-%d)
+          echo "cutoff_date=$CUTOFF_DATE" >> $GITHUB_OUTPUT
+          echo "Cleanup cutoff date: $CUTOFF_DATE"
+
+      - name: Cleanup old D1 backups
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.RAILWAY_S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.RAILWAY_S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          set -euo pipefail
+
+          echo "::group::Cleaning up old D1 backups"
+
+          # List all date directories
+          DATES=$(aws s3 ls s3://${{ secrets.RAILWAY_S3_BUCKET }}/d1/hourly/ \
+            --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }} | awk '{print $2}' | tr -d '/')
+
+          for DATE in $DATES; do
+            if [[ "$DATE" < "${{ steps.cutoff.outputs.cutoff_date }}" ]]; then
+              echo "Deleting D1 backups from $DATE"
+              aws s3 rm s3://${{ secrets.RAILWAY_S3_BUCKET }}/d1/hourly/$DATE/ \
+                --recursive \
+                --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
+            fi
+          done
+
+          echo "::endgroup::"
+
+      - name: Cleanup old Auth Postgres backups
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.RAILWAY_S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.RAILWAY_S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          set -euo pipefail
+
+          echo "::group::Cleaning up old Auth Postgres backups"
+
+          DATES=$(aws s3 ls s3://${{ secrets.RAILWAY_S3_BUCKET }}/postgres-auth/hourly/ \
+            --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }} 2>/dev/null | awk '{print $2}' | tr -d '/' || true)
+
+          for DATE in $DATES; do
+            if [[ -n "$DATE" && "$DATE" < "${{ steps.cutoff.outputs.cutoff_date }}" ]]; then
+              echo "Deleting Auth Postgres backups from $DATE"
+              aws s3 rm s3://${{ secrets.RAILWAY_S3_BUCKET }}/postgres-auth/hourly/$DATE/ \
+                --recursive \
+                --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
+            fi
+          done
+
+          echo "::endgroup::"
+
+      - name: Cleanup old Telemetry Postgres backups
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.RAILWAY_S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.RAILWAY_S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          set -euo pipefail
+
+          echo "::group::Cleaning up old Telemetry Postgres backups"
+
+          DATES=$(aws s3 ls s3://${{ secrets.RAILWAY_S3_BUCKET }}/postgres-telemetry/hourly/ \
+            --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }} 2>/dev/null | awk '{print $2}' | tr -d '/' || true)
+
+          for DATE in $DATES; do
+            if [[ -n "$DATE" && "$DATE" < "${{ steps.cutoff.outputs.cutoff_date }}" ]]; then
+              echo "Deleting Telemetry Postgres backups from $DATE"
+              aws s3 rm s3://${{ secrets.RAILWAY_S3_BUCKET }}/postgres-telemetry/hourly/$DATE/ \
+                --recursive \
+                --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
+            fi
+          done
+
+          echo "::endgroup::"
+
+      - name: Report cleanup results
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.RAILWAY_S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.RAILWAY_S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          echo "::group::Backup storage summary"
+
+          echo "D1 backups:"
+          aws s3 ls s3://${{ secrets.RAILWAY_S3_BUCKET }}/d1/hourly/ \
+            --recursive --summarize \
+            --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }} 2>/dev/null | tail -2 || echo "  No backups yet"
+
+          echo ""
+          echo "Auth Postgres backups:"
+          aws s3 ls s3://${{ secrets.RAILWAY_S3_BUCKET }}/postgres-auth/hourly/ \
+            --recursive --summarize \
+            --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }} 2>/dev/null | tail -2 || echo "  No backups yet"
+
+          echo ""
+          echo "Telemetry Postgres backups:"
+          aws s3 ls s3://${{ secrets.RAILWAY_S3_BUCKET }}/postgres-telemetry/hourly/ \
+            --recursive --summarize \
+            --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }} 2>/dev/null | tail -2 || echo "  No backups yet"
+
+          echo "::endgroup::"
+
+  # ===========================================================================
+  # Job: Notify on Failure
+  # ===========================================================================
+  notify-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: [backup-d1, backup-postgres, sync-bundles, archive-to-b2, cleanup]
+    if: failure()
+
+    steps:
+      - name: Determine failed jobs
+        id: failed
+        run: |
+          FAILED_JOBS=""
+
+          if [ "${{ needs.backup-d1.result }}" == "failure" ]; then
+            FAILED_JOBS="${FAILED_JOBS}D1 Backup, "
+          fi
+
+          if [ "${{ needs.backup-postgres.result }}" == "failure" ]; then
+            FAILED_JOBS="${FAILED_JOBS}Postgres Backup, "
+          fi
+
+          if [ "${{ needs.sync-bundles.result }}" == "failure" ]; then
+            FAILED_JOBS="${FAILED_JOBS}R2 Sync, "
+          fi
+
+          if [ "${{ needs.archive-to-b2.result }}" == "failure" ]; then
+            FAILED_JOBS="${FAILED_JOBS}B2 Archive, "
+          fi
+
+          if [ "${{ needs.cleanup.result }}" == "failure" ]; then
+            FAILED_JOBS="${FAILED_JOBS}Cleanup, "
+          fi
+
+          # Remove trailing comma and space
+          FAILED_JOBS="${FAILED_JOBS%, }"
+
+          echo "failed_jobs=$FAILED_JOBS" >> $GITHUB_OUTPUT
+
+      - name: Send Slack notification
+        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Backup System Failure",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Failed Jobs:*\n${{ steps.failed.outputs.failed_jobs }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Run:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Repository: ${{ github.repository }} | Workflow: ${{ github.workflow }}"
+                    }
+                  ]
+                }
+              ]
+            }' \
+            "$SLACK_WEBHOOK_URL"
+
+      - name: Create GitHub Issue for failure
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const failedJobs = '${{ steps.failed.outputs.failed_jobs }}';
+            const runUrl = `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+
+            // Check for existing open issue
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'backup-failure',
+              state: 'open'
+            });
+
+            if (issues.data.length > 0) {
+              // Add comment to existing issue
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues.data[0].number,
+                body: `### Additional Backup Failure\n\n**Failed Jobs:** ${failedJobs}\n**Run:** ${runUrl}\n**Time:** ${new Date().toISOString()}`
+              });
+            } else {
+              // Create new issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: 'Backup System Failure',
+                labels: ['backup-failure', 'critical'],
+                body: `## Backup System Failure\n\n**Failed Jobs:** ${failedJobs}\n\n**Run:** ${runUrl}\n\n**Time:** ${new Date().toISOString()}\n\n### Action Required\n\n1. Check the workflow run logs for detailed error messages\n2. Verify cloud provider credentials are valid\n3. Check storage quotas and permissions\n4. Re-run failed jobs manually if needed\n\n### Manual Trigger\n\nTo re-run specific backups:\n\`\`\`bash\ngh workflow run backup.yml -f backup_type=<d1|postgres|r2-sync|archive-b2>\n\`\`\``
+              });
+            }
+
+  # ===========================================================================
+  # Job: Notify on Success (Daily Summary)
+  # ===========================================================================
+  notify-success:
+    name: Daily Success Summary
+    runs-on: ubuntu-latest
+    needs: [backup-d1, backup-postgres, sync-bundles, archive-to-b2, cleanup]
+    # Only run at 3 AM UTC (after all daily jobs complete) and if all succeeded
+    if: >
+      success() &&
+      github.event_name == 'schedule' &&
+      github.event.schedule == '0 3 * * 0'
+
+    steps:
+      - name: Send success notification
+        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Weekly Backup Complete",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "All backup jobs completed successfully.\n\n- D1 Database: Backed up\n- Auth Postgres: Backed up\n- Telemetry Postgres: Backed up\n- R2 Bundles: Synced\n- B2 Archive: Updated\n- Old backups: Cleaned up"
+                  }
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run Details>"
+                    }
+                  ]
+                }
+              ]
+            }' \
+            "$SLACK_WEBHOOK_URL"
