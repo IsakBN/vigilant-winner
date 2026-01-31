@@ -54,6 +54,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Build shared packages first (required for typecheck)
+      - name: Build shared packages
+        run: pnpm --filter @bundlenudge/shared build && pnpm --filter @bundlenudge/shared-ui build
+
       # Run sequentially to save memory (as per project constraints)
       - name: Typecheck
         run: pnpm typecheck
