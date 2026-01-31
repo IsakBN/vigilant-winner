@@ -1,0 +1,712 @@
+name: Load Tests
+
+on:
+  # Run after CI passes on main
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types: [completed]
+
+  # Weekly schedule: Sunday 4 AM UTC
+  schedule:
+    - cron: '0 4 * * 0'
+
+  # Manual trigger with options
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Test type to run'
+        required: true
+        type: choice
+        options:
+          - smoke
+          - load
+          - stress
+          - soak
+          - combined
+        default: 'smoke'
+      endpoint:
+        description: 'Endpoint to test (ignored for combined)'
+        required: true
+        type: choice
+        options:
+          - all
+          - updates-check
+          - bundle-download
+          - device-register
+        default: 'all'
+
+# Cancel in-progress runs for the same ref
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  K6_VERSION: '0.49.0'
+
+jobs:
+  # Only run load tests if CI passed (for workflow_run trigger)
+  check-ci-status:
+    name: Check CI Status
+    runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+    steps:
+      - id: check
+        run: echo "should_run=true" >> $GITHUB_OUTPUT
+
+  # Smoke test - quick validation (runs on every push to main)
+  smoke-test:
+    name: Smoke Test
+    needs: check-ci-status
+    if: |
+      needs.check-ci-status.outputs.should_run == 'true' &&
+      (github.event_name == 'workflow_run' ||
+       (github.event_name == 'workflow_dispatch' && github.event.inputs.test_type == 'smoke'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+        with:
+          k6-version: ${{ env.K6_VERSION }}
+
+      - name: Run smoke tests
+        id: smoke
+        env:
+          K6_BASE_URL: ${{ secrets.API_BASE_URL }}
+          K6_API_KEY: ${{ secrets.LOAD_TEST_API_KEY }}
+          K6_TEST_APP_ID: ${{ secrets.LOAD_TEST_APP_ID }}
+          K6_TEST_RELEASE_ID: ${{ secrets.LOAD_TEST_RELEASE_ID }}
+          K6_SCENARIO: smoke
+        run: |
+          cd testing/k6
+          k6 run combined.js --summary-export=smoke-results.json 2>&1 | tee smoke-output.txt
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Parse results
+        id: parse
+        if: always()
+        run: |
+          cd testing/k6
+          if [ -f smoke-results.json ]; then
+            p50=$(jq -r '.metrics.http_req_duration.values["p(50)"] // 0' smoke-results.json)
+            p95=$(jq -r '.metrics.http_req_duration.values["p(95)"] // 0' smoke-results.json)
+            p99=$(jq -r '.metrics.http_req_duration.values["p(99)"] // 0' smoke-results.json)
+            error_rate=$(jq -r '.metrics.http_req_failed.values.rate // 0' smoke-results.json)
+            total_reqs=$(jq -r '.metrics.http_reqs.values.count // 0' smoke-results.json)
+
+            echo "p50=$p50" >> $GITHUB_OUTPUT
+            echo "p95=$p95" >> $GITHUB_OUTPUT
+            echo "p99=$p99" >> $GITHUB_OUTPUT
+            echo "error_rate=$error_rate" >> $GITHUB_OUTPUT
+            echo "total_reqs=$total_reqs" >> $GITHUB_OUTPUT
+
+            # Check thresholds
+            if (( $(echo "$p95 < 200" | bc -l) )) && (( $(echo "$p99 < 500" | bc -l) )) && (( $(echo "$error_rate < 0.00001" | bc -l) )); then
+              echo "status=passed" >> $GITHUB_OUTPUT
+            else
+              echo "status=failed" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "p50=0" >> $GITHUB_OUTPUT
+            echo "p95=0" >> $GITHUB_OUTPUT
+            echo "p99=0" >> $GITHUB_OUTPUT
+            echo "error_rate=1" >> $GITHUB_OUTPUT
+            echo "total_reqs=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-results
+          path: |
+            testing/k6/smoke-results.json
+            testing/k6/smoke-output.txt
+          retention-days: 30
+
+      - name: Notify Slack
+        if: always() && secrets.SLACK_WEBHOOK_URL != ''
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "${{ steps.parse.outputs.status == 'passed' && '✅' || '❌' }} Load Test: Smoke - ${{ steps.parse.outputs.status == 'passed' && 'PASSED' || 'FAILED' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*Test Type:*\nSmoke (10 VUs, 1 min)" },
+                    { "type": "mrkdwn", "text": "*Total Requests:*\n${{ steps.parse.outputs.total_reqs }}" }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*p50:*\n${{ steps.parse.outputs.p50 }}ms" },
+                    { "type": "mrkdwn", "text": "*p95:*\n${{ steps.parse.outputs.p95 }}ms" }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*p99:*\n${{ steps.parse.outputs.p99 }}ms" },
+                    { "type": "mrkdwn", "text": "*Error Rate:*\n${{ steps.parse.outputs.error_rate }}" }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    { "type": "mrkdwn", "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>" }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Fail if thresholds breached
+        if: steps.parse.outputs.status == 'failed'
+        run: |
+          echo "Load test thresholds were breached!"
+          echo "p95: ${{ steps.parse.outputs.p95 }}ms (threshold: 200ms)"
+          echo "p99: ${{ steps.parse.outputs.p99 }}ms (threshold: 500ms)"
+          echo "Error rate: ${{ steps.parse.outputs.error_rate }} (threshold: 0.00001)"
+          exit 1
+
+  # Load test - normal expected load (weekly schedule)
+  load-test:
+    name: Load Test
+    needs: check-ci-status
+    if: |
+      needs.check-ci-status.outputs.should_run == 'true' &&
+      (github.event_name == 'schedule' ||
+       (github.event_name == 'workflow_dispatch' && github.event.inputs.test_type == 'load'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+        with:
+          k6-version: ${{ env.K6_VERSION }}
+
+      - name: Run load tests
+        id: load
+        env:
+          K6_BASE_URL: ${{ secrets.API_BASE_URL }}
+          K6_API_KEY: ${{ secrets.LOAD_TEST_API_KEY }}
+          K6_TEST_APP_ID: ${{ secrets.LOAD_TEST_APP_ID }}
+          K6_TEST_RELEASE_ID: ${{ secrets.LOAD_TEST_RELEASE_ID }}
+          K6_SCENARIO: load
+        run: |
+          cd testing/k6
+          k6 run combined.js --summary-export=load-results.json 2>&1 | tee load-output.txt
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Parse results
+        id: parse
+        if: always()
+        run: |
+          cd testing/k6
+          if [ -f load-results.json ]; then
+            p50=$(jq -r '.metrics.http_req_duration.values["p(50)"] // 0' load-results.json)
+            p95=$(jq -r '.metrics.http_req_duration.values["p(95)"] // 0' load-results.json)
+            p99=$(jq -r '.metrics.http_req_duration.values["p(99)"] // 0' load-results.json)
+            error_rate=$(jq -r '.metrics.http_req_failed.values.rate // 0' load-results.json)
+            total_reqs=$(jq -r '.metrics.http_reqs.values.count // 0' load-results.json)
+
+            echo "p50=$p50" >> $GITHUB_OUTPUT
+            echo "p95=$p95" >> $GITHUB_OUTPUT
+            echo "p99=$p99" >> $GITHUB_OUTPUT
+            echo "error_rate=$error_rate" >> $GITHUB_OUTPUT
+            echo "total_reqs=$total_reqs" >> $GITHUB_OUTPUT
+
+            if (( $(echo "$p95 < 200" | bc -l) )) && (( $(echo "$p99 < 500" | bc -l) )) && (( $(echo "$error_rate < 0.00001" | bc -l) )); then
+              echo "status=passed" >> $GITHUB_OUTPUT
+            else
+              echo "status=failed" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "p50=0" >> $GITHUB_OUTPUT
+            echo "p95=0" >> $GITHUB_OUTPUT
+            echo "p99=0" >> $GITHUB_OUTPUT
+            echo "error_rate=1" >> $GITHUB_OUTPUT
+            echo "total_reqs=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-results
+          path: |
+            testing/k6/load-results.json
+            testing/k6/load-output.txt
+          retention-days: 30
+
+      - name: Notify Slack
+        if: always() && secrets.SLACK_WEBHOOK_URL != ''
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "${{ steps.parse.outputs.status == 'passed' && '✅' || '❌' }} Load Test: Load - ${{ steps.parse.outputs.status == 'passed' && 'PASSED' || 'FAILED' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*Test Type:*\nLoad (100 VUs, 5 min ramp)" },
+                    { "type": "mrkdwn", "text": "*Total Requests:*\n${{ steps.parse.outputs.total_reqs }}" }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*p50:*\n${{ steps.parse.outputs.p50 }}ms" },
+                    { "type": "mrkdwn", "text": "*p95:*\n${{ steps.parse.outputs.p95 }}ms" }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*p99:*\n${{ steps.parse.outputs.p99 }}ms" },
+                    { "type": "mrkdwn", "text": "*Error Rate:*\n${{ steps.parse.outputs.error_rate }}" }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    { "type": "mrkdwn", "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>" }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Fail if thresholds breached
+        if: steps.parse.outputs.status == 'failed'
+        run: |
+          echo "Load test thresholds were breached!"
+          exit 1
+
+  # Stress test - push to limits (manual only)
+  stress-test:
+    name: Stress Test
+    needs: check-ci-status
+    if: |
+      needs.check-ci-status.outputs.should_run == 'true' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.test_type == 'stress'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+        with:
+          k6-version: ${{ env.K6_VERSION }}
+
+      - name: Run stress tests
+        id: stress
+        env:
+          K6_BASE_URL: ${{ secrets.API_BASE_URL }}
+          K6_API_KEY: ${{ secrets.LOAD_TEST_API_KEY }}
+          K6_TEST_APP_ID: ${{ secrets.LOAD_TEST_APP_ID }}
+          K6_TEST_RELEASE_ID: ${{ secrets.LOAD_TEST_RELEASE_ID }}
+          K6_SCENARIO: stress
+        run: |
+          cd testing/k6
+          k6 run combined.js --summary-export=stress-results.json 2>&1 | tee stress-output.txt
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Parse results
+        id: parse
+        if: always()
+        run: |
+          cd testing/k6
+          if [ -f stress-results.json ]; then
+            p50=$(jq -r '.metrics.http_req_duration.values["p(50)"] // 0' stress-results.json)
+            p95=$(jq -r '.metrics.http_req_duration.values["p(95)"] // 0' stress-results.json)
+            p99=$(jq -r '.metrics.http_req_duration.values["p(99)"] // 0' stress-results.json)
+            error_rate=$(jq -r '.metrics.http_req_failed.values.rate // 0' stress-results.json)
+            total_reqs=$(jq -r '.metrics.http_reqs.values.count // 0' stress-results.json)
+
+            echo "p50=$p50" >> $GITHUB_OUTPUT
+            echo "p95=$p95" >> $GITHUB_OUTPUT
+            echo "p99=$p99" >> $GITHUB_OUTPUT
+            echo "error_rate=$error_rate" >> $GITHUB_OUTPUT
+            echo "total_reqs=$total_reqs" >> $GITHUB_OUTPUT
+
+            if (( $(echo "$p95 < 200" | bc -l) )) && (( $(echo "$p99 < 500" | bc -l) )) && (( $(echo "$error_rate < 0.00001" | bc -l) )); then
+              echo "status=passed" >> $GITHUB_OUTPUT
+            else
+              echo "status=failed" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "p50=0" >> $GITHUB_OUTPUT
+            echo "p95=0" >> $GITHUB_OUTPUT
+            echo "p99=0" >> $GITHUB_OUTPUT
+            echo "error_rate=1" >> $GITHUB_OUTPUT
+            echo "total_reqs=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stress-test-results
+          path: |
+            testing/k6/stress-results.json
+            testing/k6/stress-output.txt
+          retention-days: 30
+
+      - name: Notify Slack
+        if: always() && secrets.SLACK_WEBHOOK_URL != ''
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "${{ steps.parse.outputs.status == 'passed' && '✅' || '❌' }} Load Test: Stress - ${{ steps.parse.outputs.status == 'passed' && 'PASSED' || 'FAILED' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*Test Type:*\nStress (500 VUs, 3 min)" },
+                    { "type": "mrkdwn", "text": "*Total Requests:*\n${{ steps.parse.outputs.total_reqs }}" }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*p50:*\n${{ steps.parse.outputs.p50 }}ms" },
+                    { "type": "mrkdwn", "text": "*p95:*\n${{ steps.parse.outputs.p95 }}ms" }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*p99:*\n${{ steps.parse.outputs.p99 }}ms" },
+                    { "type": "mrkdwn", "text": "*Error Rate:*\n${{ steps.parse.outputs.error_rate }}" }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    { "type": "mrkdwn", "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>" }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Fail if thresholds breached
+        if: steps.parse.outputs.status == 'failed'
+        run: |
+          echo "Stress test thresholds were breached!"
+          exit 1
+
+  # Soak test - extended duration (manual only)
+  soak-test:
+    name: Soak Test
+    needs: check-ci-status
+    if: |
+      needs.check-ci-status.outputs.should_run == 'true' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.test_type == 'soak'
+    runs-on: ubuntu-latest
+    timeout-minutes: 270  # 4.5 hours to allow for 4 hour test + setup
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+        with:
+          k6-version: ${{ env.K6_VERSION }}
+
+      - name: Run soak tests
+        id: soak
+        env:
+          K6_BASE_URL: ${{ secrets.API_BASE_URL }}
+          K6_API_KEY: ${{ secrets.LOAD_TEST_API_KEY }}
+          K6_TEST_APP_ID: ${{ secrets.LOAD_TEST_APP_ID }}
+          K6_TEST_RELEASE_ID: ${{ secrets.LOAD_TEST_RELEASE_ID }}
+          K6_SCENARIO: soak
+        run: |
+          cd testing/k6
+          k6 run combined.js --summary-export=soak-results.json 2>&1 | tee soak-output.txt
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Parse results
+        id: parse
+        if: always()
+        run: |
+          cd testing/k6
+          if [ -f soak-results.json ]; then
+            p50=$(jq -r '.metrics.http_req_duration.values["p(50)"] // 0' soak-results.json)
+            p95=$(jq -r '.metrics.http_req_duration.values["p(95)"] // 0' soak-results.json)
+            p99=$(jq -r '.metrics.http_req_duration.values["p(99)"] // 0' soak-results.json)
+            error_rate=$(jq -r '.metrics.http_req_failed.values.rate // 0' soak-results.json)
+            total_reqs=$(jq -r '.metrics.http_reqs.values.count // 0' soak-results.json)
+
+            echo "p50=$p50" >> $GITHUB_OUTPUT
+            echo "p95=$p95" >> $GITHUB_OUTPUT
+            echo "p99=$p99" >> $GITHUB_OUTPUT
+            echo "error_rate=$error_rate" >> $GITHUB_OUTPUT
+            echo "total_reqs=$total_reqs" >> $GITHUB_OUTPUT
+
+            if (( $(echo "$p95 < 200" | bc -l) )) && (( $(echo "$p99 < 500" | bc -l) )) && (( $(echo "$error_rate < 0.00001" | bc -l) )); then
+              echo "status=passed" >> $GITHUB_OUTPUT
+            else
+              echo "status=failed" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "p50=0" >> $GITHUB_OUTPUT
+            echo "p95=0" >> $GITHUB_OUTPUT
+            echo "p99=0" >> $GITHUB_OUTPUT
+            echo "error_rate=1" >> $GITHUB_OUTPUT
+            echo "total_reqs=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: soak-test-results
+          path: |
+            testing/k6/soak-results.json
+            testing/k6/soak-output.txt
+          retention-days: 30
+
+      - name: Notify Slack
+        if: always() && secrets.SLACK_WEBHOOK_URL != ''
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "${{ steps.parse.outputs.status == 'passed' && '✅' || '❌' }} Load Test: Soak - ${{ steps.parse.outputs.status == 'passed' && 'PASSED' || 'FAILED' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*Test Type:*\nSoak (50 VUs, 4 hours)" },
+                    { "type": "mrkdwn", "text": "*Total Requests:*\n${{ steps.parse.outputs.total_reqs }}" }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*p50:*\n${{ steps.parse.outputs.p50 }}ms" },
+                    { "type": "mrkdwn", "text": "*p95:*\n${{ steps.parse.outputs.p95 }}ms" }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*p99:*\n${{ steps.parse.outputs.p99 }}ms" },
+                    { "type": "mrkdwn", "text": "*Error Rate:*\n${{ steps.parse.outputs.error_rate }}" }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    { "type": "mrkdwn", "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>" }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Fail if thresholds breached
+        if: steps.parse.outputs.status == 'failed'
+        run: |
+          echo "Soak test thresholds were breached!"
+          exit 1
+
+  # Single endpoint tests (manual, when specific endpoint is selected)
+  single-endpoint-test:
+    name: Single Endpoint Test
+    needs: check-ci-status
+    if: |
+      needs.check-ci-status.outputs.should_run == 'true' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.endpoint != 'all' &&
+      github.event.inputs.test_type != 'combined'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+        with:
+          k6-version: ${{ env.K6_VERSION }}
+
+      - name: Determine test script
+        id: script
+        run: |
+          case "${{ github.event.inputs.endpoint }}" in
+            updates-check)
+              echo "script=updates-check.js" >> $GITHUB_OUTPUT
+              ;;
+            bundle-download)
+              echo "script=bundle-download.js" >> $GITHUB_OUTPUT
+              ;;
+            device-register)
+              echo "script=device-register.js" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Run endpoint test
+        id: test
+        env:
+          K6_BASE_URL: ${{ secrets.API_BASE_URL }}
+          K6_API_KEY: ${{ secrets.LOAD_TEST_API_KEY }}
+          K6_TEST_APP_ID: ${{ secrets.LOAD_TEST_APP_ID }}
+          K6_TEST_RELEASE_ID: ${{ secrets.LOAD_TEST_RELEASE_ID }}
+          K6_SCENARIO: ${{ github.event.inputs.test_type }}
+        run: |
+          cd testing/k6
+          k6 run ${{ steps.script.outputs.script }} --summary-export=endpoint-results.json 2>&1 | tee endpoint-output.txt
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Parse results
+        id: parse
+        if: always()
+        run: |
+          cd testing/k6
+          if [ -f endpoint-results.json ]; then
+            p50=$(jq -r '.metrics.http_req_duration.values["p(50)"] // 0' endpoint-results.json)
+            p95=$(jq -r '.metrics.http_req_duration.values["p(95)"] // 0' endpoint-results.json)
+            p99=$(jq -r '.metrics.http_req_duration.values["p(99)"] // 0' endpoint-results.json)
+            error_rate=$(jq -r '.metrics.http_req_failed.values.rate // 0' endpoint-results.json)
+            total_reqs=$(jq -r '.metrics.http_reqs.values.count // 0' endpoint-results.json)
+
+            echo "p50=$p50" >> $GITHUB_OUTPUT
+            echo "p95=$p95" >> $GITHUB_OUTPUT
+            echo "p99=$p99" >> $GITHUB_OUTPUT
+            echo "error_rate=$error_rate" >> $GITHUB_OUTPUT
+            echo "total_reqs=$total_reqs" >> $GITHUB_OUTPUT
+
+            if (( $(echo "$p95 < 200" | bc -l) )) && (( $(echo "$p99 < 500" | bc -l) )) && (( $(echo "$error_rate < 0.00001" | bc -l) )); then
+              echo "status=passed" >> $GITHUB_OUTPUT
+            else
+              echo "status=failed" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "p50=0" >> $GITHUB_OUTPUT
+            echo "p95=0" >> $GITHUB_OUTPUT
+            echo "p99=0" >> $GITHUB_OUTPUT
+            echo "error_rate=1" >> $GITHUB_OUTPUT
+            echo "total_reqs=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.inputs.endpoint }}-${{ github.event.inputs.test_type }}-results
+          path: |
+            testing/k6/endpoint-results.json
+            testing/k6/endpoint-output.txt
+          retention-days: 30
+
+      - name: Notify Slack
+        if: always() && secrets.SLACK_WEBHOOK_URL != ''
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "${{ steps.parse.outputs.status == 'passed' && '✅' || '❌' }} Load Test: ${{ github.event.inputs.endpoint }} (${{ github.event.inputs.test_type }}) - ${{ steps.parse.outputs.status == 'passed' && 'PASSED' || 'FAILED' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*Endpoint:*\n${{ github.event.inputs.endpoint }}" },
+                    { "type": "mrkdwn", "text": "*Total Requests:*\n${{ steps.parse.outputs.total_reqs }}" }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*p50:*\n${{ steps.parse.outputs.p50 }}ms" },
+                    { "type": "mrkdwn", "text": "*p95:*\n${{ steps.parse.outputs.p95 }}ms" }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*p99:*\n${{ steps.parse.outputs.p99 }}ms" },
+                    { "type": "mrkdwn", "text": "*Error Rate:*\n${{ steps.parse.outputs.error_rate }}" }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    { "type": "mrkdwn", "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>" }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Fail if thresholds breached
+        if: steps.parse.outputs.status == 'failed'
+        run: |
+          echo "Load test thresholds were breached!"
+          exit 1
