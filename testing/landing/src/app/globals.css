@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-cream-bg font-body text-text-dark antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  @apply font-heading text-text-dark;
+}
+
+.container-main {
+  @apply max-w-6xl mx-auto px-4 sm:px-6 lg:px-8;
+}
