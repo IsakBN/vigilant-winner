@@ -1,0 +1,151 @@
+name: E2E Tests
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      dashboard_url:
+        description: 'Dashboard URL to test against'
+        required: false
+        type: string
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9.15.0'
+
+jobs:
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        working-directory: testing/e2e
+        run: pnpm install
+
+      - name: Install Playwright browsers
+        working-directory: testing/e2e
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Run E2E tests
+        working-directory: testing/e2e
+        env:
+          DASHBOARD_URL: ${{ inputs.dashboard_url || secrets.DASHBOARD_URL || 'http://localhost:3001' }}
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+        run: pnpm test
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            testing/e2e/playwright-report/
+            testing/e2e/test-results/
+          retention-days: 7
+
+      - name: Parse test results
+        if: always()
+        id: results
+        working-directory: testing/e2e
+        run: |
+          if [ -f "test-results.json" ]; then
+            TOTAL=$(jq '.stats.total // 0' test-results.json)
+            PASSED=$(jq '.stats.passed // 0' test-results.json)
+            FAILED=$(jq '.stats.failed // 0' test-results.json)
+            DURATION=$(jq '.stats.duration // 0' test-results.json)
+            DURATION_SEC=$((DURATION / 1000))
+          else
+            TOTAL="unknown"
+            PASSED="unknown"
+            FAILED="unknown"
+            DURATION_SEC="unknown"
+          fi
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          echo "duration=$DURATION_SEC" >> $GITHUB_OUTPUT
+
+      - name: Send Slack notification
+        if: always() && vars.SLACK_WEBHOOK_URL
+        uses: slackapi/slack-github-action@v1.26.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ vars.SLACK_WEBHOOK_URL }}
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "${{ job.status == 'success' && 'E2E Tests Passed' || 'E2E Tests Failed' }}",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Total:*\n${{ steps.results.outputs.total }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Passed:*\n${{ steps.results.outputs.passed }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Failed:*\n${{ steps.results.outputs.failed }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Duration:*\n${{ steps.results.outputs.duration }}s"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Branch:* `${{ github.ref_name }}`\n*Commit:* `${{ github.sha }}`"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Run"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
