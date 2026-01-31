@@ -188,7 +188,7 @@ jobs:
 
           echo "::group::Verifying D1 backup"
 
-          # Download and verify checksum
+          # Download backup and checksum file
           aws s3 cp \
             s3://${{ secrets.RAILWAY_S3_BUCKET }}/d1/hourly/${{ steps.timestamp.outputs.date }}/d1_backup_${{ steps.timestamp.outputs.timestamp }}.sql.gz \
             /tmp/verify_d1.sql.gz \
@@ -196,12 +196,20 @@ jobs:
 
           aws s3 cp \
             s3://${{ secrets.RAILWAY_S3_BUCKET }}/d1/hourly/${{ steps.timestamp.outputs.date }}/d1_backup_${{ steps.timestamp.outputs.timestamp }}.sql.gz.sha256 \
-            /tmp/verify_d1.sql.gz.sha256 \
+            /tmp/original_checksum.txt \
             --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
 
-          cd /tmp && sha256sum -c verify_d1.sql.gz.sha256
+          # Extract expected hash and compare with actual
+          EXPECTED_HASH=$(awk '{print $1}' /tmp/original_checksum.txt)
+          ACTUAL_HASH=$(sha256sum /tmp/verify_d1.sql.gz | awk '{print $1}')
 
-          echo "D1 backup verification passed"
+          if [ "$EXPECTED_HASH" = "$ACTUAL_HASH" ]; then
+            echo "D1 backup verification passed"
+          else
+            echo "Checksum mismatch! Expected: $EXPECTED_HASH, Got: $ACTUAL_HASH"
+            exit 1
+          fi
+
           echo "::endgroup::"
 
     outputs:
@@ -227,13 +235,22 @@ jobs:
 
       - name: Install PostgreSQL 17 client
         run: |
-          sudo apt-get install -y curl ca-certificates
+          # Add PostgreSQL APT repository
+          sudo apt-get install -y curl ca-certificates gnupg
           sudo install -d /usr/share/postgresql-common/pgdg
           sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
           sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
           sudo apt-get update
+
+          # Remove old postgresql-client if present, install v17
+          sudo apt-get remove -y postgresql-client postgresql-client-16 postgresql-client-common || true
           sudo apt-get install -y postgresql-client-17
-          pg_dump --version
+
+          # Verify correct version
+          /usr/lib/postgresql/17/bin/pg_dump --version
+
+          # Add to PATH for this job
+          echo "/usr/lib/postgresql/17/bin" >> $GITHUB_PATH
 
       - name: Install AWS CLI
         run: pip install awscli --quiet
@@ -355,10 +372,17 @@ jobs:
 
           aws s3 cp \
             s3://${{ secrets.RAILWAY_S3_BUCKET }}/postgres-auth/hourly/${{ steps.timestamp.outputs.date }}/auth_backup_${{ steps.timestamp.outputs.timestamp }}.dump.sha256 \
-            /tmp/verify_auth.dump.sha256 \
+            /tmp/auth_checksum.txt \
             --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
 
-          cd /tmp && sha256sum -c verify_auth.dump.sha256
+          # Verify checksum
+          EXPECTED_HASH=$(awk '{print $1}' /tmp/auth_checksum.txt)
+          ACTUAL_HASH=$(sha256sum /tmp/verify_auth.dump | awk '{print $1}')
+          if [ "$EXPECTED_HASH" != "$ACTUAL_HASH" ]; then
+            echo "Auth checksum mismatch!"; exit 1
+          fi
+
+          # Verify dump is valid
           pg_restore --list /tmp/verify_auth.dump > /dev/null
 
           echo "Auth backup verification passed"
@@ -381,10 +405,17 @@ jobs:
 
           aws s3 cp \
             s3://${{ secrets.RAILWAY_S3_BUCKET }}/postgres-telemetry/hourly/${{ steps.timestamp.outputs.date }}/telemetry_backup_${{ steps.timestamp.outputs.timestamp }}.dump.sha256 \
-            /tmp/verify_telemetry.dump.sha256 \
+            /tmp/telemetry_checksum.txt \
             --endpoint-url ${{ secrets.RAILWAY_S3_ENDPOINT }}
 
-          cd /tmp && sha256sum -c verify_telemetry.dump.sha256
+          # Verify checksum
+          EXPECTED_HASH=$(awk '{print $1}' /tmp/telemetry_checksum.txt)
+          ACTUAL_HASH=$(sha256sum /tmp/verify_telemetry.dump | awk '{print $1}')
+          if [ "$EXPECTED_HASH" != "$ACTUAL_HASH" ]; then
+            echo "Telemetry checksum mismatch!"; exit 1
+          fi
+
+          # Verify dump is valid
           pg_restore --list /tmp/verify_telemetry.dump > /dev/null
 
           echo "Telemetry backup verification passed"
